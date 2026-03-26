@@ -1,113 +1,69 @@
-# ─── OS ───────────────────────────────────────────────────────────────────────
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-Thumbs.db
-ehthumbs.db
-desktop.ini
+# ─── Env ─────────────────────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
 
 # ─── Node ─────────────────────────────────────────────────────────────────────
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnp/
-.pnp.js
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions
-
-# ─── Environment ──────────────────────────────────────────────────────────────
-.env
-.env.local
-.env.development
-.env.staging
-.env.production
-!.env.example
-
-# ─── TypeScript ───────────────────────────────────────────────────────────────
-*.tsbuildinfo
-dist/
-build/
-
-# ─── Testing ──────────────────────────────────────────────────────────────────
-coverage/
-.jest-cache/
 
 # ─── React Native ─────────────────────────────────────────────────────────────
-*.jsbundle
-*.jsbundle.map
+.expo/
+dist/
+web-build/
+.bundle/
 
-# Metro bundler
-.metro-health-check*
-metro-cache/
-
-# ─── iOS ──────────────────────────────────────────────────────────────────────
+# iOS
 ios/Pods/
 ios/build/
-ios/*.xcworkspace/xcuserdata/
-ios/*.xcodeproj/xcuserdata/
-ios/*.xcodeproj/project.xcworkspace/xcuserdata/
-ios/*.xcodeproj/*.pbxuser
-!ios/*.xcodeproj/default.pbxuser
-ios/*.xcodeproj/*.mode1v3
-!ios/*.xcodeproj/default.mode1v3
-ios/*.xcodeproj/*.mode2v3
-!ios/*.xcodeproj/default.mode2v3
-ios/*.xcodeproj/*.perspectivev3
-!ios/*.xcodeproj/default.perspectivev3
-ios/DerivedData/
-ios/*.ipa
-ios/*.xcuserstate
-ios/**/.xcode.env.local
-/vendor/bundle/
-Gemfile.lock
-
-# ─── Android ──────────────────────────────────────────────────────────────────
-android/.gradle/
-android/build/
-android/app/build/
-android/.idea/
-android/local.properties
-android/*.iml
-android/.cxx/
-android/*.keystore
-!android/app/debug.keystore
-android/.kotlin/
-android/**/google-services.json
-android/**/*.hprof
-
-# ─── Fastlane ─────────────────────────────────────────────────────────────────
-**/fastlane/report.xml
-**/fastlane/Preview.html
-**/fastlane/screenshots/**
-**/fastlane/test_output/
-
-# ─── Xcode / CocoaPods ────────────────────────────────────────────────────────
+*.xcworkspace
+!default.xcworkspace
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
 *.xccheckout
 *.moved-aside
 *.hmap
-xcuserdata/
+*.ipa
+*.xcuserstate
+project.xcworkspace
 
-# ─── Editor ───────────────────────────────────────────────────────────────────
+# Android
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties
+android/captures/
+android/.externalNativeBuild/
+android/.cxx/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# ─── Tests ────────────────────────────────────────────────────────────────────
+coverage/
+__snapshots__/
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
 .idea/
-.vscode/settings.json
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+.DS_Store
+Thumbs.db
 
-# ─── Logs & debug ─────────────────────────────────────────────────────────────
-logs/
-*.log
-
-# ─── Generated / secrets ──────────────────────────────────────────────────────
-src/generated/
-google-services.json
-GoogleService-Info.plist
+# ─── Build ────────────────────────────────────────────────────────────────────
+*.tsbuildinfo

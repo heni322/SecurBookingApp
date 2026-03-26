@@ -1,26 +1,15 @@
 import {
   UserRole, UserStatus, MissionStatus, BookingStatus,
-  ApplicationStatus, DocumentStatus, DocumentType,
-  PaymentStatus, PayoutStatus, PricingValueType, ClientType,
+  DocumentStatus, PaymentStatus, ClientType,
 } from '@constants/enums';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GENERIC API WRAPPERS
 // ─────────────────────────────────────────────────────────────────────────────
 export interface ApiResponse<T> {
-  data: T;
+  data:    T;
   message: string;
   success: boolean;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  meta: {
-    total:    number;
-    page:     number;
-    perPage:  number;
-    lastPage: number;
-  };
 }
 
 export interface ApiError {
@@ -45,11 +34,11 @@ export interface LoginPayload {
 }
 
 export interface RegisterPayload {
-  email:      string;
-  password:   string;
-  fullName:   string;
-  phone?:     string;
-  role?:      UserRole;
+  email:       string;
+  password:    string;
+  fullName:    string;
+  phone?:      string;
+  role?:       UserRole;
   clientType?: ClientType;
 }
 
@@ -59,23 +48,23 @@ export interface TwoFaSetupResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// USERS
+// USER
 // ─────────────────────────────────────────────────────────────────────────────
 export interface User {
-  id:        string;
-  email:     string;
-  fullName:  string;
-  phone?:    string;
+  id:         string;
+  email:      string;
+  fullName:   string;
+  phone?:     string;
   avatarUrl?: string;
-  role:      UserRole;
-  status:    UserStatus;
-  createdAt: string;
-  updatedAt: string;
+  role:       UserRole;
+  status:     UserStatus;
+  createdAt:  string;
+  updatedAt:  string;
 }
 
 export interface UpdateUserPayload {
-  fullName?: string;
-  phone?:    string;
+  fullName?:  string;
+  phone?:     string;
   avatarUrl?: string;
 }
 
@@ -86,90 +75,13 @@ export interface ServiceType {
   id:          string;
   name:        string;
   description: string;
-  baseRate:    number;   // €/h HT
+  baseRate:    number;
   isActive:    boolean;
   createdAt:   string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AGENT PROFILE
-// ─────────────────────────────────────────────────────────────────────────────
-export interface AgentProfile {
-  id:             string;
-  userId:         string;
-  user:           User;
-  bio?:           string;
-  latitude?:      number;
-  longitude?:     number;
-  radiusKm:       number;
-  isValidated:    boolean;
-  avgRating:      number;
-  completedCount: number;
-  serviceTypes:   ServiceType[];
-  createdAt:      string;
-}
-
-export interface AgentSearchParams {
-  latitude?:      number;
-  longitude?:     number;
-  radiusKm?:      number;
-  serviceTypeId?: string;
-  minRating?:     number;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AGENT DOCUMENTS
-// ─────────────────────────────────────────────────────────────────────────────
-export interface AgentDocument {
-  id:         string;
-  agentId:    string;
-  type:       DocumentType;
-  fileUrl:    string;
-  status:     DocumentStatus;
-  expiresAt?: string;
-  reviewedAt?: string;
-  rejectedReason?: string;
-  createdAt:  string;
-}
-
-export interface CreateAgentDocumentPayload {
-  type:       DocumentType;
-  fileUrl:    string;
-  expiresAt?: string;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// AGENT AVAILABILITIES
-// ─────────────────────────────────────────────────────────────────────────────
-export interface AgentAvailability {
-  id:        string;
-  agentId:   string;
-  startAt:   string;   // ISO 8601
-  endAt:     string;
-  createdAt: string;
-}
-
-export interface CreateAvailabilityPayload {
-  startAt: string;
-  endAt:   string;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// PRICING RULES
-// ─────────────────────────────────────────────────────────────────────────────
-export interface PricingRule {
-  id:          string;
-  name:        string;
-  description?: string;
-  type:        string;   // e.g. 'NIGHT', 'WEEKEND', 'URGENCY'
-  valueType:   PricingValueType;
-  value:       number;
-  isActive:    boolean;
-  createdAt:   string;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// QUOTES
+// QUOTE
 // ─────────────────────────────────────────────────────────────────────────────
 export interface QuoteBreakdown {
   baseAmount:       number;
@@ -184,12 +96,12 @@ export interface QuoteBreakdown {
 }
 
 export interface Quote {
-  id:         string;
-  missionId:  string;
-  breakdown:  QuoteBreakdown;
-  status:     'PENDING' | 'ACCEPTED' | 'REJECTED';
-  expiresAt:  string;
-  createdAt:  string;
+  id:        string;
+  missionId: string;
+  breakdown: QuoteBreakdown;
+  status:    'PENDING' | 'ACCEPTED' | 'REJECTED';
+  expiresAt: string;
+  createdAt: string;
 }
 
 export interface CreateQuotePayload {
@@ -197,7 +109,7 @@ export interface CreateQuotePayload {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MISSIONS
+// MISSION
 // ─────────────────────────────────────────────────────────────────────────────
 export interface MissionLocation {
   address:   string;
@@ -209,7 +121,6 @@ export interface MissionLocation {
 export interface Mission {
   id:            string;
   clientId:      string;
-  client?:       User;
   serviceTypeId: string;
   serviceType?:  ServiceType;
   title:         string;
@@ -237,14 +148,18 @@ export interface CreateMissionPayload {
   radiusKm?:     number;
 }
 
-export interface UpdateMissionPayload extends Partial<CreateMissionPayload> {}
+export type UpdateMissionPayload = Partial<CreateMissionPayload>;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BOOKINGS
+// BOOKING
 // ─────────────────────────────────────────────────────────────────────────────
-export interface GpsCoords {
-  latitude:  number;
-  longitude: number;
+export interface AgentSummary {
+  id:             string;
+  fullName:       string;
+  avatarUrl?:     string;
+  avgRating:      number;
+  completedCount: number;
+  isValidated:    boolean;
 }
 
 export interface Booking {
@@ -252,7 +167,7 @@ export interface Booking {
   missionId:    string;
   mission?:     Mission;
   agentId?:     string;
-  agent?:       AgentProfile;
+  agent?:       AgentSummary;
   status:       BookingStatus;
   checkinAt?:   string;
   checkoutAt?:  string;
@@ -260,6 +175,16 @@ export interface Booking {
   incidents?:   Incident[];
   createdAt:    string;
   updatedAt:    string;
+}
+
+export interface SelectAgentPayload {
+  applicationId: string;
+}
+
+export interface IncidentReportPayload {
+  description: string;
+  latitude?:   number;
+  longitude?:  number;
 }
 
 export interface Incident {
@@ -272,21 +197,8 @@ export interface Incident {
   createdAt:   string;
 }
 
-export interface CheckinPayload  extends GpsCoords {}
-export interface CheckoutPayload extends GpsCoords {}
-
-export interface SelectAgentPayload {
-  applicationId: string;
-}
-
-export interface IncidentReportPayload {
-  description: string;
-  latitude?:   number;
-  longitude?:  number;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// PAYMENTS
+// PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Payment {
   id:            string;
@@ -309,7 +221,7 @@ export interface PaymentIntentResponse {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// NOTIFICATIONS
+// NOTIFICATION
 // ─────────────────────────────────────────────────────────────────────────────
 export interface AppNotification {
   id:        string;
@@ -323,22 +235,22 @@ export interface AppNotification {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONVERSATIONS
+// CONVERSATION
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Message {
-  id:         string;
-  senderId:   string;
-  sender?:    User;
-  content:    string;
-  createdAt:  string;
+  id:        string;
+  senderId:  string;
+  sender?:   User;
+  content:   string;
+  createdAt: string;
 }
 
 export interface Conversation {
-  id:           string;
-  missionId:    string;
-  messages:     Message[];
-  unreadCount:  number;
-  createdAt:    string;
+  id:          string;
+  missionId:   string;
+  messages:    Message[];
+  unreadCount: number;
+  createdAt:   string;
 }
 
 export interface SendMessagePayload {
@@ -346,7 +258,7 @@ export interface SendMessagePayload {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// RATINGS
+// RATING
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Rating {
   id:        string;
@@ -354,7 +266,7 @@ export interface Rating {
   author?:   User;
   targetId:  string;
   bookingId: string;
-  score:     number;   // 1–5
+  score:     number;
   comment?:  string;
   createdAt: string;
 }
@@ -367,50 +279,7 @@ export interface CreateRatingPayload {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ADMIN
-// ─────────────────────────────────────────────────────────────────────────────
-export interface DashboardStats {
-  totalUsers:          number;
-  activeAgents:        number;
-  missionsThisMonth:   number;
-  revenueThisMonth:    number;
-  pendingDocuments:    number;
-  openDisputes:        number;
-}
-
-export interface Dispute {
-  id:          string;
-  missionId:   string;
-  reporterId:  string;
-  description: string;
-  status:      'OPEN' | 'RESOLVED' | 'REJECTED';
-  resolution?: string;
-  createdAt:   string;
-}
-
-export interface Payout {
-  id:          string;
-  agentId:     string;
-  agent?:      User;
-  bookingId:   string;
-  amountCents: number;
-  currency:    string;
-  status:      PayoutStatus;
-  scheduledAt: string;
-  paidAt?:     string;
-}
-
-export interface CreditNote {
-  id:          string;
-  missionId:   string;
-  amountCents: number;
-  reason:      string;
-  status:      'PENDING' | 'APPLIED';
-  createdAt:   string;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// NAVIGATION PARAMS
+// NAVIGATION
 // ─────────────────────────────────────────────────────────────────────────────
 export type RootStackParamList = {
   Auth: undefined;
@@ -418,38 +287,27 @@ export type RootStackParamList = {
 };
 
 export type AuthStackParamList = {
-  Login:          undefined;
-  Register:       undefined;
-  ForgotPassword: undefined;
+  Login:    undefined;
+  Register: undefined;
 };
 
 export type MainTabParamList = {
   Home:          undefined;
   Missions:      undefined;
-  Bookings:      undefined;
   Notifications: undefined;
   Profile:       undefined;
 };
 
 export type MissionStackParamList = {
-  ServiceTypeList:  undefined;
-  MissionCreate:    { serviceTypeId: string };
-  MissionDetail:    { missionId: string };
-  QuoteDetail:      { missionId: string };
-  BookingDetail:    { bookingId: string };
-  SelectSlot:       { missionId: string };
-  PaymentScreen:    { missionId: string; clientSecret: string };
-  MissionSuccess:   { missionId: string };
-  Conversation:     { missionId: string };
-};
-
-export type AgentStackParamList = {
-  NearbyMissions:   undefined;
-  MissionDetail:    { missionId: string };
-  BookingDetail:    { bookingId: string };
-  Checkin:          { bookingId: string };
-  Checkout:         { bookingId: string };
-  AgentProfile:     undefined;
-  Documents:        undefined;
-  Availabilities:   undefined;
+  MissionList:    undefined;
+  MissionCreate:  { serviceTypeId: string };
+  ServicePicker:  undefined;
+  MissionDetail:  { missionId: string };
+  QuoteDetail:    { missionId: string };
+  BookingDetail:  { bookingId: string };
+  SelectAgent:    { bookingId: string };
+  PaymentScreen:  { missionId: string; clientSecret: string };
+  MissionSuccess: { missionId: string };
+  Conversation:   { missionId: string };
+  RateAgent:      { bookingId: string; agentId: string };
 };

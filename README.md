@@ -1,97 +1,165 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# 🛡 SecurBookingApp
 
-# Getting Started
+Application mobile React Native pour la plateforme **SecurBook** — sécurité privée on-demand côté **CLIENT**.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+---
 
-## Step 1: Start Metro
+## Stack technique
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+| Couche | Technologie |
+|---|---|
+| Framework | React Native 0.84 (New Architecture) |
+| Langage | TypeScript 5.8 strict |
+| Navigation | React Navigation 7 (Stack + Bottom Tabs) |
+| État global | Zustand 5 |
+| HTTP | Axios 1.x + intercepteur JWT auto-refresh |
+| Backend | NestJS (`securbook-api`) via REST |
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+---
 
-```sh
-# Using npm
-npm start
+## Prérequis
 
-# OR using Yarn
-yarn start
-```
+- Node.js ≥ 22.11.0
+- JDK 17 (Android)
+- Xcode 15+ (iOS)
+- Android Studio + émulateur API 33+
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## Installation
 
-### Android
+```bash
+# 1. Cloner le dépôt
+git clone <repo-url> SecurBookingApp
+cd SecurBookingApp
 
-```sh
-# Using npm
-npm run android
+# 2. Installer les dépendances
+npm install
 
-# OR using Yarn
-yarn android
-```
+# 3. Variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos valeurs
 
-### iOS
+# 4. iOS — installer les pods
+cd ios && bundle exec pod install && cd ..
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+# 5. Lancer le backend (dans un autre terminal)
+cd ../securbook-api && npm run start:dev
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+# 6. Démarrer l'app
+npm run android   # ou
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+---
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## Structure du projet
 
-## Step 3: Modify your app
+```
+src/
+├── api/               # Couche HTTP — client Axios + endpoints par module
+│   ├── client.ts      # Instance Axios + intercepteurs JWT
+│   └── endpoints/     # auth · users · missions · bookings · quotes
+│                      # payments · conversations · notifications
+│                      # ratings · serviceTypes · upload
+├── components/
+│   ├── ui/            # Atomes : Button, Input, Badge, Card, Avatar…
+│   └── domain/        # Molécules : MissionCard, BookingCard, AgentCard…
+├── constants/         # config.ts · enums.ts
+├── hooks/             # useApi · useAuth · useMissions · useBookings…
+├── models/            # index.ts — tous les types et interfaces
+├── navigation/        # RootNavigator · AuthNavigator · MainNavigator
+│                      # MissionStackNavigator
+├── screens/
+│   ├── auth/          # LoginScreen · RegisterScreen
+│   └── client/        # HomeScreen · MissionsScreen · ServicePickerScreen
+│                      # MissionCreateScreen · MissionDetailScreen
+│                      # QuoteDetailScreen · PaymentScreen
+│                      # BookingDetailScreen · ConversationScreen
+│                      # NotificationsScreen · ProfileScreen
+│                      # MissionSuccessScreen
+├── services/          # tokenStorage · navigationRef
+├── store/             # authStore · notificationsStore (Zustand)
+├── theme/             # colors · typography · spacing
+└── utils/             # formatters · statusHelpers · typeGuards
+```
 
-Now that you have successfully run the app, let's make changes!
+---
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+## Flux utilisateur principal
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+```
+Login / Register
+      ↓
+Home (Dashboard)
+      ↓
+ServicePicker → MissionCreate (3 étapes)
+      ↓
+QuoteDetail → Accepter devis
+      ↓
+PaymentScreen (Stripe)
+      ↓
+MissionSuccess
+      ↓
+MissionDetail → BookingDetail → Évaluer l'agent
+             ↘ Conversation (messagerie)
+```
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+---
 
-## Congratulations! :tada:
+## Authentification
 
-You've successfully run and modified your React Native App. :partying_face:
+- **JWT** : `accessToken` (15 min) + `refreshToken` (30 jours)
+- Refresh automatique via intercepteur Axios (file d'attente des requêtes en parallèle)
+- **2FA** TOTP optionnel (Google Authenticator / Authy)
 
-### Now what?
+> ⚠️ En production, remplacer `tokenStorage` (mémoire) par `react-native-keychain`.
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+---
 
-# Troubleshooting
+## Paiement Stripe
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+1. Le client accepte le devis → `POST /quotes/:id/accept`
+2. Création du PaymentIntent → `POST /payments/intent` → reçoit `clientSecret`
+3. Confirmation via `@stripe/stripe-react-native` → `confirmPayment(clientSecret)`
 
-# Learn More
+> Le `PaymentScreen` actuel est un placeholder. Installer `@stripe/stripe-react-native` pour la production.
 
-To learn more about React Native, take a look at the following resources:
+---
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## Commandes utiles
+
+```bash
+npm run start          # Metro bundler
+npm run android        # Build + lancer sur émulateur Android
+npm run ios            # Build + lancer sur simulateur iOS
+npm run lint           # ESLint
+npm run test           # Jest
+```
+
+---
+
+## Variables d'environnement clés
+
+| Variable | Description |
+|---|---|
+| `API_BASE_URL_ANDROID` | URL API pour émulateur Android |
+| `API_BASE_URL_IOS` | URL API pour simulateur iOS |
+| `STRIPE_PUBLISHABLE_KEY` | Clé publique Stripe (pk_test_...) |
+
+---
+
+## Dépendances à installer en production
+
+```bash
+# Paiement Stripe
+npm install @stripe/stripe-react-native
+
+# Stockage sécurisé des tokens
+npm install react-native-keychain
+
+# Notifications push
+npm install @notifee/react-native
+# ou
+npm install react-native-push-notification
+```
