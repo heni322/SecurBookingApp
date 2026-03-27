@@ -5,7 +5,9 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Card }      from '@components/ui/Card';
 import { Separator } from '@components/ui/Separator';
-import { Button }    from '@components/ui/Button';
+import { Button }    from 
+
+'@components/ui/Button';
 import { colors }      from '@theme/colors';
 import { spacing }     from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
