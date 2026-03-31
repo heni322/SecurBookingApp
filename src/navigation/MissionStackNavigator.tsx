@@ -13,6 +13,7 @@ import { BookingDetailScreen }  from '@screens/client/BookingDetailScreen';
 import { ConversationScreen }   from '@screens/client/ConversationScreen';
 import { MissionSuccessScreen } from '@screens/client/MissionSuccessScreen';
 import { MissionsScreen }       from '@screens/client/MissionsScreen';
+import { SelectAgentScreen }    from '@screens/client/SelectAgentScreen';
 import type { MissionStackParamList } from '@models/index';
 
 const Stack = createNativeStackNavigator<MissionStackParamList>();
@@ -28,5 +29,7 @@ export const MissionStackNavigator: React.FC = () => (
     <Stack.Screen name="BookingDetail"  component={BookingDetailScreen}  />
     <Stack.Screen name="Conversation"   component={ConversationScreen}   />
     <Stack.Screen name="MissionSuccess" component={MissionSuccessScreen} />
+    <Stack.Screen name="SelectAgent"    component={SelectAgentScreen}    />
+    <Stack.Screen name="RateAgent"      component={BookingDetailScreen}  />
   </Stack.Navigator>
 );

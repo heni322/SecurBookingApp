@@ -39,9 +39,9 @@ export const AgentCard: React.FC<Props> = ({
         <View style={styles.info}>
           <Text style={styles.name}>{agent.fullName}</Text>
           <View style={styles.ratingRow}>
-            <StarRating value={agent.avgRating} size={14} readonly />
+            <StarRating value={agent.avgRating ?? 0} size={14} readonly />
             <Text style={styles.ratingText}>
-              {agent.avgRating.toFixed(1)} ({agent.completedCount} missions)
+              {(agent.avgRating ?? 0).toFixed(1)} ({agent.completedCount ?? 0} missions)
             </Text>
           </View>
         </View>

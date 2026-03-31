@@ -1,5 +1,6 @@
 /**
- * MissionDetailScreen — vue complète d'une mission avec toutes ses sections.
+ * MissionDetailScreen — vue complète d'une mission.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback } from 'react';
 import {
@@ -7,29 +8,34 @@ import {
   RefreshControl, Alert, StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { missionsApi }     from '@api/endpoints/missions';
-import { useApi }          from '@hooks/useApi';
-import { BookingCard }     from '@components/domain/BookingCard';
-import { Badge }           from '@components/ui/Badge';
-import { Button }          from '@components/ui/Button';
-import { Card }            from '@components/ui/Card';
-import { LoadingState }    from '@components/ui/LoadingState';
-import { ScreenHeader }    from '@components/ui/ScreenHeader';
-import { Separator }       from '@components/ui/Separator';
-import { colors }          from '@theme/colors';
+import {
+  Calendar, Clock, MapPin, Radio, Banknote,
+  CalendarDays, MessageSquare, Users, ChevronRight,
+  AlertTriangle, FileText,
+} from 'lucide-react-native';
+import { missionsApi } from '@api/endpoints/missions';
+import { useApi }      from '@hooks/useApi';
+import { BookingCard } from '@components/domain/BookingCard';
+import { Badge }       from '@components/ui/Badge';
+import { Button }      from '@components/ui/Button';
+import { Card }        from '@components/ui/Card';
+import { LoadingState } from '@components/ui/LoadingState';
+import { ScreenHeader } from '@components/ui/ScreenHeader';
+import { Separator }    from '@components/ui/Separator';
+import { colors }       from '@theme/colors';
 import { spacing, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { formatMissionRange, formatCurrency, formatDate } from '@utils/formatters';
-import { MISSION_STATUS_LABEL, MISSION_STATUS_COLOR }    from '@utils/statusHelpers';
-import { isCancellableMission }  from '@utils/typeGuards';
-import { MissionStatus }         from '@constants/enums';
+import { MISSION_STATUS_LABEL, MISSION_STATUS_COLOR } from '@utils/statusHelpers';
+import { isCancellableMission } from '@utils/typeGuards';
+import { MissionStatus }        from '@constants/enums';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionDetail'>;
 
 export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { missionId }                               = route.params;
-  const { data: mission, loading, execute, error }  = useApi(missionsApi.getById);
+  const { missionId }                              = route.params;
+  const { data: mission, loading, execute, error } = useApi(missionsApi.getById);
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
@@ -59,7 +65,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   if (loading && !mission) return <LoadingState message="Chargement…" />;
-  if (error || !mission)   return (
+  if (error || !mission) return (
     <View style={styles.screen}>
       <ScreenHeader title="Mission" onBack={() => navigation.goBack()} />
       <View style={styles.errorWrap}>
@@ -75,19 +81,26 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const hasQuote    = Boolean(mission.quote);
   const bookings    = mission.bookings ?? [];
 
+  const openBookings    = bookings.filter((b) => b.status === 'OPEN');
+  const hasApplications = openBookings.some((b) => (b.applications?.length ?? 0) > 0);
+
   const cta = (() => {
     if (mission.status === MissionStatus.DRAFT && !hasQuote)
       return { label: 'Obtenir un devis', onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
     if (mission.status === MissionStatus.DRAFT && hasQuote)
       return { label: 'Voir le devis',    onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
-    if (mission.status === MissionStatus.CONFIRMED && mission.quote?.status === 'ACCEPTED')
-      return { label: 'Payer la mission', onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
+    if (mission.status === MissionStatus.CONFIRMED)
+      return { label: 'Voir le devis & payer', onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
+    if (mission.status === MissionStatus.PUBLISHED && hasApplications)
+      return { label: 'Sélectionner les agents', onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
     if (mission.status === MissionStatus.PUBLISHED)
-      return { label: 'Suivre les candidatures', onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
+      return { label: 'En attente de candidatures…', onPress: () => {} };
     if (mission.status === MissionStatus.COMPLETED)
       return { label: 'Messagerie', onPress: () => navigation.navigate('Conversation', { missionId }) };
     return null;
   })();
+
+  const displayTitle = mission.title?.trim() || `Mission à ${mission.city}`;
 
   return (
     <View style={styles.screen}>
@@ -101,7 +114,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.chatBtn}
               onPress={() => navigation.navigate('Conversation', { missionId })}
             >
-              <Text style={styles.chatIcon}>💬</Text>
+              <MessageSquare size={22} color={colors.primary} strokeWidth={1.8} />
             </TouchableOpacity>
           ) : undefined
         }
@@ -118,48 +131,57 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Hero */}
         <View style={styles.hero}>
           <Badge label={statusLabel} color={statusColor} bg={statusColor + '20'} />
-          <Text style={styles.title}>{mission.title}</Text>
-          {mission.serviceType && (
-            <Text style={styles.serviceType}>{mission.serviceType.name}</Text>
+          <Text style={styles.title}>{displayTitle}</Text>
+          {mission.isUrgent && (
+            <View style={styles.urgencyBadge}>
+              <AlertTriangle size={12} color={colors.warning} strokeWidth={2} />
+              <Text style={styles.urgencyText}>Mission urgente — majoration appliquée</Text>
+            </View>
           )}
         </View>
 
-        {/* Info grid */}
+        {/* Infos générales */}
         <Card style={styles.infoCard}>
-          <InfoRow icon="🗓" label="Période"  value={formatMissionRange(mission.startAt, mission.endAt)} />
+          <InfoRow Icon={Calendar}    label="Période"   value={formatMissionRange(mission.startAt, mission.endAt)} />
           <Separator marginV={spacing[3]} />
-          <InfoRow icon="📍" label="Lieu"     value={`${mission.location.address}, ${mission.location.city}`} />
+          <InfoRow Icon={Clock}       label="Durée"     value={`${mission.durationHours}h`} />
           <Separator marginV={spacing[3]} />
-          <InfoRow icon="👥" label="Agents"   value={`${mission.agentCount} agent${mission.agentCount > 1 ? 's' : ''}`} />
+          <InfoRow Icon={MapPin}      label="Adresse"   value={`${mission.address}, ${mission.city}${mission.zipCode ? ' ' + mission.zipCode : ''}`} />
           <Separator marginV={spacing[3]} />
-          <InfoRow icon="📡" label="Rayon"    value={`${mission.radiusKm} km`} />
+          <InfoRow Icon={Radio}       label="Rayon"     value={`${mission.radiusKm} km`} />
           {mission.quote && (
             <>
               <Separator marginV={spacing[3]} />
               <InfoRow
-                icon="💶"
+                Icon={Banknote}
                 label="Total TTC"
-                value={formatCurrency(mission.quote.breakdown.totalTTC * 100)}
+                value={formatCurrency(mission.quote.totalWithVat * 100)}
                 valueStyle={{ color: colors.primary }}
               />
             </>
           )}
           <Separator marginV={spacing[3]} />
-          <InfoRow icon="📅" label="Créée le" value={formatDate(mission.createdAt)} />
+          <InfoRow Icon={CalendarDays} label="Créée le" value={formatDate(mission.createdAt)} />
         </Card>
 
-        {/* Description */}
-        {mission.description && (
-          <Card style={styles.descCard}>
-            <Text style={styles.sectionLabel}>Description</Text>
-            <Text style={styles.description}>{mission.description}</Text>
+        {/* Notes */}
+        {mission.notes ? (
+          <Card style={styles.notesCard}>
+            <View style={styles.notesHeader}>
+              <FileText size={14} color={colors.textMuted} strokeWidth={1.8} />
+              <Text style={styles.sectionLabel}>Notes & consignes</Text>
+            </View>
+            <Text style={styles.notesText}>{mission.notes}</Text>
           </Card>
-        )}
+        ) : null}
 
         {/* Bookings */}
         {bookings.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Postes ({bookings.length})</Text>
+            <View style={styles.sectionHeader}>
+              <Users size={16} color={colors.textSecondary} strokeWidth={1.8} />
+              <Text style={styles.sectionTitle}>Postes ({bookings.length})</Text>
+            </View>
             {bookings.map((b) => (
               <BookingCard
                 key={b.id}
@@ -172,14 +194,23 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         )}
 
         {cta && (
-          <Button label={cta.label} onPress={cta.onPress} fullWidth size="lg" style={styles.ctaBtn} />
+          <Button
+            label={cta.label}
+            onPress={cta.onPress}
+            fullWidth
+            size="lg"
+            style={styles.ctaBtn}
+            disabled={mission.status === MissionStatus.PUBLISHED && !hasApplications}
+          />
         )}
 
         {canCancel && (
           <Button
             label="Annuler la mission"
             onPress={handleCancel}
-            fullWidth variant="danger" size="sm"
+            fullWidth
+            variant="danger"
+            size="sm"
             style={styles.cancelBtn}
           />
         )}
@@ -188,12 +219,16 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
+// ── InfoRow ───────────────────────────────────────────────────────────────────
 const InfoRow: React.FC<{
-  icon: string; label: string; value: string; valueStyle?: object;
-}> = ({ icon, label, value, valueStyle }) => (
+  Icon: React.FC<{ size: number; color: string; strokeWidth: number }>;
+  label: string;
+  value: string;
+  valueStyle?: object;
+}> = ({ Icon, label, value, valueStyle }) => (
   <View style={infoStyles.row}>
     <View style={infoStyles.left}>
-      <Text style={infoStyles.icon}>{icon}</Text>
+      <Icon size={15} color={colors.textMuted} strokeWidth={1.8} />
       <Text style={infoStyles.label}>{label}</Text>
     </View>
     <Text style={[infoStyles.value, valueStyle]} numberOfLines={2}>{value}</Text>
@@ -203,28 +238,50 @@ const InfoRow: React.FC<{
 const infoStyles = StyleSheet.create({
   row:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing[4] },
   left:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  icon:  { fontSize: 16 },
   label: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary },
   value: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textPrimary, flex: 1, textAlign: 'right' },
 });
 
 const styles = StyleSheet.create({
-  screen:      { flex: 1, backgroundColor: colors.background },
-  flex:        { flex: 1 },
-  content:     { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[12] },
-  errorWrap:   { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
-  errorText:   { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary },
-  chatBtn:     { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  chatIcon:    { fontSize: 22 },
-  hero:        { paddingTop: spacing[5], paddingBottom: spacing[4], gap: spacing[2] },
-  title:       { fontFamily: fontFamily.display, fontSize: fontSize['2xl'], color: colors.textPrimary, letterSpacing: -0.6, marginTop: spacing[2] },
-  serviceType: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  screen:    { flex: 1, backgroundColor: colors.background },
+  flex:      { flex: 1 },
+  content:   { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[12] },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[4] },
+  errorText: { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary },
+  chatBtn:   { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+
+  hero:       { paddingTop: spacing[5], paddingBottom: spacing[4], gap: spacing[2] },
+  title: {
+    fontFamily:    fontFamily.display,
+    fontSize:      fontSize['2xl'],
+    color:         colors.textPrimary,
+    letterSpacing: -0.6,
+    marginTop:     spacing[2],
+  },
+  urgencyBadge: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             spacing[1] + 2,
+    backgroundColor: colors.warningSurface,
+    borderRadius:    8,
+    paddingHorizontal: spacing[3],
+    paddingVertical:   spacing[1] + 2,
+    borderWidth:     1,
+    borderColor:     colors.warning,
+    alignSelf:       'flex-start',
+  },
+  urgencyText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.warning },
+
   infoCard:    { marginBottom: spacing[4] },
-  descCard:    { marginBottom: spacing[4], gap: spacing[2] },
+  notesCard:   { marginBottom: spacing[4], gap: spacing[2] },
+  notesHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   sectionLabel:{ fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
-  description: { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary, lineHeight: fontSize.base * 1.6 },
-  section:     { marginBottom: spacing[4] },
-  sectionTitle:{ fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.3, marginBottom: spacing[3] },
-  ctaBtn:      { marginBottom: spacing[3] },
-  cancelBtn:   { opacity: 0.8 },
+  notesText:   { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary, lineHeight: fontSize.base * 1.6 },
+
+  section:      { marginBottom: spacing[4] },
+  sectionHeader:{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginBottom: spacing[3] },
+  sectionTitle: { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.3 },
+
+  ctaBtn:    { marginBottom: spacing[3] },
+  cancelBtn: { opacity: 0.8 },
 });

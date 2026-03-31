@@ -72,79 +72,87 @@ export interface UpdateUserPayload {
 // SERVICE TYPES
 // ─────────────────────────────────────────────────────────────────────────────
 export interface ServiceType {
-  id:          string;
-  name:        string;
-  description: string;
-  baseRate:    number;
-  isActive:    boolean;
-  createdAt:   string;
+  id:              string;
+  name:            string;
+  description?:    string;
+  category:        string;
+  baseRatePerHour: number;   // €/h — convention collective
+  isActive:        boolean;
+  createdAt:       string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // QUOTE
 // ─────────────────────────────────────────────────────────────────────────────
-export interface QuoteBreakdown {
-  baseAmount:       number;
+/** Quote retournée par le backend (champs à plat dans la table Prisma) */
+export interface Quote {
+  id:               string;
+  missionId:        string;
+  status:           'PENDING' | 'ACCEPTED' | 'REJECTED';
+  expiresAt:        string;
+  createdAt:        string;
+  // Champs financiers à plat
+  totalClientPrice: number;   // HT
+  totalWithVat:     number;   // TTC — ce que paie le client
+  totalAgentSalary: number;   // virement agent J+15
+  platformMargin:   number;   // commission SecurBook
+  fixedCharges:     number;   // charges patronales
+  vatAmount:        number;   // TVA 20%
   nightSurcharge:   number;
   weekendSurcharge: number;
   urgencySurcharge: number;
-  subtotalHT:       number;
-  commission:       number;
-  vatAmount:        number;
-  totalTTC:         number;
-  agentSalary:      number;
 }
 
-export interface Quote {
-  id:        string;
-  missionId: string;
-  breakdown: QuoteBreakdown;
-  status:    'PENDING' | 'ACCEPTED' | 'REJECTED';
-  expiresAt: string;
-  createdAt: string;
+export interface BookingLine {
+  serviceTypeId: string;
+  agentCount:    number;
 }
 
 export interface CreateQuotePayload {
-  missionId: string;
+  missionId:    string;
+  bookingLines: BookingLine[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MISSION
 // ─────────────────────────────────────────────────────────────────────────────
-export interface MissionLocation {
-  address:   string;
-  city:      string;
-  latitude:  number;
-  longitude: number;
-}
-
 export interface Mission {
   id:            string;
   clientId:      string;
-  serviceTypeId: string;
-  serviceType?:  ServiceType;
-  title:         string;
-  description?:  string;
   status:        MissionStatus;
-  location:      MissionLocation;
+  // Champs plats (pas d'objet location imbriqué — modèle Prisma)
+  address:       string;
+  city:          string;
+  zipCode?:      string;
+  latitude:      number;
+  longitude:     number;
   startAt:       string;
   endAt:         string;
-  agentCount:    number;
+  durationHours: number;
+  title?:        string;
+  notes?:        string;
+  isUrgent:      boolean;
   radiusKm:      number;
   quote?:        Quote;
+  payment?:      Payment;
   bookings?:     Booking[];
   createdAt:     string;
   updatedAt:     string;
 }
 
+/** Payload aligné sur CreateMissionDto backend */
 export interface CreateMissionPayload {
-  serviceTypeId: string;
-  title:         string;
-  description?:  string;
-  location:      MissionLocation;
+  address:       string;
+  city:          string;
+  zipCode?:      string;
+  latitude:      number;
+  longitude:     number;
   startAt:       string;
   endAt:         string;
-  agentCount:    number;
+  durationHours: number;   // calculé côté frontend (min 6)
+  title?:        string;
+  notes?:        string;
+  isUrgent?:     boolean;
   radiusKm?:     number;
 }
 
@@ -168,13 +176,25 @@ export interface Booking {
   mission?:     Mission;
   agentId?:     string;
   agent?:       AgentSummary;
+  serviceTypeId?: string;
+  serviceType?: ServiceType;
   status:       BookingStatus;
   checkinAt?:   string;
   checkoutAt?:  string;
   durationMin?: number;
   incidents?:   Incident[];
+  applications?: Application[];
   createdAt:    string;
   updatedAt:    string;
+}
+
+export interface Application {
+  id:        string;
+  bookingId: string;
+  agentId:   string;
+  agent?:    AgentSummary;
+  status:    'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+  createdAt: string;
 }
 
 export interface SelectAgentPayload {
@@ -201,23 +221,33 @@ export interface Incident {
 // PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Payment {
-  id:            string;
-  missionId:     string;
-  stripeId:      string;
-  amountCents:   number;
-  currency:      string;
-  status:        PaymentStatus;
-  clientSecret?: string;
-  createdAt:     string;
+  id:             string;
+  missionId:      string;
+  stripeIntentId: string;
+  amount:         number;   // €  TTC
+  method:         'CARD' | 'SEPA' | 'TRANSFER';
+  status:         PaymentStatus;
+  invoiceNumber:  string;
+  createdAt:      string;
 }
 
 export interface CreatePaymentIntentPayload {
   missionId: string;
+  method:    'CARD' | 'SEPA' | 'TRANSFER';
 }
 
 export interface PaymentIntentResponse {
-  clientSecret: string;
-  breakdown:    QuoteBreakdown;
+  clientSecret:  string;
+  paymentId:     string;
+  invoiceNumber: string;
+  breakdown: {
+    totalTTC:       number;
+    totalHT:        number;
+    agentShare:     number;
+    platformMargin: number;
+    fixedCharges:   number;
+    vat:            number;
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,7 +336,7 @@ export type MissionStackParamList = {
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
   SelectAgent:    { bookingId: string };
-  PaymentScreen:  { missionId: string; clientSecret: string };
+  PaymentScreen:  { missionId: string; clientSecret: string; totalTTC: number };
   MissionSuccess: { missionId: string };
   Conversation:   { missionId: string };
   RateAgent:      { bookingId: string; agentId: string };

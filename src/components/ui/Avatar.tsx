@@ -27,7 +27,7 @@ const FONT_MAP: Record<AvatarSize, number> = {
 };
 
 interface AvatarProps {
-  fullName:   string;
+  fullName:   string | null | undefined;  // null/undefined → affiche '?'
   avatarUrl?: string;
   size?:      AvatarSize;
   online?:    boolean;
@@ -39,13 +39,15 @@ export const Avatar: React.FC<AvatarProps> = ({
   size    = 'md',
   online  = false,
 }) => {
+  // Sécurisation : un avatarUrl vide string ou invalide ne doit pas crasher Image
+  const safeAvatarUrl = avatarUrl?.trim() || null;
   const dim = SIZE_MAP[size];
 
   return (
     <View style={{ width: dim, height: dim }}>
-      {avatarUrl ? (
+      {safeAvatarUrl ? (
         <Image
-          source={{ uri: avatarUrl }}
+          source={{ uri: safeAvatarUrl }}
           style={[styles.image, { width: dim, height: dim, borderRadius: dim / 2 }]}
         />
       ) : (

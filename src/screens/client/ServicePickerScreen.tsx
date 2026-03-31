@@ -1,6 +1,6 @@
-﻿/**
+/**
  * ServicePickerScreen — sélection du type de prestation avant création de mission.
- * Affiche les ServiceTypes actifs avec tarif horaire et description.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect } from 'react';
 import {
@@ -8,6 +8,10 @@ import {
   RefreshControl, StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {
+  Shield, Building2, Flame, Dog, Car, Star,
+  UserCheck, Users, ChevronRight,
+} from 'lucide-react-native';
 import { serviceTypesApi } from '@api/endpoints/serviceTypes';
 import { useApi }          from '@hooks/useApi';
 import { LoadingState }    from '@components/ui/LoadingState';
@@ -21,21 +25,24 @@ import type { ServiceType, MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'ServicePicker'>;
 
-const SERVICE_ICONS: Record<string, string> = {
-  default:    '🛡',
-  gardiennage:'🏢',
-  evenement:  '🎪',
-  cynophile:  '🐕',
-  ssiap:      '🔥',
-  rondier:    '🚗',
-  magasin:    '🏪',
-};
+type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
 
-function getIcon(name: string): string {
-  const key = Object.keys(SERVICE_ICONS).find((k) =>
-    name.toLowerCase().includes(k),
+const SERVICE_ICON_MAP: Array<{ keywords: string[]; Icon: LucideIconComp; accent: string }> = [
+  { keywords: ['luxe', 'hotel', 'vip'],                        Icon: Star,      accent: '#EAB308' },
+  { keywords: ['cynophile', 'chien', 'dog'],                   Icon: Dog,       accent: '#10B981' },
+  { keywords: ['incendie', 'ssiap', 'feu'],                    Icon: Flame,     accent: '#EF4444' },
+  { keywords: ['rondier', 'mobile', 'voiture'],                Icon: Car,       accent: '#3B82F6' },
+  { keywords: ['corps', 'apr', 'garde'],                       Icon: UserCheck, accent: '#8B5CF6' },
+  { keywords: ['accueil', 'hôtesse', 'hotesse', 'réception'],  Icon: Users,     accent: '#F5A623' },
+  { keywords: ['equipe', 'chef', 'coord'],                     Icon: Building2, accent: '#06B6D4' },
+];
+
+function getServiceMeta(name: string): { Icon: LucideIconComp; accent: string } {
+  const lower = name.toLowerCase();
+  const found = SERVICE_ICON_MAP.find(({ keywords }) =>
+    keywords.some((k) => lower.includes(k)),
   );
-  return SERVICE_ICONS[key ?? 'default'];
+  return found ?? { Icon: Shield, accent: colors.primary };
 }
 
 export const ServicePickerScreen: React.FC<Props> = ({ navigation }) => {
@@ -79,9 +86,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation }) => {
           renderItem={({ item }) => (
             <ServiceCard
               service={item}
-              onPress={() =>
-                navigation.navigate('MissionCreate', { serviceTypeId: item.id })
-              }
+              onPress={() => navigation.navigate('MissionCreate', { serviceTypeId: item.id })}
             />
           )}
         />
@@ -92,26 +97,26 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation }) => {
 
 // ── ServiceCard ───────────────────────────────────────────────────────────────
 const ServiceCard: React.FC<{ service: ServiceType; onPress: () => void }> = ({
-  service,
-  onPress,
-}) => (
-  <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
-    <View style={styles.cardIcon}>
-      <Text style={styles.cardIconText}>{getIcon(service.name)}</Text>
-    </View>
-    <View style={styles.cardBody}>
-      <Text style={styles.cardName}>{service.name}</Text>
-      <Text style={styles.cardDesc} numberOfLines={2}>
-        {service.description}
-      </Text>
-      <View style={styles.rateRow}>
-        <Text style={styles.rateLabel}>À partir de</Text>
-        <Text style={styles.rateValue}>{formatRate(service.baseRate)}</Text>
+  service, onPress,
+}) => {
+  const { Icon, accent } = getServiceMeta(service.name);
+  return (
+    <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
+      <View style={[styles.cardIcon, { backgroundColor: accent + '1A', borderColor: accent + '55' }]}>
+        <Icon size={26} color={accent} strokeWidth={1.7} />
       </View>
-    </View>
-    <Text style={styles.cardArrow}>›</Text>
-  </TouchableOpacity>
-);
+      <View style={styles.cardBody}>
+        <Text style={styles.cardName}>{service.name}</Text>
+        <Text style={styles.cardDesc} numberOfLines={2}>{service.description}</Text>
+        <View style={styles.rateRow}>
+          <Text style={styles.rateLabel}>À partir de</Text>
+          <Text style={styles.rateValue}>{formatRate(service.baseRatePerHour)}</Text>
+        </View>
+      </View>
+      <ChevronRight size={20} color={colors.textMuted} strokeWidth={1.8} />
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
@@ -122,10 +127,10 @@ const styles = StyleSheet.create({
     gap:               spacing[3],
   },
   listHeader: {
-    fontFamily:   fontFamily.body,
-    fontSize:     fontSize.sm,
-    color:        colors.textMuted,
-    marginBottom: spacing[2],
+    fontFamily:    fontFamily.body,
+    fontSize:      fontSize.sm,
+    color:         colors.textMuted,
+    marginBottom:  spacing[2],
     letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
@@ -143,15 +148,12 @@ const styles = StyleSheet.create({
     width:           52,
     height:          52,
     borderRadius:    radius.lg,
-    backgroundColor: colors.primarySurface,
     borderWidth:     1,
-    borderColor:     colors.borderPrimary,
     alignItems:      'center',
     justifyContent:  'center',
     flexShrink:      0,
   },
-  cardIconText: { fontSize: 26 },
-  cardBody:     { flex: 1, gap: spacing[1] },
+  cardBody:  { flex: 1, gap: spacing[1] },
   cardName: {
     fontFamily:    fontFamily.display,
     fontSize:      fontSize.md,
@@ -170,19 +172,6 @@ const styles = StyleSheet.create({
     gap:           spacing[2],
     marginTop:     spacing[1],
   },
-  rateLabel: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.xs,
-    color:      colors.textMuted,
-  },
-  rateValue: {
-    fontFamily: fontFamily.monoMedium,
-    fontSize:   fontSize.sm,
-    color:      colors.primary,
-  },
-  cardArrow: {
-    fontSize:   24,
-    color:      colors.textMuted,
-    flexShrink: 0,
-  },
+  rateLabel: { fontFamily: fontFamily.body,       fontSize: fontSize.xs, color: colors.textMuted },
+  rateValue: { fontFamily: fontFamily.monoMedium, fontSize: fontSize.sm, color: colors.primary },
 });

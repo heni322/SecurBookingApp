@@ -1,5 +1,6 @@
-﻿/**
+/**
  * RegisterScreen — création de compte client.
+ * Icônes : lucide-react-native
  */
 import React, { useState } from 'react';
 import {
@@ -7,17 +8,15 @@ import {
   KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { ArrowLeft, User, Building2, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
-import { usersApi }     from '@api/endpoints/users';
-import { tokenStorage } from '@services/tokenStorage';
 import { useAuthStore } from '@store/authStore';
-import { Button }   from '@components/ui/Button';
-import { Input }    from '@components/ui/Input';
-import { colors }   from '@theme/colors';
-import { spacing, layout } from '@theme/spacing';
+import { Button }  from '@components/ui/Button';
+import { Input }   from '@components/ui/Input';
+import { colors }  from '@theme/colors';
+import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-import { ClientType } from '@constants/enums';
-import type { AuthStackParamList, AuthTokens, User } from '@models/index';
+import type { AuthStackParamList, AuthTokens, User as UserModel } from '@models/index';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -55,10 +54,11 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         role:       'CLIENT' as const,
         clientType,
       });
-      const { tokens } = res.data as { user: User; tokens: AuthTokens };
-      tokenStorage.setTokens(tokens);
-      const { data: meRes } = await usersApi.getMe();
-      hydrate(meRes.data, tokens);
+      const { user, accessToken, refreshToken } = (res as any).data as {
+        user: UserModel; accessToken: string; refreshToken: string;
+      };
+      const tokens: AuthTokens = { accessToken, refreshToken, expiresIn: 900 };
+      hydrate(user, tokens);
     } catch (err: unknown) {
       const message =
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -82,28 +82,30 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backText}>←</Text>
+            <ArrowLeft size={20} color={colors.textPrimary} strokeWidth={2} />
           </TouchableOpacity>
-          <View style={styles.logoMark}>
-            <Text style={styles.logoIcon}>🛡</Text>
-          </View>
           <Text style={styles.title}>Créer un compte</Text>
           <Text style={styles.subtitle}>Rejoignez SecurBook en tant que client</Text>
         </View>
 
         {/* Type de client */}
         <View style={styles.typeRow}>
-          {(['INDIVIDUAL', 'COMPANY'] as const).map((type) => (
+          {([
+            { type: 'INDIVIDUAL', label: 'Particulier', Icon: User     },
+            { type: 'COMPANY',    label: 'Entreprise',  Icon: Building2 },
+          ] as const).map(({ type, label, Icon }) => (
             <TouchableOpacity
               key={type}
               style={[styles.typeBtn, clientType === type && styles.typeBtnActive]}
               onPress={() => setClientType(type)}
             >
-              <Text style={styles.typeIcon}>
-                {type === 'INDIVIDUAL' ? '👤' : '🏢'}
-              </Text>
+              <Icon
+                size={24}
+                color={clientType === type ? colors.primary : colors.textSecondary}
+                strokeWidth={1.8}
+              />
               <Text style={[styles.typeLabel, clientType === type && styles.typeLabelActive]}>
-                {type === 'INDIVIDUAL' ? 'Particulier' : 'Entreprise'}
+                {label}
               </Text>
             </TouchableOpacity>
           ))}
@@ -118,7 +120,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             autoCapitalize="words"
             placeholder="Jean Dupont"
             error={errors.fullName}
-            leftIcon={<Text style={styles.inputIcon}>👤</Text>}
+            leftIcon={<User size={16} color={colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
             label="Adresse email"
@@ -128,7 +130,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             autoCapitalize="none"
             placeholder="vous@exemple.com"
             error={errors.email}
-            leftIcon={<Text style={styles.inputIcon}>✉️</Text>}
+            leftIcon={<Mail size={16} color={colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
             label="Téléphone (optionnel)"
@@ -136,7 +138,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholder="+33 6 00 00 00 00"
-            leftIcon={<Text style={styles.inputIcon}>📱</Text>}
+            leftIcon={<Phone size={16} color={colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
             label="Mot de passe"
@@ -145,8 +147,12 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
             secureTextEntry={!showPass}
             placeholder="8 caractères minimum"
             error={errors.password}
-            leftIcon={<Text style={styles.inputIcon}>🔒</Text>}
-            rightIcon={<Text style={styles.inputIcon}>{showPass ? '🙈' : '👁'}</Text>}
+            leftIcon={<Lock size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            rightIcon={
+              showPass
+                ? <EyeOff size={18} color={colors.textMuted} strokeWidth={1.8} />
+                : <Eye    size={18} color={colors.textMuted} strokeWidth={1.8} />
+            }
             onRightPress={() => setShowPass((v) => !v)}
           />
 
@@ -180,12 +186,10 @@ const styles = StyleSheet.create({
     paddingBottom:     spacing[8],
   },
   header: {
-    alignItems:   'center',
     marginBottom: spacing[6],
     gap:          spacing[2],
   },
   backBtn: {
-    alignSelf:       'flex-start',
     width:           40,
     height:          40,
     borderRadius:    20,
@@ -196,18 +200,6 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginBottom:    spacing[3],
   },
-  backText: { fontSize: 20, color: colors.textPrimary },
-  logoMark: {
-    width:           64,
-    height:          64,
-    borderRadius:    20,
-    backgroundColor: colors.primarySurface,
-    borderWidth:     1.5,
-    borderColor:     colors.borderPrimary,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  logoIcon:  { fontSize: 30 },
   title: {
     fontFamily:    fontFamily.display,
     fontSize:      fontSize['2xl'],
@@ -220,9 +212,9 @@ const styles = StyleSheet.create({
     color:      colors.textSecondary,
   },
   typeRow: {
-    flexDirection:  'row',
-    gap:            spacing[3],
-    marginBottom:   spacing[6],
+    flexDirection: 'row',
+    gap:           spacing[3],
+    marginBottom:  spacing[6],
   },
   typeBtn: {
     flex:            1,
@@ -238,21 +230,19 @@ const styles = StyleSheet.create({
     borderColor:     colors.primary,
     backgroundColor: colors.primarySurface,
   },
-  typeIcon:  { fontSize: 24 },
   typeLabel: {
     fontFamily: fontFamily.bodyMedium,
     fontSize:   fontSize.sm,
     color:      colors.textSecondary,
   },
   typeLabelActive: { color: colors.primary },
-  form:      { gap: spacing[1] },
-  inputIcon: { fontSize: 16 },
-  submitBtn: { marginTop: spacing[3] },
+  form:            { gap: spacing[1] },
+  submitBtn:       { marginTop: spacing[3] },
   footer: {
     flexDirection:  'row',
     justifyContent: 'center',
     marginTop:      spacing[6],
   },
-  footerText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
+  footerText: { fontFamily: fontFamily.body,         fontSize: fontSize.sm, color: colors.textSecondary },
   footerLink: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
 });

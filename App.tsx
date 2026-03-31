@@ -42,15 +42,18 @@ function App(): React.JSX.Element {
         return;
       }
       try {
-        const { data: res } = await usersApi.getMe();
-        const rt = tokenStorage.getRefreshToken()!;
-        hydrate(res.data, {
+        // usersApi.getMe() retourne AxiosResponse<ApiResponse<User>>
+        // response.data = ApiResponse<User> = { success, data: User }
+        const response = await usersApi.getMe();
+        const user = (response.data as any).data;   // unwrap ApiResponse.data
+        const rt   = tokenStorage.getRefreshToken()!;
+        hydrate(user, {
           accessToken:  token,
           refreshToken: rt,
           expiresIn:    900,
         });
-      } catch {
-        // Token expiré ou invalide — déconnexion silencieuse
+      } catch (e) {
+        console.error('[App] restoreSession failed:', e);
         logout();
       }
     };

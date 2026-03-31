@@ -44,9 +44,11 @@ export const BookingCard: React.FC<Props> = ({
         {/* Mission info (agent perspective) */}
         {perspective === 'agent' && mission && (
           <>
-            <Text style={styles.missionTitle} numberOfLines={1}>{mission.title}</Text>
+            <Text style={styles.missionTitle} numberOfLines={1}>
+              {mission.title?.trim() || `Mission à ${mission.city}`}
+            </Text>
             <Text style={styles.meta}>🗓 {formatMissionRange(mission.startAt, mission.endAt)}</Text>
-            <Text style={styles.meta} numberOfLines={1}>📍 {mission.location.city}</Text>
+            <Text style={styles.meta} numberOfLines={1}>📍 {mission.city}</Text>
           </>
         )}
 
@@ -61,7 +63,7 @@ export const BookingCard: React.FC<Props> = ({
             <View style={styles.agentInfo}>
               <Text style={styles.agentName}>{agent.fullName}</Text>
               <Text style={styles.agentRating}>
-                ★ {agent.avgRating.toFixed(1)} · {agent.completedCount} missions
+                ★ {agent.avgRating?.toFixed(1) ?? '—'} · {agent.completedCount ?? 0} missions
               </Text>
             </View>
           </View>

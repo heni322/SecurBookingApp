@@ -1,36 +1,46 @@
 /**
- * ProfileScreen — profil utilisateur client avec gestion du compte.
- * Sections : infos · 2FA · déconnexion
+ * ProfileScreen — profil utilisateur client.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   Alert, Switch, StyleSheet,
 } from 'react-native';
-import { usersApi }  from '@api/endpoints/users';
-import { authApi }   from '@api/endpoints/auth';
-import { useApi }    from '@hooks/useApi';
+import {
+  User, Mail, Phone, CalendarDays, ShieldCheck,
+  LogOut, Info, FileText, ChevronRight, KeyRound,
+} from 'lucide-react-native';
+import { usersApi }     from '@api/endpoints/users';
+import { authApi }      from '@api/endpoints/auth';
+import { useApi }       from '@hooks/useApi';
 import { useAuthStore } from '@store/authStore';
 import { tokenStorage } from '@services/tokenStorage';
-import { Avatar }    from '@components/ui/Avatar';
-import { Card }      from '@components/ui/Card';
-import { Button }    from '@components/ui/Button';
-import { Separator } from '@components/ui/Separator';
-import { colors }    from '@theme/colors';
+import { Avatar }       from '@components/ui/Avatar';
+import { Card }         from '@components/ui/Card';
+import { Button }       from '@components/ui/Button';
+import { LoadingState } from '@components/ui/LoadingState';
+import { Separator }    from '@components/ui/Separator';
+import { colors }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatDate }              from '@utils/formatters';
 
 export const ProfileScreen: React.FC = () => {
-  const { user, logout }                       = useAuthStore();
-  const { data: profile, execute: fetchMe }    = useApi(usersApi.getMe);
-  const [twoFaEnabled, setTwoFaEnabled]        = useState(false);
-  const [logoutLoading, setLogoutLoading]      = useState(false);
+  const { user, logout }                    = useAuthStore();
+  const { data: profile, execute: fetchMe } = useApi(usersApi.getMe);
+  const [twoFaEnabled, setTwoFaEnabled]     = useState(false);
+  const [logoutLoading, setLogoutLoading]   = useState(false);
+
+  React.useEffect(() => {
+    if (profile) setTwoFaEnabled((profile as any).twoFaEnabled ?? false);
+  }, [profile]);
 
   const load = useCallback(() => fetchMe(), [fetchMe]);
   useEffect(() => { load(); }, [load]);
 
-  const displayUser = profile ?? user;
+  const displayUser    = profile ?? user;
+  const isProfileReady = Boolean(profile);
 
   const handleLogout = async () => {
     Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
@@ -44,10 +54,7 @@ export const ProfileScreen: React.FC = () => {
             const rt = tokenStorage.getRefreshToken();
             if (rt) await authApi.logout(rt);
           } catch { /* silent */ }
-          finally {
-            setLogoutLoading(false);
-            logout();
-          }
+          finally { setLogoutLoading(false); logout(); }
         },
       },
     ]);
@@ -56,17 +63,20 @@ export const ProfileScreen: React.FC = () => {
   const handleSetup2FA = async () => {
     try {
       const { data: res } = await authApi.setup2FA();
+      const setup = (res as any).data;
       Alert.alert(
         'Configuration 2FA',
-        `Secret : ${res.data.secret}\n\nScannez le QR avec Google Authenticator ou Authy, puis activez la 2FA depuis les paramètres de sécurité.`,
+        `Secret : ${setup.secret}\n\nScannez le QR avec Google Authenticator ou Authy, puis activez la 2FA.`,
         [{ text: 'OK' }],
       );
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'initialiser la 2FA.');
+      Alert.alert('Erreur', "Impossible d'initialiser la 2FA.");
     }
   };
 
-  if (!displayUser) return null;
+  if (!displayUser || !isProfileReady) {
+    return <LoadingState message="Chargement du profil…" />;
+  }
 
   return (
     <ScrollView
@@ -84,20 +94,20 @@ export const ProfileScreen: React.FC = () => {
         <Text style={styles.fullName}>{displayUser.fullName}</Text>
         <Text style={styles.email}>{displayUser.email}</Text>
         {displayUser.phone && (
-          <Text style={styles.phone}>📱 {displayUser.phone}</Text>
+          <Text style={styles.phone}>{displayUser.phone}</Text>
         )}
       </View>
 
       {/* Compte */}
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>Mon compte</Text>
-        <MenuRow icon="👤" label="Nom complet"  value={displayUser.fullName} />
+        <MenuRow Icon={User}         label="Nom complet"    value={displayUser.fullName} />
         <Separator marginV={spacing[3]} />
-        <MenuRow icon="✉️"  label="Email"        value={displayUser.email} />
+        <MenuRow Icon={Mail}         label="Email"          value={displayUser.email} />
         <Separator marginV={spacing[3]} />
-        <MenuRow icon="📱" label="Téléphone"    value={displayUser.phone ?? 'Non renseigné'} />
+        <MenuRow Icon={Phone}        label="Téléphone"      value={displayUser.phone ?? 'Non renseigné'} />
         <Separator marginV={spacing[3]} />
-        <MenuRow icon="📅" label="Membre depuis" value={formatDate(displayUser.createdAt)} />
+        <MenuRow Icon={CalendarDays} label="Membre depuis"  value={formatDate(displayUser.createdAt)} />
       </Card>
 
       {/* Sécurité */}
@@ -105,7 +115,9 @@ export const ProfileScreen: React.FC = () => {
         <Text style={styles.sectionTitle}>Sécurité</Text>
         <View style={styles.menuRow}>
           <View style={styles.menuLeft}>
-            <Text style={styles.menuIcon}>🔐</Text>
+            <View style={[styles.iconBox, { backgroundColor: colors.primarySurface, borderColor: colors.borderPrimary }]}>
+              <KeyRound size={16} color={colors.primary} strokeWidth={1.8} />
+            </View>
             <View>
               <Text style={styles.menuLabel}>Authentification 2FA</Text>
               <Text style={styles.menuSub}>Code TOTP (Google Authenticator)</Text>
@@ -114,9 +126,7 @@ export const ProfileScreen: React.FC = () => {
           <Switch
             value={twoFaEnabled}
             onValueChange={async (v) => {
-              if (v) {
-                await handleSetup2FA();
-              }
+              if (v) await handleSetup2FA();
               setTwoFaEnabled(v);
             }}
             trackColor={{ false: colors.border, true: colors.primary }}
@@ -128,52 +138,59 @@ export const ProfileScreen: React.FC = () => {
       {/* À propos */}
       <Card style={styles.section}>
         <Text style={styles.sectionTitle}>Application</Text>
-        <MenuRow icon="📋" label="Version"    value="1.0.0" />
+        <MenuRow Icon={Info}     label="Version"                    value="1.0.0" />
         <Separator marginV={spacing[3]} />
-        <MenuRow icon="🔒" label="Politique de confidentialité" value="›" />
+        <MenuRow Icon={ShieldCheck} label="Politique de confidentialité" value="›" tappable />
         <Separator marginV={spacing[3]} />
-        <MenuRow icon="📄" label="CGV"        value="›" />
+        <MenuRow Icon={FileText}  label="CGV"                       value="›" tappable />
       </Card>
 
       {/* Déconnexion */}
-      <Button
-        label={logoutLoading ? 'Déconnexion…' : 'Se déconnecter'}
-        onPress={handleLogout}
-        loading={logoutLoading}
-        variant="danger"
-        fullWidth
-        size="lg"
+      <TouchableOpacity
         style={styles.logoutBtn}
-      />
+        onPress={handleLogout}
+        activeOpacity={0.8}
+      >
+        <LogOut size={18} color={colors.danger} strokeWidth={2} />
+        <Text style={styles.logoutText}>
+          {logoutLoading ? 'Déconnexion…' : 'Se déconnecter'}
+        </Text>
+      </TouchableOpacity>
 
       <Text style={styles.uid}>ID : {displayUser.id.slice(0, 8).toUpperCase()}</Text>
     </ScrollView>
   );
 };
 
-const MenuRow: React.FC<{ icon: string; label: string; value: string }> = ({
-  icon, label, value,
-}) => (
+// ── MenuRow ───────────────────────────────────────────────────────────────────
+const MenuRow: React.FC<{
+  Icon: React.FC<{ size: number; color: string; strokeWidth: number }>;
+  label: string;
+  value: string;
+  tappable?: boolean;
+}> = ({ Icon, label, value, tappable }) => (
   <View style={styles.menuRow}>
     <View style={styles.menuLeft}>
-      <Text style={styles.menuIcon}>{icon}</Text>
+      <View style={[styles.iconBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Icon size={15} color={colors.textSecondary} strokeWidth={1.8} />
+      </View>
       <Text style={styles.menuLabel}>{label}</Text>
     </View>
-    <Text style={styles.menuValue} numberOfLines={1}>{value}</Text>
+    <View style={styles.menuRight}>
+      <Text style={styles.menuValue} numberOfLines={1}>{value === '›' ? '' : value}</Text>
+      {tappable && <ChevronRight size={16} color={colors.textMuted} strokeWidth={1.8} />}
+    </View>
   </View>
 );
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: colors.background },
-  content: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingBottom:     spacing[12],
-  },
+  content: { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[12] },
   hero: {
-    alignItems:   'center',
-    paddingTop:   spacing[10],
+    alignItems:    'center',
+    paddingTop:    spacing[10],
     paddingBottom: spacing[6],
-    gap:          spacing[2],
+    gap:           spacing[2],
   },
   fullName: {
     fontFamily:    fontFamily.display,
@@ -182,20 +199,10 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
     marginTop:     spacing[2],
   },
-  email: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.textSecondary,
-  },
-  phone: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.textMuted,
-  },
-  section: {
-    marginBottom: spacing[4],
-    gap:          0,
-  },
+  email: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
+  phone: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
+
+  section: { marginBottom: spacing[4], gap: 0 },
   sectionTitle: {
     fontFamily:    fontFamily.bodyMedium,
     fontSize:      fontSize.xs,
@@ -216,7 +223,21 @@ const styles = StyleSheet.create({
     gap:           spacing[3],
     flex:          1,
   },
-  menuIcon:  { fontSize: 18, width: 24, textAlign: 'center' },
+  menuRight: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[1],
+    maxWidth:      '50%',
+  },
+  iconBox: {
+    width:           30,
+    height:          30,
+    borderRadius:    radius.md,
+    borderWidth:     1,
+    alignItems:      'center',
+    justifyContent:  'center',
+    flexShrink:      0,
+  },
   menuLabel: {
     fontFamily: fontFamily.bodyMedium,
     fontSize:   fontSize.sm,
@@ -231,10 +252,27 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.body,
     fontSize:   fontSize.sm,
     color:      colors.textSecondary,
-    maxWidth:   '45%',
     textAlign:  'right',
   },
-  logoutBtn: { marginTop: spacing[2], marginBottom: spacing[3] },
+
+  logoutBtn: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             spacing[3],
+    marginTop:       spacing[2],
+    marginBottom:    spacing[3],
+    paddingVertical: spacing[4],
+    borderRadius:    radius.xl,
+    borderWidth:     1,
+    borderColor:     colors.danger,
+    backgroundColor: colors.dangerSurface,
+  },
+  logoutText: {
+    fontFamily: fontFamily.bodySemiBold,
+    fontSize:   fontSize.base,
+    color:      colors.danger,
+  },
   uid: {
     textAlign:  'center',
     fontFamily: fontFamily.mono,

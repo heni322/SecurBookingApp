@@ -1,20 +1,22 @@
 /**
  * ScreenHeader — en-tête de screen avec titre, sous-titre et actions.
+ * Icônes : lucide-react-native
  */
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, type ViewStyle,
 } from 'react-native';
+import { ChevronLeft } from 'lucide-react-native';
 import { colors } from '@theme/colors';
 import { spacing, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
 interface Props {
-  title:       string;
-  subtitle?:   string;
-  onBack?:     () => void;
+  title:        string;
+  subtitle?:    string;
+  onBack?:      () => void;
   rightAction?: React.ReactNode;
-  style?:      ViewStyle;
+  style?:       ViewStyle;
 }
 
 export const ScreenHeader: React.FC<Props> = ({
@@ -32,7 +34,7 @@ export const ScreenHeader: React.FC<Props> = ({
           style={styles.backBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <ChevronLeft size={20} color={colors.textPrimary} strokeWidth={2.2} />
         </TouchableOpacity>
       )}
       <View style={styles.titleWrap}>
@@ -48,20 +50,20 @@ export const ScreenHeader: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height:          layout.headerHeight,
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'space-between',
+    height:            layout.headerHeight,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
     paddingHorizontal: spacing[5],
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor:  colors.background,
+    backgroundColor:   colors.background,
   },
   left: {
-    flex:         1,
+    flex:          1,
     flexDirection: 'row',
-    alignItems:   'center',
-    gap:          spacing[3],
+    alignItems:    'center',
+    gap:           spacing[3],
   },
   backBtn: {
     width:           36,
@@ -73,18 +75,11 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  backIcon: {
-    fontSize: 18,
-    color:    colors.textPrimary,
-    lineHeight: 22,
-  },
-  titleWrap: {
-    flex: 1,
-  },
+  titleWrap: { flex: 1 },
   title: {
-    fontFamily: fontFamily.display,
-    fontSize:   fontSize.md,
-    color:      colors.textPrimary,
+    fontFamily:    fontFamily.display,
+    fontSize:      fontSize.md,
+    color:         colors.textPrimary,
     letterSpacing: -0.3,
   },
   subtitle: {
@@ -93,7 +88,5 @@ const styles = StyleSheet.create({
     color:      colors.textSecondary,
     marginTop:  2,
   },
-  right: {
-    marginLeft: spacing[3],
-  },
+  right: { marginLeft: spacing[3] },
 });

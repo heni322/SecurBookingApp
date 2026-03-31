@@ -1,5 +1,6 @@
-﻿/**
+/**
  * MissionsScreen — liste complète des missions du client avec filtres de statut.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
@@ -8,12 +9,13 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { missionsApi }   from '@api/endpoints/missions';
-import { useApi }        from '@hooks/useApi';
-import { MissionCard }   from '@components/domain/MissionCard';
-import { LoadingState }  from '@components/ui/LoadingState';
-import { EmptyState }    from '@components/ui/EmptyState';
-import { colors }        from '@theme/colors';
+import { Plus } from 'lucide-react-native';
+import { missionsApi }  from '@api/endpoints/missions';
+import { useApi }       from '@hooks/useApi';
+import { MissionCard }  from '@components/domain/MissionCard';
+import { LoadingState } from '@components/ui/LoadingState';
+import { EmptyState }   from '@components/ui/EmptyState';
+import { colors }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { MissionStatus } from '@constants/enums';
@@ -21,25 +23,42 @@ import type { Mission, MissionStackParamList } from '@models/index';
 
 type Nav = NativeStackNavigationProp<MissionStackParamList>;
 
-const FILTERS: Array<{ label: string; value: string | null }> = [
-  { label: 'Toutes',      value: null                    },
-  { label: 'En cours',    value: MissionStatus.IN_PROGRESS },
-  { label: 'Publiées',    value: MissionStatus.PUBLISHED  },
-  { label: 'Brouillons',  value: MissionStatus.DRAFT      },
-  { label: 'Terminées',   value: MissionStatus.COMPLETED  },
-  { label: 'Annulées',    value: MissionStatus.CANCELLED  },
+const ACTIVE_STATUSES = [
+  MissionStatus.CONFIRMED,
+  MissionStatus.PUBLISHED,
+  MissionStatus.IN_PROGRESS,
 ];
 
+type FilterValue = string | string[] | null;
+
+const FILTERS: Array<{ label: string; value: FilterValue }> = [
+  { label: 'Toutes',     value: null                   },
+  { label: 'En cours',  value: ACTIVE_STATUSES         },
+  { label: 'Publiées',  value: MissionStatus.PUBLISHED  },
+  { label: 'Brouillons', value: MissionStatus.DRAFT     },
+  { label: 'Terminées', value: MissionStatus.COMPLETED  },
+  { label: 'Annulées',  value: MissionStatus.CANCELLED  },
+];
+
+const isFilterActive = (active: FilterValue, value: FilterValue): boolean => {
+  if (active === null && value === null) return true;
+  if (Array.isArray(active) && Array.isArray(value))
+    return active.length === value.length && active.every((v, i) => v === value[i]);
+  return active === value;
+};
+
 export const MissionsScreen: React.FC = () => {
-  const navigation                                 = useNavigation<Nav>();
-  const [activeFilter, setActiveFilter]            = useState<string | null>(null);
-  const { data: missions, loading, execute }       = useApi(missionsApi.getMyMissions);
+  const navigation                           = useNavigation<Nav>();
+  const [activeFilter, setActiveFilter]      = useState<FilterValue>(null);
+  const { data: missions, loading, execute } = useApi(missionsApi.getMyMissions);
 
   useEffect(() => { execute(); }, [execute]);
 
-  const filtered: Mission[] = (missions ?? []).filter((m) =>
-    activeFilter ? m.status === activeFilter : true,
-  );
+  const filtered: Mission[] = (missions ?? []).filter((m) => {
+    if (!activeFilter) return true;
+    if (Array.isArray(activeFilter)) return activeFilter.includes(m.status);
+    return m.status === activeFilter;
+  });
 
   const renderItem = useCallback(
     ({ item }: { item: Mission }) => (
@@ -61,7 +80,8 @@ export const MissionsScreen: React.FC = () => {
           onPress={() => navigation.navigate('ServicePicker')}
           activeOpacity={0.8}
         >
-          <Text style={styles.newBtnText}>+ Nouvelle</Text>
+          <Plus size={16} color={colors.textInverse} strokeWidth={2.5} />
+          <Text style={styles.newBtnText}>Nouvelle</Text>
         </TouchableOpacity>
       </View>
 
@@ -74,10 +94,10 @@ export const MissionsScreen: React.FC = () => {
         contentContainerStyle={styles.filters}
         renderItem={({ item: f }) => (
           <TouchableOpacity
-            style={[styles.chip, activeFilter === f.value && styles.chipActive]}
+            style={[styles.chip, isFilterActive(activeFilter, f.value) && styles.chipActive]}
             onPress={() => setActiveFilter(f.value)}
           >
-            <Text style={[styles.chipText, activeFilter === f.value && styles.chipTextActive]}>
+            <Text style={[styles.chipText, isFilterActive(activeFilter, f.value) && styles.chipTextActive]}>
               {f.label}
             </Text>
           </TouchableOpacity>
@@ -120,12 +140,12 @@ export const MissionsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   header: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'space-between',
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
     paddingHorizontal: layout.screenPaddingH,
-    paddingTop:      spacing[8],
-    paddingBottom:   spacing[4],
+    paddingTop:        spacing[8],
+    paddingBottom:     spacing[4],
   },
   title: {
     fontFamily:    fontFamily.display,
@@ -134,10 +154,13 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   newBtn: {
-    backgroundColor: colors.primary,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[1] + 2,
+    backgroundColor:   colors.primary,
     paddingHorizontal: spacing[4],
-    paddingVertical:   spacing[2],
-    borderRadius:    radius.full,
+    paddingVertical:   spacing[2] + 1,
+    borderRadius:      radius.full,
   },
   newBtnText: {
     fontFamily: fontFamily.bodySemiBold,

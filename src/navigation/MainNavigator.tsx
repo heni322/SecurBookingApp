@@ -1,28 +1,39 @@
-﻿/**
- * MainNavigator — Tab bar CLIENT avec MissionStack branché sur Home & Missions.
+/**
+ * MainNavigator — Tab bar CLIENT premium.
+ * Design : glassmorphism obsidian · pill indicator amber · icônes Lucide · glow actif
  */
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useNotificationsStore }    from '@store/notificationsStore';
-import { MissionStackNavigator }    from './MissionStackNavigator';
-import { NotificationsScreen }      from '@screens/client/NotificationsScreen';
-import { ProfileScreen }            from '@screens/client/ProfileScreen';
-import { HomeScreen }               from '@screens/client/HomeScreen';
-import { colors }    from '@theme/colors';
-import { spacing, layout, radius } from '@theme/spacing';
-import { fontFamily } from '@theme/typography';
+import { Home, Shield, Bell, User } from 'lucide-react-native';
+import { useNotificationsStore }  from '@store/notificationsStore';
+import { MissionStackNavigator } from './MissionStackNavigator';
+import { NotificationsScreen }   from '@screens/client/NotificationsScreen';
+import { ProfileScreen }         from '@screens/client/ProfileScreen';
+import { HomeScreen }            from '@screens/client/HomeScreen';
+import { colors, palette }       from '@theme/colors';
+import { spacing, radius }       from '@theme/spacing';
+import { fontFamily, fontSize }  from '@theme/typography';
 import type { MainTabParamList } from '@models/index';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const TABS: Array<{ name: keyof MainTabParamList; icon: string; label: string }> = [
-  { name: 'Home',          icon: '🏠', label: 'Accueil'  },
-  { name: 'Missions',      icon: '🛡',  label: 'Missions' },
-  { name: 'Notifications', icon: '🔔', label: 'Alertes'  },
-  { name: 'Profile',       icon: '👤', label: 'Profil'   },
+type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
+
+interface TabDef {
+  name:  keyof MainTabParamList;
+  label: string;
+  Icon:  LucideIcon;
+}
+
+const TABS: TabDef[] = [
+  { name: 'Home',          label: 'Accueil',  Icon: Home   },
+  { name: 'Missions',      label: 'Missions', Icon: Shield },
+  { name: 'Notifications', label: 'Alertes',  Icon: Bell   },
+  { name: 'Profile',       label: 'Profil',   Icon: User   },
 ];
 
+// ─── Navigator ────────────────────────────────────────────────────────────────
 export const MainNavigator: React.FC = () => {
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
 
@@ -35,68 +46,169 @@ export const MainNavigator: React.FC = () => {
         tabBarIcon:  ({ focused }) => {
           const tab   = TABS.find((t) => t.name === route.name)!;
           const badge = route.name === 'Notifications' ? unreadCount : 0;
-          return <TabItem icon={tab.icon} label={tab.label} focused={focused} badge={badge} />;
+          return (
+            <TabItem
+              Icon={tab.Icon}
+              label={tab.label}
+              focused={focused}
+              badge={badge}
+            />
+          );
         },
       })}
     >
-      <Tab.Screen name="Home"          component={HomeScreen}             />
-      <Tab.Screen name="Missions"      component={MissionStackNavigator}  />
-      <Tab.Screen name="Notifications" component={NotificationsScreen}    />
-      <Tab.Screen name="Profile"       component={ProfileScreen}          />
+      <Tab.Screen name="Home"          component={HomeScreen}            />
+      <Tab.Screen name="Missions"      component={MissionStackNavigator} />
+      <Tab.Screen name="Notifications" component={NotificationsScreen}   />
+      <Tab.Screen name="Profile"       component={ProfileScreen}         />
     </Tab.Navigator>
   );
 };
 
+// ─── TabItem avec animations ──────────────────────────────────────────────────
 const TabItem: React.FC<{
-  icon: string; label: string; focused: boolean; badge?: number;
-}> = ({ icon, label, focused, badge = 0 }) => (
-  <View style={[tabStyles.wrap, focused && tabStyles.wrapActive]}>
-    <View>
-      <Text style={tabStyles.icon}>{icon}</Text>
-      {badge > 0 && (
-        <View style={tabStyles.badge}>
-          <Text style={tabStyles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-        </View>
-      )}
+  Icon:    LucideIcon;
+  label:   string;
+  focused: boolean;
+  badge?:  number;
+}> = ({ Icon, label, focused, badge = 0 }) => {
+  const scaleAnim  = useRef(new Animated.Value(1)).current;
+  const glowAnim   = useRef(new Animated.Value(0)).current;
+  const labelAnim  = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (focused) {
+      Animated.sequence([
+        Animated.timing(scaleAnim, { toValue: 1.18, duration: 110, useNativeDriver: true }),
+        Animated.spring(scaleAnim, { toValue: 1, friction: 4, useNativeDriver: true }),
+      ]).start();
+    }
+    Animated.parallel([
+      Animated.timing(glowAnim,  { toValue: focused ? 1 : 0, duration: 220, useNativeDriver: false }),
+      Animated.timing(labelAnim, { toValue: focused ? 1 : 0, duration: 180, useNativeDriver: false }),
+    ]).start();
+  }, [focused]);
+
+  const iconColor    = focused ? palette.obsidian : palette.slate10;
+  const glowOpacity  = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });
+  const labelOpacity = labelAnim;
+  const labelTranslY = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [4, 0] });
+
+  return (
+    <View style={tabStyles.outer}>
+      <View style={[tabStyles.pill, focused && tabStyles.pillActive]}>
+        {/* Amber glow */}
+        {focused && (
+          <Animated.View
+            style={[tabStyles.glow, { shadowOpacity: glowOpacity }]}
+          />
+        )}
+
+        {/* Icône Lucide animée */}
+        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+          <Icon
+            size={22}
+            color={iconColor}
+            strokeWidth={focused ? 2.4 : 1.8}
+          />
+        </Animated.View>
+
+        {/* Badge notifications */}
+        {badge > 0 && (
+          <View style={tabStyles.badge}>
+            <Text style={tabStyles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Label animé */}
+      <Animated.Text
+        numberOfLines={1}
+        style={[
+          tabStyles.label,
+          focused && tabStyles.labelActive,
+          { opacity: focused ? labelOpacity : 0.6, transform: [{ translateY: labelTranslY }] },
+        ]}
+      >
+        {label}
+      </Animated.Text>
     </View>
-    <Text style={[tabStyles.label, focused && tabStyles.labelActive]}>{label}</Text>
-  </View>
-);
+  );
+};
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const TAB_BAR_HEIGHT = 74;
 
 const styles = StyleSheet.create({
   tabBar: {
-    height:          layout.tabBarHeight,
-    backgroundColor: colors.backgroundElevated,
-    borderTopWidth:  1,
-    borderTopColor:  colors.border,
-    paddingBottom:   0,
+    height:           TAB_BAR_HEIGHT + (Platform.OS === 'ios' ? 16 : 0),
+    backgroundColor:  'rgba(20,24,32,0.97)',
+    borderTopWidth:   0,
+    borderTopColor:   colors.borderPrimary,
+    ...Platform.select({
+      ios: {
+        shadowColor:   palette.amber,
+        shadowOffset:  { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius:  20,
+      },
+      android: { elevation: 24 },
+    }),
+    paddingBottom: 0,
+    paddingTop:    0,
   },
 });
 
 const tabStyles = StyleSheet.create({
-  wrap: {
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingHorizontal: spacing[3],
-    paddingVertical:   spacing[2],
-    borderRadius:    radius.lg,
-    gap:             3,
+  outer: {
+    width:          72,
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            4,
+    paddingTop:     spacing[2],
   },
-  wrapActive:   { backgroundColor: colors.primarySurface },
-  icon:         { fontSize: 22 },
-  badge: {
-    position:        'absolute',
-    top:             -4,
-    right:           -8,
-    backgroundColor: colors.danger,
-    borderRadius:    10,
-    minWidth:        16,
-    height:          16,
+  pill: {
+    width:           52,
+    height:          36,
+    borderRadius:    radius.full,
     alignItems:      'center',
     justifyContent:  'center',
+  },
+  pillActive: {
+    backgroundColor: palette.amber,
+    ...Platform.select({
+      ios: {
+        shadowColor:   palette.amber,
+        shadowOffset:  { width: 0, height: 2 },
+        shadowOpacity: 0.7,
+        shadowRadius:  10,
+      },
+      android: { elevation: 10 },
+    }),
+  },
+  glow: {
+    position:        'absolute',
+    width:           52,
+    height:          36,
+    borderRadius:    radius.full,
+    backgroundColor: palette.amber,
+    shadowColor:     palette.amber,
+    shadowOffset:    { width: 0, height: 0 },
+    shadowRadius:    18,
+  },
+  badge: {
+    position:          'absolute',
+    top:               -3,
+    right:             -3,
+    backgroundColor:   colors.danger,
+    borderRadius:      radius.full,
+    minWidth:          16,
+    height:            16,
+    alignItems:        'center',
+    justifyContent:    'center',
     paddingHorizontal: 3,
-    borderWidth:     1.5,
-    borderColor:     colors.backgroundElevated,
+    borderWidth:       1.5,
+    borderColor:       palette.obsidian80,
   },
   badgeText: {
     fontFamily: fontFamily.monoMedium,
@@ -104,6 +216,15 @@ const tabStyles = StyleSheet.create({
     color:      colors.white,
     lineHeight: 11,
   },
-  label:        { fontFamily: fontFamily.body,       fontSize: 10, color: colors.textMuted },
-  labelActive:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.primary },
+  label: {
+    fontFamily:    fontFamily.body,
+    fontSize:      fontSize.xs,
+    color:         colors.textMuted,
+    letterSpacing: 0.2,
+    textAlign:     'center',
+  },
+  labelActive: {
+    fontFamily: fontFamily.bodyMedium,
+    color:      palette.amber,
+  },
 });

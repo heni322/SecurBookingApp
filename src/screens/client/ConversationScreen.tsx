@@ -1,5 +1,6 @@
-﻿/**
- * ConversationScreen — messagerie temps réel entre client et agent sur une mission.
+/**
+ * ConversationScreen — messagerie temps réel entre client et agent.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import {
@@ -7,6 +8,7 @@ import {
   KeyboardAvoidingView, Platform, StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SendHorizonal } from 'lucide-react-native';
 import { conversationsApi } from '@api/endpoints/conversations';
 import { useApi }           from '@hooks/useApi';
 import { useAuthStore }     from '@store/authStore';
@@ -21,12 +23,12 @@ import type { Message, MissionStackParamList } from '@models/index';
 type Props = NativeStackScreenProps<MissionStackParamList, 'Conversation'>;
 
 export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { missionId }                             = route.params;
-  const { user }                                  = useAuthStore();
-  const { data: conversation, loading, execute }  = useApi(conversationsApi.getByMission);
-  const [text, setText]                           = useState('');
-  const [sending, setSending]                     = useState(false);
-  const listRef                                   = useRef<FlatList>(null);
+  const { missionId }                            = route.params;
+  const { user }                                 = useAuthStore();
+  const { data: conversation, loading, execute } = useApi(conversationsApi.getByMission);
+  const [text,    setText]    = useState('');
+  const [sending, setSending] = useState(false);
+  const listRef               = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
     await execute(missionId);
@@ -35,7 +37,14 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Polling toutes les 5s (remplacer par WebSocket/SSE en production)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      execute(missionId).catch(() => {});
+    }, 5_000);
+    return () => clearInterval(interval);
+  }, [execute, missionId]);
+
   useEffect(() => {
     if ((conversation?.messages?.length ?? 0) > 0) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -57,7 +66,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
   const messages = conversation?.messages ?? [];
 
   const renderMessage = ({ item }: { item: Message }) => {
-    const isMe = item.senderId === user?.id;
+    const isMe   = item.senderId === user?.id;
     const sender = item.sender;
 
     return (
@@ -78,8 +87,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
           <Text style={[msgStyles.time, isMe && msgStyles.timeMe]}>
             {new Date(item.createdAt).toLocaleTimeString('fr-FR', {
-              hour:   '2-digit',
-              minute: '2-digit',
+              hour: '2-digit', minute: '2-digit',
             })}
           </Text>
         </View>
@@ -114,7 +122,6 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyIcon}>💬</Text>
               <Text style={styles.emptyText}>
                 Démarrez la conversation avec votre agent.
               </Text>
@@ -141,7 +148,11 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           disabled={!text.trim() || sending}
           activeOpacity={0.8}
         >
-          <Text style={styles.sendIcon}>{sending ? '⏳' : '➤'}</Text>
+          <SendHorizonal
+            size={20}
+            color={(!text.trim() || sending) ? colors.textMuted : colors.textInverse}
+            strokeWidth={2}
+          />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -150,32 +161,32 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
 
 const msgStyles = StyleSheet.create({
   row: {
-    flexDirection:  'row',
-    alignItems:     'flex-end',
-    gap:            spacing[2],
-    marginBottom:   spacing[3],
+    flexDirection: 'row',
+    alignItems:    'flex-end',
+    gap:           spacing[2],
+    marginBottom:  spacing[3],
   },
   rowMe: { flexDirection: 'row-reverse' },
   bubble: {
-    maxWidth:    '75%',
+    maxWidth:     '75%',
     borderRadius: radius.xl,
-    padding:     spacing[3] + 2,
-    gap:         4,
+    padding:      spacing[3] + 2,
+    gap:          4,
   },
   bubbleThem: {
-    backgroundColor: colors.surface,
+    backgroundColor:        colors.surface,
     borderBottomLeftRadius: 4,
-    borderWidth:  1,
-    borderColor:  colors.border,
+    borderWidth:            1,
+    borderColor:            colors.border,
   },
   bubbleMe: {
-    backgroundColor:    colors.primary,
+    backgroundColor:         colors.primary,
     borderBottomRightRadius: 4,
   },
   senderName: {
-    fontFamily: fontFamily.bodyMedium,
-    fontSize:   fontSize.xs,
-    color:      colors.primary,
+    fontFamily:   fontFamily.bodyMedium,
+    fontSize:     fontSize.xs,
+    color:        colors.primary,
     marginBottom: 2,
   },
   content: {
@@ -202,13 +213,11 @@ const styles = StyleSheet.create({
     flexGrow:          1,
   },
   emptyWrap: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
+    flex:            1,
+    alignItems:      'center',
+    justifyContent:  'center',
     paddingVertical: spacing[16],
-    gap:            spacing[3],
   },
-  emptyIcon: { fontSize: 44 },
   emptyText: {
     fontFamily: fontFamily.body,
     fontSize:   fontSize.sm,
@@ -216,27 +225,27 @@ const styles = StyleSheet.create({
     textAlign:  'center',
   },
   inputBar: {
-    flexDirection:   'row',
-    alignItems:      'flex-end',
+    flexDirection:     'row',
+    alignItems:        'flex-end',
     paddingHorizontal: layout.screenPaddingH,
     paddingVertical:   spacing[3],
-    backgroundColor: colors.backgroundElevated,
-    borderTopWidth:  1,
-    borderTopColor:  colors.border,
-    gap:             spacing[3],
+    backgroundColor:   colors.backgroundElevated,
+    borderTopWidth:    1,
+    borderTopColor:    colors.border,
+    gap:               spacing[3],
   },
   input: {
-    flex:            1,
-    maxHeight:       120,
-    backgroundColor: colors.surface,
-    borderRadius:    radius.xl,
-    borderWidth:     1,
-    borderColor:     colors.border,
+    flex:              1,
+    maxHeight:         120,
+    backgroundColor:   colors.surface,
+    borderRadius:      radius.xl,
+    borderWidth:       1,
+    borderColor:       colors.border,
     paddingHorizontal: spacing[4],
-    paddingVertical: spacing[3],
-    fontFamily:      fontFamily.body,
-    fontSize:        fontSize.base,
-    color:           colors.textPrimary,
+    paddingVertical:   spacing[3],
+    fontFamily:        fontFamily.body,
+    fontSize:          fontSize.base,
+    color:             colors.textPrimary,
   },
   sendBtn: {
     width:           44,
@@ -247,9 +256,4 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
   },
   sendBtnDisabled: { backgroundColor: colors.border },
-  sendIcon: {
-    fontSize: 18,
-    color:    colors.textInverse,
-    marginLeft: 2,
-  },
 });

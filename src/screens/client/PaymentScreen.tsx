@@ -1,13 +1,11 @@
-﻿/**
- * PaymentScreen — confirmation de paiement Stripe.
- * En production : intégrer @stripe/stripe-react-native pour le sheet natif.
- * Ici : simulation de confirmation avec le clientSecret reçu.
+/**
+ * PaymentScreen — page de paiement Stripe.
+ * Icônes : lucide-react-native
  */
 import React, { useState } from 'react';
-import {
-  View, Text, ScrollView, Alert, StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Lock, CreditCard, CheckCircle2, ShieldCheck, Lightbulb } from 'lucide-react-native';
 import { Button }      from '@components/ui/Button';
 import { Card }        from '@components/ui/Card';
 import { ScreenHeader } from '@components/ui/ScreenHeader';
@@ -15,42 +13,43 @@ import { Separator }   from '@components/ui/Separator';
 import { colors }      from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
+import { formatCurrency }          from '@utils/formatters';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'PaymentScreen'>;
 
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { missionId, clientSecret } = route.params;
-  const [loading, setLoading]       = useState(false);
-  const [paid,    setPaid]          = useState(false);
+  const { missionId, clientSecret, totalTTC } = route.params;
+  const [loading, setLoading] = useState(false);
+  const [paid,    setPaid]    = useState(false);
 
   /**
-   * En production, remplacer cette logique par :
+   * TODO production :
    *   const { confirmPayment } = useStripe();
    *   const { error } = await confirmPayment(clientSecret, { paymentMethodType: 'Card' });
    */
   const handleConfirmPayment = async () => {
     setLoading(true);
     try {
-      // Simuler la confirmation (remplacer par Stripe SDK)
       await new Promise<void>((res) => setTimeout(res, 1800));
       setPaid(true);
     } catch {
-      Alert.alert('Paiement refusé', 'Veuillez vérifier vos informations bancaires et réessayer.');
+      Alert.alert('Paiement refusé', 'Veuillez vérifier vos informations et réessayer.');
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Succès ──────────────────────────────────────────────────────────────────
   if (paid) {
     return (
       <View style={styles.successScreen}>
         <View style={styles.successIcon}>
-          <Text style={styles.successEmoji}>✅</Text>
+          <CheckCircle2 size={54} color={colors.success} strokeWidth={1.5} />
         </View>
         <Text style={styles.successTitle}>Paiement confirmé !</Text>
         <Text style={styles.successSubtitle}>
-          Votre mission est maintenant confirmée. Nous publions les postes aux agents qualifiés dans votre secteur.
+          Votre mission est confirmée. Les agents qualifiés dans votre secteur vont recevoir une notification et pourront candidater.
         </Text>
         <Button
           label="Voir ma mission"
@@ -70,6 +69,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   }
 
+  // ── Formulaire ─────────────────────────────────────────────────────────────
   return (
     <View style={styles.screen}>
       <ScreenHeader
@@ -78,23 +78,31 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         onBack={() => navigation.goBack()}
       />
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Stripe placeholder */}
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Récap montant */}
+        <Card style={styles.amountCard} elevated>
+          <Text style={styles.amountLabel}>Montant total TTC</Text>
+          <Text style={styles.amountValue}>
+            {totalTTC ? formatCurrency(totalTTC * 100) : '—'}
+          </Text>
+          <Text style={styles.amountSub}>TVA 20% incluse · Virement agent à J+15</Text>
+        </Card>
+
+        {/* Formulaire carte */}
         <Card style={styles.stripeCard} elevated>
           <View style={styles.stripeHeader}>
-            <Text style={styles.stripeTitle}>🔒 Stripe Checkout</Text>
-            <Text style={styles.stripeSubtitle}>Chiffrement TLS 256-bit</Text>
+            <View style={styles.stripeHeaderLeft}>
+              <Lock size={18} color={colors.success} strokeWidth={2} />
+              <Text style={styles.stripeTitle}>Carte bancaire</Text>
+            </View>
+            <Text style={styles.stripeSubtitle}>TLS 256-bit</Text>
           </View>
           <Separator marginV={spacing[4]} />
 
-          {/* Card Number */}
           <Text style={styles.fieldLabel}>Numéro de carte</Text>
           <View style={styles.fieldBox}>
             <Text style={styles.fieldPlaceholder}>1234  5678  9012  3456</Text>
-            <Text style={styles.cardBrand}>💳</Text>
+            <CreditCard size={20} color={colors.textMuted} strokeWidth={1.5} />
           </View>
 
           <View style={styles.row}>
@@ -108,41 +116,35 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.fieldLabel}>CVC</Text>
               <View style={styles.fieldBox}>
                 <Text style={styles.fieldPlaceholder}>•••</Text>
+                <Lock size={15} color={colors.textMuted} strokeWidth={1.5} />
               </View>
             </View>
           </View>
 
-          <View style={styles.stripeBadges}>
-            <Text style={styles.stripeBadge}>Visa</Text>
-            <Text style={styles.stripeBadge}>Mastercard</Text>
-            <Text style={styles.stripeBadge}>CB</Text>
-            <Text style={styles.stripeBadge}>AMEX</Text>
+          {/* Logos CB */}
+          <View style={styles.badges}>
+            {['Visa', 'Mastercard', 'CB', 'AMEX'].map((b) => (
+              <Text key={b} style={styles.badge}>{b}</Text>
+            ))}
           </View>
         </Card>
 
-        {/* Integration notice */}
+        {/* Note dev */}
         <View style={styles.devNotice}>
+          <Lightbulb size={16} color={colors.warning} strokeWidth={1.8} />
           <Text style={styles.devNoticeText}>
-            💡 En production, intégrer{' '}
-            <Text style={styles.devNoticeCode}>@stripe/stripe-react-native</Text>
+            Intégrer{' '}
+            <Text style={styles.devCode}>@stripe/stripe-react-native</Text>
             {' '}et appeler{' '}
-            <Text style={styles.devNoticeCode}>confirmPayment(clientSecret)</Text>
+            <Text style={styles.devCode}>confirmPayment(clientSecret)</Text>
             {' '}pour le sheet natif sécurisé.
           </Text>
         </View>
-
-        {/* Récap clientSecret (debug) */}
-        <Card style={styles.secretCard}>
-          <Text style={styles.secretLabel}>Payment Intent</Text>
-          <Text style={styles.secretValue} numberOfLines={1}>
-            {clientSecret.slice(0, 30)}…
-          </Text>
-        </Card>
       </ScrollView>
 
       <View style={styles.footer}>
         <Button
-          label={loading ? 'Traitement en cours…' : '💳  Confirmer le paiement'}
+          label={loading ? 'Traitement…' : `Payer ${totalTTC ? formatCurrency(totalTTC * 100) : ''}`}
           onPress={handleConfirmPayment}
           loading={loading}
           fullWidth
@@ -157,17 +159,19 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: colors.background },
-  content:        { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[6], gap: spacing[4] },
-  stripeCard:     { gap: spacing[3] },
-  stripeHeader:   { gap: spacing[1] },
-  stripeTitle: {
-    fontFamily:    fontFamily.display,
-    fontSize:      fontSize.md,
-    color:         colors.textPrimary,
-    letterSpacing: -0.2,
-  },
-  stripeSubtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.success },
+  screen:  { flex: 1, backgroundColor: colors.background },
+  content: { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[6], gap: spacing[4] },
+
+  amountCard:  { alignItems: 'center', gap: spacing[1], paddingVertical: spacing[5] },
+  amountLabel: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1 },
+  amountValue: { fontFamily: fontFamily.display, fontSize: fontSize['3xl'], color: colors.primary, letterSpacing: -1 },
+  amountSub:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
+
+  stripeCard:       { gap: spacing[3] },
+  stripeHeader:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stripeHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  stripeTitle:      { fontFamily: fontFamily.display, fontSize: fontSize.md, color: colors.textPrimary, letterSpacing: -0.2 },
+  stripeSubtitle:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.success },
   fieldLabel: {
     fontFamily:    fontFamily.bodyMedium,
     fontSize:      fontSize.xs,
@@ -177,49 +181,46 @@ const styles = StyleSheet.create({
     marginBottom:  spacing[2],
   },
   fieldBox: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'space-between',
-    height:          48,
-    backgroundColor: colors.backgroundElevated,
-    borderRadius:    radius.md,
-    borderWidth:     1,
-    borderColor:     colors.border,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    height:            48,
+    backgroundColor:   colors.backgroundElevated,
+    borderRadius:      radius.md,
+    borderWidth:       1,
+    borderColor:       colors.border,
     paddingHorizontal: spacing[4],
-    marginBottom:    spacing[3],
+    marginBottom:      spacing[3],
   },
   fieldPlaceholder: { fontFamily: fontFamily.mono, fontSize: fontSize.base, color: colors.textMuted },
-  cardBrand:        { fontSize: 20 },
   row:  { flexDirection: 'row', gap: spacing[3] },
   half: { flex: 1 },
-  stripeBadges: {
-    flexDirection: 'row',
-    gap:           spacing[2],
-    marginTop:     spacing[2],
-  },
-  stripeBadge: {
-    fontFamily:      fontFamily.bodyMedium,
-    fontSize:        fontSize.xs,
-    color:           colors.textMuted,
-    backgroundColor: colors.backgroundElevated,
+  badges: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[2] },
+  badge: {
+    fontFamily:        fontFamily.bodyMedium,
+    fontSize:          fontSize.xs,
+    color:             colors.textMuted,
+    backgroundColor:   colors.backgroundElevated,
     paddingHorizontal: spacing[2],
-    paddingVertical: 3,
-    borderRadius:    radius.sm,
-    borderWidth:     1,
-    borderColor:     colors.border,
+    paddingVertical:   3,
+    borderRadius:      radius.sm,
+    borderWidth:       1,
+    borderColor:       colors.border,
   },
+
   devNotice: {
+    flexDirection:   'row',
+    alignItems:      'flex-start',
+    gap:             spacing[3],
     backgroundColor: colors.warningSurface,
     borderRadius:    radius.lg,
     padding:         spacing[4],
     borderWidth:     1,
     borderColor:     colors.warning,
   },
-  devNoticeText: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning, lineHeight: fontSize.xs * 1.7 },
-  devNoticeCode: { fontFamily: fontFamily.mono, color: colors.primaryLight },
-  secretCard:    { gap: spacing[1] },
-  secretLabel:   { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
-  secretValue:   { fontFamily: fontFamily.mono, fontSize: fontSize.xs, color: colors.textSecondary },
+  devNoticeText: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning, lineHeight: fontSize.xs * 1.7 },
+  devCode:       { fontFamily: fontFamily.mono, color: colors.primaryLight },
+
   footer: {
     paddingHorizontal: layout.screenPaddingH,
     paddingVertical:   spacing[4],
@@ -230,19 +231,19 @@ const styles = StyleSheet.create({
   },
   footerNote: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, textAlign: 'center', lineHeight: fontSize.xs * 1.6 },
 
-  // Success state
+  // Succès
   successScreen: {
-    flex:            1,
-    backgroundColor: colors.background,
-    alignItems:      'center',
-    justifyContent:  'center',
+    flex:              1,
+    backgroundColor:   colors.background,
+    alignItems:        'center',
+    justifyContent:    'center',
     paddingHorizontal: layout.screenPaddingH,
-    gap:             spacing[4],
+    gap:               spacing[4],
   },
   successIcon: {
-    width:           100,
-    height:          100,
-    borderRadius:    50,
+    width:           110,
+    height:          110,
+    borderRadius:    55,
     backgroundColor: colors.successSurface,
     borderWidth:     2,
     borderColor:     colors.success,
@@ -250,7 +251,6 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginBottom:    spacing[2],
   },
-  successEmoji:    { fontSize: 50 },
   successTitle: {
     fontFamily:    fontFamily.display,
     fontSize:      fontSize['2xl'],

@@ -3,10 +3,11 @@ import { Platform } from 'react-native';
 // ─── API Base URL ─────────────────────────────────────────────────────────────
 // In dev: Android emulator uses 10.0.2.2 to reach host localhost
 //         iOS simulator uses localhost directly
+// USB connection: adb reverse tcp:3000 tcp:3000 maps device localhost → PC localhost
+// This works for both physical device (USB) and emulator
+const DEV_HOST = '192.168.1.13';
 export const API_BASE_URL = __DEV__
-  ? Platform.OS === 'android'
-    ? 'http://10.0.2.2:3000/api/v1'
-    : 'http://localhost:3000/api/v1'
+  ? `http://${DEV_HOST}:3000/api/v1`
   : 'https://api.securbooking.com/api/v1';
 
 export const API_TIMEOUT = 15_000;

@@ -1,24 +1,44 @@
-﻿/**
+/**
  * NotificationItem — ligne de notification avec statut lu/non-lu.
+ * Icônes : lucide-react-native (fallback emoji pour les types non couverts)
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  Megaphone, CheckCircle2, MapPin, LogOut,
+  CreditCard, AlertTriangle, Star, FileCheck,
+  XCircle, Bell,
+} from 'lucide-react-native';
 import { colors }  from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { formatDate } from '@utils/formatters';
 import type { AppNotification } from '@models/index';
 
-const TYPE_ICON: Record<string, string> = {
-  MISSION_PUBLISHED:   '📢',
-  BOOKING_ASSIGNED:    '✅',
-  BOOKING_CHECKIN:     '📍',
-  BOOKING_CHECKOUT:    '🏁',
-  PAYMENT_CONFIRMED:   '💳',
-  INCIDENT_REPORTED:   '⚠️',
-  RATING_RECEIVED:     '⭐',
-  DOCUMENT_APPROVED:   '📄',
-  DOCUMENT_REJECTED:   '❌',
+type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
+
+interface NotifMeta {
+  Icon:    LucideIconComp;
+  color:   string;
+  bgColor: string;
+}
+
+const TYPE_META: Record<string, NotifMeta> = {
+  MISSION_PUBLISHED: { Icon: Megaphone,    color: colors.primary,  bgColor: colors.primarySurface },
+  BOOKING_ASSIGNED:  { Icon: CheckCircle2, color: colors.success,  bgColor: colors.successSurface },
+  BOOKING_CHECKIN:   { Icon: MapPin,       color: colors.info,     bgColor: colors.infoSurface    },
+  BOOKING_CHECKOUT:  { Icon: LogOut,       color: colors.primary,  bgColor: colors.primarySurface },
+  PAYMENT_CONFIRMED: { Icon: CreditCard,   color: colors.success,  bgColor: colors.successSurface },
+  INCIDENT_REPORTED: { Icon: AlertTriangle,color: colors.warning,  bgColor: colors.warningSurface },
+  RATING_RECEIVED:   { Icon: Star,         color: '#EAB308',       bgColor: '#713F1215'            },
+  DOCUMENT_APPROVED: { Icon: FileCheck,    color: colors.success,  bgColor: colors.successSurface },
+  DOCUMENT_REJECTED: { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface  },
+};
+
+const DEFAULT_META: NotifMeta = {
+  Icon:    Bell,
+  color:   colors.primary,
+  bgColor: colors.primarySurface,
 };
 
 interface Props {
@@ -27,7 +47,8 @@ interface Props {
 }
 
 export const NotificationItem: React.FC<Props> = ({ notification, onPress }) => {
-  const icon = TYPE_ICON[notification.type] ?? '🔔';
+  const meta = TYPE_META[notification.type] ?? DEFAULT_META;
+  const { Icon, color, bgColor } = meta;
 
   return (
     <TouchableOpacity
@@ -35,8 +56,8 @@ export const NotificationItem: React.FC<Props> = ({ notification, onPress }) => 
       onPress={onPress}
       style={[styles.container, !notification.isRead && styles.unread]}
     >
-      <View style={[styles.iconBubble, !notification.isRead && styles.iconBubbleActive]}>
-        <Text style={styles.iconText}>{icon}</Text>
+      <View style={[styles.iconBubble, { backgroundColor: bgColor, borderColor: color + '44' }]}>
+        <Icon size={20} color={color} strokeWidth={1.8} />
       </View>
       <View style={styles.content}>
         <View style={styles.topRow}>
@@ -54,34 +75,25 @@ export const NotificationItem: React.FC<Props> = ({ notification, onPress }) => 
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection:   'row',
-    alignItems:      'flex-start',
+    flexDirection:     'row',
+    alignItems:        'flex-start',
     paddingHorizontal: spacing[5],
     paddingVertical:   spacing[4],
-    gap:             spacing[3],
+    gap:               spacing[3],
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor:   colors.background,
   },
-  unread: {
-    backgroundColor: colors.primarySurface,
-  },
+  unread:    { backgroundColor: colors.primarySurface },
   iconBubble: {
-    width:           42,
-    height:          42,
-    borderRadius:    radius.lg,
-    backgroundColor: colors.surface,
-    borderWidth:     1,
-    borderColor:     colors.border,
-    alignItems:      'center',
-    justifyContent:  'center',
-    flexShrink:      0,
+    width:          42,
+    height:         42,
+    borderRadius:   radius.lg,
+    borderWidth:    1,
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
   },
-  iconBubbleActive: {
-    borderColor:     colors.borderPrimary,
-    backgroundColor: colors.primarySurface,
-  },
-  iconText:  { fontSize: 20 },
   content:   { flex: 1, gap: spacing[1] },
   topRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: {
@@ -90,10 +102,7 @@ const styles = StyleSheet.create({
     color:      colors.textSecondary,
     flex:       1,
   },
-  titleBold: {
-    color:      colors.textPrimary,
-    fontFamily: fontFamily.bodySemiBold,
-  },
+  titleBold: { color: colors.textPrimary, fontFamily: fontFamily.bodySemiBold },
   dot: {
     width:           8,
     height:          8,

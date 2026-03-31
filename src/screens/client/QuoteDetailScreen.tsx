@@ -1,31 +1,31 @@
-﻿/**
- * QuoteDetailScreen — affiche le devis d'une mission et propose
- * d'accepter → déclenche le paiement Stripe.
+/**
+ * QuoteDetailScreen — affiche le devis et déclenche le paiement Stripe.
+ * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback, useState } from 'react';
-import {
-  View, Text, ScrollView, Alert, StyleSheet,
-} from 'react-native';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { quotesApi }    from '@api/endpoints/quotes';
-import { paymentsApi }  from '@api/endpoints/payments';
-import { useApi }       from '@hooks/useApi';
+import { Clock, CheckCircle2, CreditCard, Lock, Info } from 'lucide-react-native';
+import { quotesApi }          from '@api/endpoints/quotes';
+import { paymentsApi }        from '@api/endpoints/payments';
+import { useApi }             from '@hooks/useApi';
 import { QuoteBreakdownCard } from '@components/domain/QuoteBreakdownCard';
-import { LoadingState }  from '@components/ui/LoadingState';
-import { EmptyState }    from '@components/ui/EmptyState';
-import { ScreenHeader }  from '@components/ui/ScreenHeader';
-import { colors }        from '@theme/colors';
-import { spacing, layout } from '@theme/spacing';
-import { fontSize, fontFamily } from '@theme/typography';
+import { LoadingState }       from '@components/ui/LoadingState';
+import { EmptyState }         from '@components/ui/EmptyState';
+import { ScreenHeader }       from '@components/ui/ScreenHeader';
+import { Button }             from '@components/ui/Button';
+import { colors }             from '@theme/colors';
+import { spacing, layout, radius } from '@theme/spacing';
+import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'QuoteDetail'>;
 
 export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { missionId }                                 = route.params;
-  const { data: quote, loading, execute }             = useApi(quotesApi.getByMission);
-  const [accepting, setAccepting]                     = useState(false);
-  const [paying,    setPaying]                        = useState(false);
+  const { missionId }                     = route.params;
+  const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
+  const [accepting, setAccepting]         = useState(false);
+  const [paying,    setPaying]            = useState(false);
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
@@ -37,7 +37,8 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       await quotesApi.accept(quote.id);
       await load();
     } catch (err: unknown) {
-      Alert.alert('Erreur', (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Impossible d\'accepter le devis');
+      const msg = (err as any)?.response?.data?.message ?? "Impossible d'accepter le devis";
+      Alert.alert('Erreur', msg);
     } finally {
       setAccepting(false);
     }
@@ -47,13 +48,19 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!quote) return;
     setPaying(true);
     try {
-      const { data: res } = await paymentsApi.createIntent({ missionId });
+      const { data: res } = await paymentsApi.createIntent({
+        missionId,
+        method: 'CARD',
+      });
+      const intent = (res as any).data;
       navigation.navigate('PaymentScreen', {
         missionId,
-        clientSecret: res.data.clientSecret,
+        clientSecret: intent.clientSecret,
+        totalTTC:     quote.totalWithVat,
       });
     } catch (err: unknown) {
-      Alert.alert('Erreur', (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Impossible d\'initier le paiement');
+      const msg = (err as any)?.response?.data?.message ?? "Impossible d'initier le paiement";
+      Alert.alert('Erreur', msg);
     } finally {
       setPaying(false);
     }
@@ -63,7 +70,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     <View style={styles.screen}>
       <ScreenHeader
         title="Devis"
-        subtitle={quote ? `Mission #${missionId.slice(-6).toUpperCase()}` : ''}
+        subtitle={quote ? `Réf. #${missionId.slice(-6).toUpperCase()}` : ''}
         onBack={() => navigation.goBack()}
       />
 
@@ -80,26 +87,26 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
-          {/* Info contextuelle selon statut */}
+          {/* Bandeaux contextuels */}
           {quote.status === 'PENDING' && (
             <View style={styles.infoBanner}>
-              <Text style={styles.infoBannerIcon}>⏳</Text>
-              <Text style={styles.infoBannerText}>
+              <Clock size={18} color={colors.info} strokeWidth={1.8} />
+              <Text style={styles.bannerText}>
                 Vérifiez le détail tarifaire et acceptez le devis pour procéder au paiement.
               </Text>
             </View>
           )}
+
           {quote.status === 'ACCEPTED' && (
             <View style={styles.successBanner}>
-              <Text style={styles.infoBannerIcon}>✅</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.infoBannerText, { color: colors.success }]}>
-                  Devis accepté — procédez au paiement pour valider votre mission.
-                </Text>
-              </View>
+              <CheckCircle2 size={18} color={colors.success} strokeWidth={2} />
+              <Text style={[styles.bannerText, { color: colors.success }]}>
+                Devis accepté — procédez au paiement pour valider votre mission.
+              </Text>
             </View>
           )}
 
+          {/* Carte de breakdown */}
           <QuoteBreakdownCard
             quote={quote}
             onAccept={handleAccept}
@@ -107,22 +114,22 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             readonly={quote.status !== 'PENDING'}
           />
 
-          {/* CTA paiement si devis accepté */}
+          {/* CTA paiement */}
           {quote.status === 'ACCEPTED' && (
-            <View style={styles.payBtnWrap}>
-              <Text style={styles.payNote}>
-                🔒 Paiement sécurisé via Stripe — vos données bancaires ne transitent jamais par nos serveurs.
-              </Text>
-              <View
-                style={[styles.payBtn, paying && styles.payBtnLoading]}
-              >
-                <Text
-                  style={styles.payBtnText}
-                  onPress={paying ? undefined : handlePay}
-                >
-                  {paying ? 'Redirection…' : '💳  Payer maintenant'}
+            <View style={styles.paySection}>
+              <View style={styles.secureRow}>
+                <Lock size={13} color={colors.textMuted} strokeWidth={2} />
+                <Text style={styles.secureNote}>
+                  Paiement sécurisé via Stripe — vos données bancaires ne transitent jamais par nos serveurs.
                 </Text>
               </View>
+              <Button
+                label={paying ? 'Redirection…' : 'Payer maintenant'}
+                onPress={paying ? undefined : handlePay}
+                loading={paying}
+                fullWidth
+                size="lg"
+              />
             </View>
           )}
         </ScrollView>
@@ -143,7 +150,7 @@ const styles = StyleSheet.create({
     flexDirection:   'row',
     alignItems:      'flex-start',
     backgroundColor: colors.infoSurface,
-    borderRadius:    14,
+    borderRadius:    radius.xl,
     padding:         spacing[4],
     borderWidth:     1,
     borderColor:     colors.info,
@@ -153,41 +160,26 @@ const styles = StyleSheet.create({
     flexDirection:   'row',
     alignItems:      'flex-start',
     backgroundColor: colors.successSurface,
-    borderRadius:    14,
+    borderRadius:    radius.xl,
     padding:         spacing[4],
     borderWidth:     1,
     borderColor:     colors.success,
     gap:             spacing[3],
   },
-  infoBannerIcon: { fontSize: 20 },
-  infoBannerText: {
+  bannerText: {
     flex:       1,
     fontFamily: fontFamily.body,
     fontSize:   fontSize.sm,
     color:      colors.info,
     lineHeight: fontSize.sm * 1.6,
   },
-  payBtnWrap: {
-    gap: spacing[3],
-  },
-  payNote: {
+  paySection: { gap: spacing[3] },
+  secureRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  secureNote: {
+    flex:       1,
     fontFamily: fontFamily.body,
     fontSize:   fontSize.xs,
     color:      colors.textMuted,
-    textAlign:  'center',
     lineHeight: fontSize.xs * 1.7,
-  },
-  payBtn: {
-    backgroundColor: colors.primary,
-    borderRadius:    16,
-    paddingVertical: spacing[4],
-    alignItems:      'center',
-  },
-  payBtnLoading: { opacity: 0.6 },
-  payBtnText: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize:   fontSize.md,
-    color:      colors.textInverse,
-    letterSpacing: 0.2,
   },
 });

@@ -1,6 +1,6 @@
-﻿/**
+/**
  * LoginScreen — authentification client.
- * Design : obsidian dark, amber accent, champs flottants.
+ * Icônes : lucide-react-native
  */
 import React, { useState } from 'react';
 import {
@@ -8,14 +8,14 @@ import {
   KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Mail, Lock, Eye, EyeOff, ShieldCheck, KeyRound } from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
-import { usersApi }     from '@api/endpoints/users';
 import { tokenStorage } from '@services/tokenStorage';
 import { useAuthStore } from '@store/authStore';
 import { Button }  from '@components/ui/Button';
 import { Input }   from '@components/ui/Input';
 import { colors }  from '@theme/colors';
-import { spacing, layout } from '@theme/spacing';
+import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User } from '@models/index';
 
@@ -34,9 +34,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!email.trim())   e.email    = 'Email requis';
-    if (!password)       e.password = 'Mot de passe requis';
-    if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Email invalide';
+    if (!email.trim())                  e.email    = 'Email requis';
+    if (!password)                      e.password = 'Mot de passe requis';
+    if (!/\S+@\S+\.\S+/.test(email))   e.email    = 'Email invalide';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -46,16 +46,15 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     try {
       const { data: res } = await authApi.login({
-        email: email.trim().toLowerCase(),
+        email:    email.trim().toLowerCase(),
         password,
         ...(need2FA && twoFaCode ? { twoFaCode } : {}),
       });
-      const { tokens } = res.data as { user: User; tokens: AuthTokens };
-      tokenStorage.setTokens(tokens);
-
-      // Fetch full profile
-      const { data: meRes } = await usersApi.getMe();
-      hydrate(meRes.data, tokens);
+      const { user, accessToken, refreshToken } = (res as any).data as {
+        user: User; accessToken: string; refreshToken: string;
+      };
+      const tokens: AuthTokens = { accessToken, refreshToken, expiresIn: 900 };
+      hydrate(user, tokens);
     } catch (err: unknown) {
       const status  = (err as { response?: { status?: number } })?.response?.status;
       const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Erreur de connexion';
@@ -79,10 +78,10 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo area */}
+        {/* Logo */}
         <View style={styles.hero}>
           <View style={styles.logoMark}>
-            <Text style={styles.logoIcon}>🛡</Text>
+            <ShieldCheck size={40} color={colors.primary} strokeWidth={1.8} />
           </View>
           <Text style={styles.brand}>SecurBook</Text>
           <Text style={styles.tagline}>Sécurité privée on‑demand</Text>
@@ -105,7 +104,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 autoComplete="email"
                 placeholder="vous@exemple.com"
                 error={errors.email}
-                leftIcon={<Text style={styles.inputIcon}>✉️</Text>}
+                leftIcon={<Mail size={16} color={colors.textMuted} strokeWidth={1.8} />}
               />
               <Input
                 label="Mot de passe"
@@ -115,9 +114,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 autoComplete="password"
                 placeholder="••••••••"
                 error={errors.password}
-                leftIcon={<Text style={styles.inputIcon}>🔒</Text>}
+                leftIcon={<Lock size={16} color={colors.textMuted} strokeWidth={1.8} />}
                 rightIcon={
-                  <Text style={styles.inputIcon}>{showPass ? '🙈' : '👁'}</Text>
+                  showPass
+                    ? <EyeOff size={18} color={colors.textMuted} strokeWidth={1.8} />
+                    : <Eye    size={18} color={colors.textMuted} strokeWidth={1.8} />
                 }
                 onRightPress={() => setShowPass((v) => !v)}
               />
@@ -134,7 +135,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 keyboardType="number-pad"
                 placeholder="123456"
                 maxLength={6}
-                leftIcon={<Text style={styles.inputIcon}>🔐</Text>}
+                leftIcon={<KeyRound size={16} color={colors.textMuted} strokeWidth={1.8} />}
               />
             </>
           )}
@@ -149,10 +150,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
           />
 
           {need2FA && (
-            <TouchableOpacity
-              onPress={() => setNeed2FA(false)}
-              style={styles.linkRow}
-            >
+            <TouchableOpacity onPress={() => setNeed2FA(false)} style={styles.linkRow}>
               <Text style={styles.link}>← Retour</Text>
             </TouchableOpacity>
           )}
@@ -173,11 +171,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
 const styles = StyleSheet.create({
   flex:   { flex: 1, backgroundColor: colors.background },
   scroll: {
-    flexGrow:        1,
+    flexGrow:          1,
     paddingHorizontal: layout.screenPaddingH,
-    paddingTop:      spacing[12],
-    paddingBottom:   spacing[8],
-    justifyContent:  'center',
+    paddingTop:        spacing[12],
+    paddingBottom:     spacing[8],
+    justifyContent:    'center',
   },
   hero: {
     alignItems:   'center',
@@ -195,7 +193,6 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginBottom:    spacing[2],
   },
-  logoIcon:  { fontSize: 40 },
   brand: {
     fontFamily:    fontFamily.display,
     fontSize:      fontSize['3xl'],
@@ -203,14 +200,12 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   tagline: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.textSecondary,
+    fontFamily:    fontFamily.body,
+    fontSize:      fontSize.sm,
+    color:         colors.textSecondary,
     letterSpacing: 0.3,
   },
-  form: {
-    gap: spacing[1],
-  },
+  form:      { gap: spacing[1] },
   formTitle: {
     fontFamily:    fontFamily.display,
     fontSize:      fontSize.xl,
@@ -225,9 +220,8 @@ const styles = StyleSheet.create({
     lineHeight:   fontSize.sm * 1.6,
     marginBottom: spacing[4],
   },
-  inputIcon:  { fontSize: 16 },
-  submitBtn:  { marginTop: spacing[3] },
-  linkRow:    { alignItems: 'center', marginTop: spacing[3] },
+  submitBtn: { marginTop: spacing[3] },
+  linkRow:   { alignItems: 'center', marginTop: spacing[3] },
   link: {
     fontFamily: fontFamily.bodyMedium,
     fontSize:   fontSize.sm,
@@ -238,14 +232,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop:      spacing[8],
   },
-  footerText: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.textSecondary,
-  },
-  footerLink: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize:   fontSize.sm,
-    color:      colors.primary,
-  },
+  footerText: { fontFamily: fontFamily.body,         fontSize: fontSize.sm, color: colors.textSecondary },
+  footerLink: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
 });
