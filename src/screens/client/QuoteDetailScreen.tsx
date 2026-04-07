@@ -3,9 +3,9 @@
  * Icônes : lucide-react-native
  */
 import React, { useEffect, useCallback, useState } from 'react';
-import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Clock, CheckCircle2, CreditCard, Lock, Info } from 'lucide-react-native';
+import { Clock, CheckCircle2, CreditCard, Lock, Info, Landmark } from 'lucide-react-native';
 import { quotesApi }          from '@api/endpoints/quotes';
 import { paymentsApi }        from '@api/endpoints/payments';
 import { useApi }             from '@hooks/useApi';
@@ -26,6 +26,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
   const [accepting, setAccepting]         = useState(false);
   const [paying,    setPaying]            = useState(false);
+  const [payMethod, setPayMethod]          = useState<'CARD' | 'SEPA'>('CARD');
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
@@ -50,7 +51,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       const { data: res } = await paymentsApi.createIntent({
         missionId,
-        method: 'CARD',
+        method: payMethod,
       });
       const intent = (res as any).data;
       navigation.navigate('PaymentScreen', {
@@ -97,6 +98,39 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
 
+          {/* ── Sélecteur mode de paiement ── */}
+          {quote.status === 'ACCEPTED' && (
+            <View style={styles.methodSection}>
+              <Text style={styles.methodTitle}>Mode de paiement</Text>
+              <View style={styles.methodRow}>
+                <TouchableOpacity
+                  style={[styles.methodChip, payMethod === 'CARD' && styles.methodChipActive]}
+                  onPress={() => setPayMethod('CARD')}
+                  activeOpacity={0.75}
+                >
+                  <CreditCard size={16} color={payMethod === 'CARD' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
+                  <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>Carte bancaire</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.methodChip, payMethod === 'SEPA' && styles.methodChipActive]}
+                  onPress={() => setPayMethod('SEPA')}
+                  activeOpacity={0.75}
+                >
+                  <Landmark size={16} color={payMethod === 'SEPA' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
+                  <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>Virement SEPA</Text>
+                </TouchableOpacity>
+              </View>
+              {payMethod === 'SEPA' && (
+                <View style={styles.sepaNote}>
+                  <Info size={13} color={colors.primary} strokeWidth={2} />
+                  <Text style={styles.sepaText}>
+                    Le virement SEPA est traité sous 1–2 jours ouvrés. Votre IBAN sera collecté sur la page suivante via Stripe.
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {quote.status === 'ACCEPTED' && (
             <View style={styles.successBanner}>
               <CheckCircle2 size={18} color={colors.success} strokeWidth={2} />
@@ -115,6 +149,39 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           />
 
           {/* CTA paiement */}
+          {/* ── Sélecteur mode de paiement ── */}
+          {quote.status === 'ACCEPTED' && (
+            <View style={styles.methodSection}>
+              <Text style={styles.methodTitle}>Mode de paiement</Text>
+              <View style={styles.methodRow}>
+                <TouchableOpacity
+                  style={[styles.methodChip, payMethod === 'CARD' && styles.methodChipActive]}
+                  onPress={() => setPayMethod('CARD')}
+                  activeOpacity={0.75}
+                >
+                  <CreditCard size={16} color={payMethod === 'CARD' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
+                  <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>Carte bancaire</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.methodChip, payMethod === 'SEPA' && styles.methodChipActive]}
+                  onPress={() => setPayMethod('SEPA')}
+                  activeOpacity={0.75}
+                >
+                  <Landmark size={16} color={payMethod === 'SEPA' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
+                  <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>Virement SEPA</Text>
+                </TouchableOpacity>
+              </View>
+              {payMethod === 'SEPA' && (
+                <View style={styles.sepaNote}>
+                  <Info size={13} color={colors.primary} strokeWidth={2} />
+                  <Text style={styles.sepaText}>
+                    Le virement SEPA est traité sous 1–2 jours ouvrés. Votre IBAN sera collecté sur la page suivante via Stripe.
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {quote.status === 'ACCEPTED' && (
             <View style={styles.paySection}>
               <View style={styles.secureRow}>
@@ -182,4 +249,13 @@ const styles = StyleSheet.create({
     color:      colors.textMuted,
     lineHeight: fontSize.xs * 1.7,
   },
+  methodSection:      { marginTop: spacing[2], marginBottom: spacing[2] },
+  methodTitle:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing[3], textTransform: 'uppercase', letterSpacing: 0.5 },
+  methodRow:          { flexDirection: 'row', gap: spacing[3] },
+  methodChip:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], height: 46, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  methodChipActive:   { backgroundColor: colors.primarySurface, borderColor: colors.primary, borderWidth: 1.5 },
+  methodChipText:     { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted },
+  methodChipTextActive:{ color: colors.primary },
+  sepaNote:           { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], marginTop: spacing[3], backgroundColor: colors.primarySurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary },
+  sepaText:           { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primary, lineHeight: fontSize.xs * 1.6 },
 });

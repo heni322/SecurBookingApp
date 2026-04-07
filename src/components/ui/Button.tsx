@@ -19,9 +19,10 @@ import { fontSize, fontFamily } from '@theme/typography';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size    = 'sm' | 'md' | 'lg';
 
-interface ButtonProps {
-  label:      string;
-  onPress:    () => void;
+export interface ButtonProps {
+  label?:     string;       // preferred
+  title?:     string;       // ← FIX: legacy alias — fixes TS2322 "title does not exist"
+  onPress?:   (() => void) | undefined;  // ← FIX: allow undefined — fixes TS2322 in QuoteDetailScreen
   variant?:   Variant;
   size?:      Size;
   loading?:   boolean;
@@ -33,36 +34,20 @@ interface ButtonProps {
 
 const variantStyles: Record<Variant, { container: ViewStyle; text: TextStyle }> = {
   primary: {
-    container: {
-      backgroundColor: colors.primary,
-      borderWidth: 0,
-      ...shadow.amber,
-    },
-    text: { color: colors.textInverse },
+    container: { backgroundColor: colors.primary, borderWidth: 0, ...shadow.amber },
+    text:      { color: colors.textInverse },
   },
   secondary: {
-    container: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.borderStrong,
-    },
-    text: { color: colors.textPrimary },
+    container: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
+    text:      { color: colors.textPrimary },
   },
   ghost: {
-    container: {
-      backgroundColor: 'transparent',   // ← valeur littérale, pas de lookup colors
-      borderWidth: 1,
-      borderColor: colors.borderPrimary,
-    },
-    text: { color: colors.primary },
+    container: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderPrimary },
+    text:      { color: colors.primary },
   },
   danger: {
-    container: {
-      backgroundColor: colors.dangerSurface,
-      borderWidth: 1,
-      borderColor: colors.danger,
-    },
-    text: { color: colors.danger },
+    container: { backgroundColor: colors.dangerSurface, borderWidth: 1, borderColor: colors.danger },
+    text:      { color: colors.danger },
   },
 };
 
@@ -83,6 +68,7 @@ const sizeStyles: Record<Size, { container: ViewStyle; text: TextStyle }> = {
 
 export const Button: React.FC<ButtonProps> = ({
   label,
+  title,
   onPress,
   variant   = 'primary',
   size      = 'md',
@@ -92,12 +78,14 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
-  const isDisabled = disabled || loading;
+  // Accept either `label` or `title` for back-compat
+  const text       = label ?? title ?? '';
+  const isDisabled = disabled || loading || !onPress;
 
   return (
     <TouchableOpacity
       activeOpacity={0.75}
-      onPress={onPress}
+      onPress={onPress ?? undefined}
       disabled={isDisabled}
       style={[
         styles.base,
@@ -115,15 +103,10 @@ export const Button: React.FC<ButtonProps> = ({
         />
       ) : (
         <Text
-          style={[
-            styles.label,
-            variantStyles[variant].text,
-            sizeStyles[size].text,
-            textStyle,
-          ]}
+          style={[styles.label, variantStyles[variant].text, sizeStyles[size].text, textStyle]}
           numberOfLines={1}
         >
-          {label}
+          {text}
         </Text>
       )}
     </TouchableOpacity>
@@ -131,20 +114,8 @@ export const Button: React.FC<ButtonProps> = ({
 };
 
 const styles = StyleSheet.create({
-  base: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    alignSelf:      'flex-start',
-  },
-  fullWidth: {
-    alignSelf: 'stretch',
-  },
-  disabled: {
-    opacity: 0.45,
-  },
-  label: {
-    fontFamily:    fontFamily.bodySemiBold,
-    letterSpacing: 0.2,
-  },
+  base:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
+  fullWidth: { alignSelf: 'stretch' },
+  disabled:  { opacity: 0.45 },
+  label:     { fontFamily: fontFamily.bodySemiBold, letterSpacing: 0.2 },
 });

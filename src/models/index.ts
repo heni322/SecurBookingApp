@@ -1,4 +1,4 @@
-import {
+﻿import {
   UserRole, UserStatus, MissionStatus, BookingStatus,
   DocumentStatus, PaymentStatus, ClientType,
 } from '@constants/enums';
@@ -76,7 +76,7 @@ export interface ServiceType {
   name:            string;
   description?:    string;
   category:        string;
-  baseRatePerHour: number;   // €/h — convention collective
+  baseRatePerHour: number;
   isActive:        boolean;
   createdAt:       string;
 }
@@ -84,20 +84,18 @@ export interface ServiceType {
 // ─────────────────────────────────────────────────────────────────────────────
 // QUOTE
 // ─────────────────────────────────────────────────────────────────────────────
-/** Quote retournée par le backend (champs à plat dans la table Prisma) */
 export interface Quote {
   id:               string;
   missionId:        string;
   status:           'PENDING' | 'ACCEPTED' | 'REJECTED';
   expiresAt:        string;
   createdAt:        string;
-  // Champs financiers à plat
-  totalClientPrice: number;   // HT
-  totalWithVat:     number;   // TTC — ce que paie le client
-  totalAgentSalary: number;   // virement agent J+15
-  platformMargin:   number;   // commission SecurBook
-  fixedCharges:     number;   // charges patronales
-  vatAmount:        number;   // TVA 20%
+  totalClientPrice: number;
+  totalWithVat:     number;
+  totalAgentSalary: number;
+  platformMargin:   number;
+  fixedCharges:     number;
+  vatAmount:        number;
   nightSurcharge:   number;
   weekendSurcharge: number;
   urgencySurcharge: number;
@@ -120,7 +118,6 @@ export interface Mission {
   id:            string;
   clientId:      string;
   status:        MissionStatus;
-  // Champs plats (pas d'objet location imbriqué — modèle Prisma)
   address:       string;
   city:          string;
   zipCode?:      string;
@@ -140,7 +137,6 @@ export interface Mission {
   updatedAt:     string;
 }
 
-/** Payload aligné sur CreateMissionDto backend */
 export interface CreateMissionPayload {
   address:       string;
   city:          string;
@@ -149,7 +145,7 @@ export interface CreateMissionPayload {
   longitude:     number;
   startAt:       string;
   endAt:         string;
-  durationHours: number;   // calculé côté frontend (min 6)
+  durationHours: number;
   title?:        string;
   notes?:        string;
   isUrgent?:     boolean;
@@ -171,21 +167,21 @@ export interface AgentSummary {
 }
 
 export interface Booking {
-  id:           string;
-  missionId:    string;
-  mission?:     Mission;
-  agentId?:     string;
-  agent?:       AgentSummary;
+  id:             string;
+  missionId:      string;
+  mission?:       Mission;
+  agentId?:       string;
+  agent?:         AgentSummary;
   serviceTypeId?: string;
-  serviceType?: ServiceType;
-  status:       BookingStatus;
-  checkinAt?:   string;
-  checkoutAt?:  string;
-  durationMin?: number;
-  incidents?:   Incident[];
-  applications?: Application[];
-  createdAt:    string;
-  updatedAt:    string;
+  serviceType?:   ServiceType;
+  status:         BookingStatus;
+  checkinAt?:     string;
+  checkoutAt?:    string;
+  durationMin?:   number;
+  incidents?:     Incident[];
+  applications?:  Application[];
+  createdAt:      string;
+  updatedAt:      string;
 }
 
 export interface Application {
@@ -218,13 +214,34 @@ export interface Incident {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DISPUTE  ← FIX: was missing — caused TS2305 in disputes.ts
+// ─────────────────────────────────────────────────────────────────────────────
+export interface Dispute {
+  id:          string;
+  missionId:   string;
+  bookingId?:  string;
+  reason:      string;
+  description: string;
+  status:      'OPEN' | 'UNDER_REVIEW' | 'RESOLVED' | 'REJECTED';
+  resolution?: string;
+  createdAt:   string;
+}
+
+export interface CreateDisputePayload {  // ← FIX: was missing — caused TS2724 in disputes.ts
+  missionId:   string;
+  bookingId?:  string;
+  reason:      string;
+  description: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Payment {
   id:             string;
   missionId:      string;
   stripeIntentId: string;
-  amount:         number;   // €  TTC
+  amount:         number;
   method:         'CARD' | 'SEPA' | 'TRANSFER';
   status:         PaymentStatus;
   invoiceNumber:  string;
@@ -290,22 +307,29 @@ export interface SendMessagePayload {
 // ─────────────────────────────────────────────────────────────────────────────
 // RATING
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 export interface Rating {
   id:        string;
-  authorId:  string;
-  author?:   User;
-  targetId:  string;
+  raterId:   string;
+  rater?:    User;
+  ratedId:   string;
   bookingId: string;
   score:     number;
   comment?:  string;
+  direction: 'CLIENT_TO_AGENT' | 'AGENT_TO_CLIENT';
   createdAt: string;
 }
 
+
 export interface CreateRatingPayload {
-  targetId:  string;
+  /** ratedId est optionnel — le backend le dérive auto depuis booking+direction */
+  ratedId?:  string;
   bookingId: string;
+  direction: 'CLIENT_TO_AGENT' | 'AGENT_TO_CLIENT';
   score:     number;
   comment?:  string;
+  /** Net Promoter Score 0-10 (spec §11 — NPS tracking) */
+  npsScore?:  number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -319,6 +343,7 @@ export type RootStackParamList = {
 export type AuthStackParamList = {
   Login:    undefined;
   Register: undefined;
+  TwoFa:    { tempToken: string };   // ← FIX: was missing → caused "TwoFa not assignable" errors
 };
 
 export type MainTabParamList = {
@@ -336,8 +361,21 @@ export type MissionStackParamList = {
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
   SelectAgent:    { bookingId: string };
-  PaymentScreen:  { missionId: string; clientSecret: string; totalTTC: number };
+  PaymentScreen:  { missionId: string; clientSecret: string; totalTTC: number; paymentMethod?: 'CARD' | 'SEPA'; intentType?: 'payment_intent' | 'setup_intent' };
   MissionSuccess: { missionId: string };
   Conversation:   { missionId: string };
-  RateAgent:      { bookingId: string; agentId: string };
+  RateAgent:      { bookingId: string; agentId: string; agentName: string; missionTitle: string };
+  LiveTracking:   {             // ← FIX: was missing → caused "LiveTracking not assignable"
+    missionId:      string;
+    bookingId:      string;
+    agentName:      string;
+    missionAddress: string;
+    siteLat:        number;
+    siteLng:        number;
+  };
+  Dispute:        {             // ← FIX: was missing → caused "Dispute not assignable"
+    missionId:    string;
+    bookingId?:   string;
+    missionTitle: string;
+  };
 };

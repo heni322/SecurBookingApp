@@ -48,11 +48,14 @@ export const colors = {
   textMuted:     palette.white30,
   textInverse:   palette.obsidian,
 
+  // ─── Shorthand aliases — fix TS2339 for colors.text ───────────────────
+  text:          palette.white,       // alias → textPrimary
+
   // Primary (Amber)
-  primary:       palette.amber,
-  primaryLight:  palette.amberLight,
-  primaryDark:   palette.amberDark,
-  primarySurface:'rgba(245,166,35,0.12)',
+  primary:        palette.amber,
+  primaryLight:   palette.amberLight,
+  primaryDark:    palette.amberDark,
+  primarySurface: 'rgba(245,166,35,0.12)',
 
   // Status
   success:        palette.emerald,
@@ -73,7 +76,7 @@ export const colors = {
   overlay:       'rgba(10,12,15,0.85)',
   scrim:         'rgba(0,0,0,0.6)',
 
-  // Utility (explicitement nommé pour éviter les magic strings)
+  // Utility
   transparent:   'transparent',
   white:         palette.white,
 } as const;

@@ -16,6 +16,14 @@ export const spacing = {
   12:  48,
   16:  64,
   20:  80,
+
+  // ─── Named aliases — fix all TS2339 for spacing.xs/sm/md/lg/xl/xxl ───
+  xs:  4,
+  sm:  8,
+  md:  16,
+  lg:  24,
+  xl:  32,
+  xxl: 40,
 } as const;
 
 export const radius = {

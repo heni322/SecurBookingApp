@@ -1,13 +1,3 @@
-/**
- * @file src/api/index.ts
- * ─────────────────────────────────────────────────────────────────────────────
- * Barrel API — SecurBookingApp (CLIENT only)
- *
- * Usage :
- *   import { authApi, missionsApi, bookingsApi } from '@api';
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
 export { default as apiClient } from './client';
 
 // Auth
@@ -29,7 +19,8 @@ export { paymentsApi }       from './endpoints/payments';
 export { conversationsApi }  from './endpoints/conversations';
 export { notificationsApi }  from './endpoints/notifications';
 export { ratingsApi }        from './endpoints/ratings';
+export { disputesApi }       from './endpoints/disputes';
 
-// Upload fichiers (avatar, justificatifs)
+// Upload fichiers
 export { uploadApi }         from './endpoints/upload';
 export type { UploadDocumentResponse } from './endpoints/upload';
