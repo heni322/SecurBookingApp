@@ -4,7 +4,11 @@ import type {
 } from '@models/index';
 
 export const paymentsApi = {
-  /** [CLIENT] Créer un PaymentIntent Stripe (devis ACCEPTED requis) */
+  /**
+   * [CLIENT] Créer un PaymentIntent (CARD) ou SetupIntent (SEPA).
+   * Le backend détermine le type depuis payload.method.
+   * Retourne clientSecret + type ('payment_intent' | 'setup_intent').
+   */
   createIntent: (payload: CreatePaymentIntentPayload) =>
     apiClient.post<ApiResponse<PaymentIntentResponse>>('/payments/intent', payload),
 

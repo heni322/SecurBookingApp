@@ -148,39 +148,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             readonly={quote.status !== 'PENDING'}
           />
 
-          {/* CTA paiement */}
-          {/* ── Sélecteur mode de paiement ── */}
-          {quote.status === 'ACCEPTED' && (
-            <View style={styles.methodSection}>
-              <Text style={styles.methodTitle}>Mode de paiement</Text>
-              <View style={styles.methodRow}>
-                <TouchableOpacity
-                  style={[styles.methodChip, payMethod === 'CARD' && styles.methodChipActive]}
-                  onPress={() => setPayMethod('CARD')}
-                  activeOpacity={0.75}
-                >
-                  <CreditCard size={16} color={payMethod === 'CARD' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-                  <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>Carte bancaire</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.methodChip, payMethod === 'SEPA' && styles.methodChipActive]}
-                  onPress={() => setPayMethod('SEPA')}
-                  activeOpacity={0.75}
-                >
-                  <Landmark size={16} color={payMethod === 'SEPA' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-                  <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>Virement SEPA</Text>
-                </TouchableOpacity>
-              </View>
-              {payMethod === 'SEPA' && (
-                <View style={styles.sepaNote}>
-                  <Info size={13} color={colors.primary} strokeWidth={2} />
-                  <Text style={styles.sepaText}>
-                    Le virement SEPA est traité sous 1–2 jours ouvrés. Votre IBAN sera collecté sur la page suivante via Stripe.
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+          
 
           {quote.status === 'ACCEPTED' && (
             <View style={styles.paySection}>

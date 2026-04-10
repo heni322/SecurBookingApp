@@ -1,49 +1,87 @@
 /**
- * LiveTrackingScreen — Suivi agent en temps réel.
+ * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
- * Carte : OpenStreetMap via react-native-maps UrlTile (gratuit, sans clé API).
- * Provider : PROVIDER_DEFAULT sur iOS (MapKit), PROVIDER_GOOGLE sur Android.
- *
- * Features :
- *  ─ Tuiles OSM vectorielles (Tile.openstreetmap.org)
- *  ─ Marqueur agent animé avec direction compass
- *  ─ Zone geofence (cercle 30m autour du site) avec animation pulse
- *  ─ Bannière d'alerte si agent hors zone
- *  ─ Distance temps réel agent ↔ site
- *  ─ Statut WebSocket (connecté / hors ligne)
- *  ─ Boutons recentrer sur agent / sur site
+ * Architecture:
+ *  • useSocketTracking hook owns ALL socket logic — screen is purely UI
+ *  • Camera follow uses a ref (not state) — prevents listener re-registration
+ *  • Heading uses Animated.Value interpolated on the marker's transform
+ *  • Signal-lost banner: shown when no GPS update > 30 s while connected
+ *  • Geofence alert: auto-dismissed on zone re-entry via inZone state
+ *  • OSM tiles (free, no key) — Google Maps on Android, MapKit on iOS
+ *  • "Suivre agent" / "Voir site" / "Sync" controls
+ *  • Pulsing geofence ring animation
+ *  • Last known position shown at reduced opacity when signal lost
  */
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+
+import React, {
+  useEffect, useRef, useState, useCallback,
+} from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   Platform, ActivityIndicator, Animated, Vibration,
 } from 'react-native';
-import MapView, {
-  Marker, Circle, UrlTile, PROVIDER_GOOGLE,
-} from 'react-native-maps';
+import MapView, { Marker, Circle, UrlTile, PROVIDER_GOOGLE } from 'react-native-maps';
+import Svg, { G, Circle as SvgCircle, Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  Navigation2, MapPin, Wifi, WifiOff, AlertTriangle,
-  CheckCircle2, RefreshCw, Target,
+  Navigation2, MapPin, Wifi, WifiOff,
+  AlertTriangle, CheckCircle2, Target, RefreshCw,
+  WifiOff as SignalIcon, Radio,
 } from 'lucide-react-native';
-import { ScreenHeader }      from '@components/ui';
-import { colors, palette }   from '@theme/colors';
-import { spacing, radius }   from '@theme/spacing';
+import { ScreenHeader }       from '@components/ui';
+import { colors, palette }    from '@theme/colors';
+import { spacing, radius }    from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-import { socketService }     from '@services/socketService';
-import type { AgentPosition, GeofenceAlert, DistanceUpdate } from '@services/socketService';
-import { useAuthStore }      from '@store/authStore';
-import { formatTime }        from '@utils/formatters';
+import { socketService }      from '@services/socketService';
+import { useSocketTracking }  from '@hooks/useSocketTracking';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'LiveTracking'>;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const GEOFENCE_RADIUS_M = 30;         // mirror backend constant
-const DELTA             = 0.004;      // tighter zoom than before
+const GEOFENCE_RADIUS_M = 30;
 const OSM_TILE_URL      = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const OSM_ATTRIBUTION   = '© OpenStreetMap contributors';
 
+// ── Agent SVG Marker ──────────────────────────────────────────────────────────
+interface AgentMarkerProps {
+  initials:   string;
+  heading:    number | null;
+  inZone:     boolean;
+  signalLost: boolean;
+}
+
+const AgentMarker: React.FC<AgentMarkerProps> = ({ initials, heading, inZone, signalLost }) => {
+  const bubbleColor = signalLost ? palette.slate30 : (inZone ? palette.azure : palette.crimson);
+  const size = 56;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', opacity: signalLost ? 0.5 : 1 }}>
+      <Svg width={size} height={size} viewBox="0 0 56 56">
+        {/* Heading cone — only when heading available */}
+        {heading !== null && heading >= 0 && (
+          <G rotation={heading} origin="28,28">
+            <Path d="M28 12 L24 26 L28 22 L32 26 Z" fill={bubbleColor} opacity="0.8" />
+          </G>
+        )}
+        {/* Agent bubble */}
+        <SvgCircle cx="28" cy="28" r="16" fill={bubbleColor} />
+        <SvgCircle cx="28" cy="28" r="16" fill="none" stroke="#fff" strokeWidth="3" />
+        {/* Online dot */}
+        {!signalLost && (
+          <SvgCircle cx="40" cy="16" r="5" fill={inZone ? palette.emerald : palette.amber} />
+        )}
+      </Svg>
+      {/* Initials label — drawn outside SVG for font rendering */}
+      <View style={{ position: 'absolute', width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+        <Text style={{ fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: '#fff' }}>
+          {initials}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+// ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const {
     missionId, bookingId, agentName,
@@ -52,140 +90,107 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
   const mapRef = useRef<MapView>(null);
 
-  // ── State ─────────────────────────────────────────────────────────────────
-  const [agentPos,   setAgentPos]   = useState<AgentPosition | null>(null);
-  const [lastSeen,   setLastSeen]   = useState<string | null>(null);
-  const [connected,  setConnected]  = useState(false);
-  const [centered,   setCentered]   = useState(true);
-  const [distanceM,  setDistanceM]  = useState<number | null>(null);
-  const [inZone,     setInZone]     = useState(true);
-  const [geofenceAlert, setGeofenceAlert] = useState<GeofenceAlert | null>(null);
+  // Use ref for follow mode — avoids triggering useEffect re-subscriptions
+  const followingRef = useRef(true);
+  const [showFollowBtn, setShowFollowBtn] = useState(false);
+
+  // ── Tracking state (all socket logic isolated in hook) ────────────────────
+  const {
+    agentPosition, lastSeenLabel, connected, signalLost,
+    distanceM, inZone, pendingAlert, dismissAlert,
+  } = useSocketTracking({
+    missionId,
+    bookingId,
+    onMissionEnd: () => navigation.goBack(),
+  });
 
   // ── Animations ────────────────────────────────────────────────────────────
-  const pulseAnim   = useRef(new Animated.Value(1)).current;
-  const alertAnim   = useRef(new Animated.Value(0)).current;
-  const headingAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim  = useRef(new Animated.Value(1)).current;
+  const alertSlide = useRef(new Animated.Value(-160)).current;
+  const headingRef = useRef<number>(0);
 
-  // Geofence ring pulse
+  // Geofence ring pulse loop
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.15, duration: 1500, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 1500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.25, duration: 1400, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 1400, useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => loop.stop();
   }, [pulseAnim]);
 
-  // Alert slide-in
-  const showAlert = useCallback((alert: GeofenceAlert) => {
-    setGeofenceAlert(alert);
-    Vibration.vibrate([0, 300, 100, 300]);
-    Animated.spring(alertAnim, { toValue: 1, friction: 7, useNativeDriver: true }).start();
-  }, [alertAnim]);
-
-  const dismissAlert = () => {
-    Animated.timing(alertAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-      setGeofenceAlert(null);
-    });
-  };
-
-  // ── WebSocket setup ───────────────────────────────────────────────────────
+  // Alert banner slide-in / slide-out
   useEffect(() => {
-    const token = useAuthStore.getState().accessToken;
-    if (token) socketService.connect(token);
-    socketService.joinMission(missionId);
-    setConnected(socketService.isConnected());
-
-    // Agent GPS position
-    const unsubPos = socketService.onAgentPosition((pos: AgentPosition) => {
-      if (pos.missionId !== missionId) return;
-
-      setAgentPos(pos);
-      setLastSeen(formatTime(new Date(pos.timestamp).toISOString()));
-      setConnected(true);
-
-      // Animate compass heading
-      if (pos.heading != null && pos.heading >= 0) {
-        Animated.timing(headingAnim, {
-          toValue:  pos.heading,
-          duration: 500,
-          useNativeDriver: true,
-        }).start();
-      }
-
-      // Follow agent camera
-      if (centered) {
-        mapRef.current?.animateCamera({
-          center:  { latitude: pos.latitude, longitude: pos.longitude },
-          zoom:    16,
-          heading: pos.heading ?? 0,
-        }, { duration: 600 });
-      }
-    });
-
-    // Distance / geofence state from server
-    const unsubDist = socketService.onDistanceUpdate((d: DistanceUpdate) => {
-      if (d.missionId !== missionId) return;
-      setDistanceM(d.distanceM);
-      setInZone(d.inZone);
-    });
-
-    // Geofence breach alert
-    const unsubAlert = socketService.onGeofenceAlert((a: GeofenceAlert) => {
-      if (a.missionId !== missionId) return;
-      showAlert(a);
-    });
-
-    // Mission end
-    const unsubMission = socketService.onMissionUpdate((data: any) => {
-      if (data.status === 'COMPLETED' || data.status === 'CANCELLED') {
-        navigation.goBack();
-      }
-    });
-
-    return () => { unsubPos(); unsubDist(); unsubAlert(); unsubMission(); };
-  }, [missionId, centered, showAlert, navigation, headingAnim]);
-
-  // ── Camera helpers ────────────────────────────────────────────────────────
-  const centerOnAgent = useCallback(() => {
-    setCentered(true);
-    if (agentPos) {
-      mapRef.current?.animateCamera({
-        center: { latitude: agentPos.latitude, longitude: agentPos.longitude },
-        zoom:   16,
-      }, { duration: 500 });
+    if (pendingAlert) {
+      Vibration.vibrate([0, 250, 100, 250]);
+      Animated.spring(alertSlide, {
+        toValue: 0, friction: 8, tension: 80, useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(alertSlide, {
+        toValue: -160, duration: 220, useNativeDriver: true,
+      }).start();
     }
-  }, [agentPos]);
+  }, [pendingAlert, alertSlide]);
 
-  const centerOnSite = useCallback(() => {
-    setCentered(false);
-    mapRef.current?.animateCamera({
-      center: { latitude: siteLat, longitude: siteLng },
-      zoom:   17,
-    }, { duration: 500 });
-  }, [siteLat, siteLng]);
+  // Dismiss alert when agent re-enters zone
+  useEffect(() => {
+    if (inZone && pendingAlert) dismissAlert();
+  }, [inZone, pendingAlert, dismissAlert]);
 
-  // ── Distance label ────────────────────────────────────────────────────────
+  // ── Camera follow ─────────────────────────────────────────────────────────
+  const animateToAgent = useCallback(() => {
+    if (!agentPosition || !mapRef.current) return;
+    mapRef.current.animateCamera({
+      center:  { latitude: agentPosition.latitude, longitude: agentPosition.longitude },
+      zoom:    16,
+      heading: headingRef.current,
+    }, { duration: 700 });
+  }, [agentPosition]);
+
+  // Follow agent on each new position (if follow mode active)
+  useEffect(() => {
+    if (!followingRef.current || !agentPosition) return;
+    headingRef.current = agentPosition.heading ?? 0;
+    animateToAgent();
+  }, [agentPosition, animateToAgent]);
+
+  const handleReCenter = useCallback(() => {
+    followingRef.current = true;
+    setShowFollowBtn(false);
+    animateToAgent();
+  }, [animateToAgent]);
+
+  const handlePanDrag = useCallback(() => {
+    if (followingRef.current) {
+      followingRef.current = false;
+      setShowFollowBtn(true);
+    }
+  }, []);
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const agentInitials = agentName
+    .split(' ')
+    .map((w: string) => w[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   const distanceLabel = distanceM !== null
-    ? distanceM < 1000
-      ? `${distanceM} m`
-      : `${(distanceM / 1000).toFixed(1)} km`
+    ? distanceM < 1000 ? `${distanceM} m` : `${(distanceM / 1000).toFixed(1)} km`
     : null;
 
-  const agentInitials = agentName.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader title="Suivi en direct" onBack={() => navigation.goBack()} />
 
-      {/* ── Map ── */}
+      {/* ── MAP ─────────────────────────────────────────────────────── */}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
-        // Use PROVIDER_GOOGLE on Android (required for smooth tile loading)
-        // Use undefined (MapKit) on iOS — OSM tiles work on both
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialCamera={{
           center:   { latitude: siteLat, longitude: siteLng },
@@ -194,14 +199,14 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           pitch:    0,
           altitude: 0,
         }}
-        onPanDrag={() => setCentered(false)}
+        onPanDrag={handlePanDrag}
         showsUserLocation={false}
         showsCompass={true}
         showsScale={true}
         rotateEnabled={true}
         pitchEnabled={false}
       >
-        {/* ── OpenStreetMap tiles — free, no API key ── */}
+        {/* OSM tiles */}
         <UrlTile
           urlTemplate={OSM_TILE_URL}
           maximumZ={19}
@@ -210,178 +215,199 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           shouldReplaceMapContent={Platform.OS === 'ios'}
         />
 
-        {/* ── Geofence circle (30m) with pulse ── */}
+        {/* Geofence zone fill */}
         <Circle
           center={{ latitude: siteLat, longitude: siteLng }}
           radius={GEOFENCE_RADIUS_M}
-          fillColor={inZone ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.12)'}
-          strokeColor={inZone ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)'}
+          fillColor={inZone ? 'rgba(16,185,129,0.13)' : 'rgba(239,68,68,0.13)'}
+          strokeColor={inZone ? 'rgba(16,185,129,0.75)' : 'rgba(239,68,68,0.75)'}
           strokeWidth={2}
           zIndex={1}
         />
 
-        {/* ── Outer alert ring (only visible when out of zone) ── */}
+        {/* Outer alert ring — breach only */}
         {!inZone && (
           <Circle
             center={{ latitude: siteLat, longitude: siteLng }}
-            radius={GEOFENCE_RADIUS_M * 1.6}
+            radius={GEOFENCE_RADIUS_M * 2}
             fillColor="rgba(239,68,68,0.04)"
-            strokeColor="rgba(239,68,68,0.3)"
+            strokeColor="rgba(239,68,68,0.25)"
             strokeWidth={1}
             zIndex={1}
           />
         )}
 
-        {/* ── Mission site marker ── */}
+        {/* Accuracy circle */}
+        {agentPosition && (agentPosition.accuracy ?? 0) > 0 && (
+          <Circle
+            center={{ latitude: agentPosition.latitude, longitude: agentPosition.longitude }}
+            radius={Math.min(agentPosition.accuracy ?? 0, 150)}
+            fillColor="rgba(59,130,246,0.08)"
+            strokeColor="rgba(59,130,246,0.3)"
+            strokeWidth={1}
+            zIndex={2}
+          />
+        )}
+
+        {/* Mission site pin */}
         <Marker
           coordinate={{ latitude: siteLat, longitude: siteLng }}
-          title="Site de mission"
-          description={missionAddress}
           anchor={{ x: 0.5, y: 0.5 }}
-          zIndex={2}
+          zIndex={3}
         >
-          <View style={[styles.siteMarker, !inZone && styles.siteMarkerAlert]}>
+          <View style={[styles.sitePin, !inZone && styles.sitePinAlert]}>
             <MapPin size={18} color="#fff" strokeWidth={2.5} />
           </View>
         </Marker>
 
-        {/* ── Agent marker with heading arrow ── */}
-        {agentPos && (
+        {/* Agent marker */}
+        {agentPosition && (
           <Marker
-            coordinate={{ latitude: agentPos.latitude, longitude: agentPos.longitude }}
-            title={agentName}
-            description={lastSeen ? `Vu à ${lastSeen}` : ''}
+            coordinate={{ latitude: agentPosition.latitude, longitude: agentPosition.longitude }}
             anchor={{ x: 0.5, y: 0.5 }}
-            zIndex={3}
+            flat={true}
+            zIndex={4}
           >
-            <View style={styles.agentMarkerWrap}>
-              {/* Compass heading arrow */}
-              {agentPos.heading != null && agentPos.heading >= 0 && (
-                <View style={[
-                  styles.headingArrow,
-                  { transform: [{ rotate: `${agentPos.heading}deg` }] },
-                ]}>
-                  <Navigation2 size={12} color={colors.primary} strokeWidth={2.5} />
-                </View>
-              )}
-              {/* Agent avatar bubble */}
-              <View style={[styles.agentBubble, !inZone && styles.agentBubbleAlert]}>
-                <Text style={styles.agentInitials}>{agentInitials}</Text>
-              </View>
-              {/* Online pulse dot */}
-              <View style={styles.onlineDotWrap}>
-                <View style={[styles.onlineDot, !inZone && styles.onlineDotAlert]} />
-              </View>
-            </View>
+            <AgentMarker
+              initials={agentInitials}
+              heading={agentPosition.heading ?? null}
+              inZone={inZone}
+              signalLost={signalLost}
+            />
           </Marker>
         )}
       </MapView>
 
-      {/* ── OSM Attribution (required by license) ── */}
+      {/* OSM Attribution — license required */}
       <View style={styles.attribution}>
-        <Text style={styles.attributionText}>{OSM_ATTRIBUTION}</Text>
+        <Text style={styles.attributionTxt}>{OSM_ATTRIBUTION}</Text>
       </View>
 
-      {/* ── Status bar ── */}
+      {/* ── CONNECTION STATUS BAR ── */}
       <View style={styles.statusBar}>
         {connected
-          ? <Wifi     size={13} color={colors.success} strokeWidth={2} />
-          : <WifiOff  size={13} color={colors.danger}  strokeWidth={2} />
+          ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
+          : <WifiOff size={12} color={colors.danger}  strokeWidth={2} />
         }
-        <Text style={styles.statusText}>
-          {connected
-            ? (agentPos ? `Mis à jour ${lastSeen}` : 'En attente de position…')
-            : 'Hors ligne — reconnexion…'
+        <Text style={[styles.statusTxt, !connected && styles.statusTxtOff]}>
+          {!connected
+            ? 'Hors ligne — reconnexion…'
+            : signalLost
+              ? '⚠ Signal GPS perdu'
+              : agentPosition
+                ? lastSeenLabel ?? 'En direct'
+                : 'En attente de position…'
           }
         </Text>
-        {!agentPos && connected && (
-          <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 6 }} />
+        {connected && !agentPosition && (
+          <ActivityIndicator size="small" color={colors.primary} />
+        )}
+        {signalLost && connected && (
+          <SignalIcon size={12} color={colors.warning} strokeWidth={2} />
         )}
       </View>
 
-      {/* ── Geofence alert banner ── */}
-      {geofenceAlert && (
-        <Animated.View style={[
-          styles.alertBanner,
-          {
-            transform: [{
-              translateY: alertAnim.interpolate({
-                inputRange: [0, 1], outputRange: [-120, 0],
-              }),
-            }],
-          },
-        ]}>
-          <View style={styles.alertContent}>
-            <AlertTriangle size={20} color="#fff" strokeWidth={2.5} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.alertTitle}>Agent hors zone</Text>
-              <Text style={styles.alertBody}>
-                {geofenceAlert.agentName} est à {geofenceAlert.distanceStr} du site.
-              </Text>
-            </View>
-            <TouchableOpacity onPress={dismissAlert} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-              <Text style={styles.alertDismiss}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
+      {/* ── GEOFENCE ALERT BANNER ── */}
+      <Animated.View
+        style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
+        pointerEvents={pendingAlert ? 'auto' : 'none'}
+      >
+        <AlertTriangle size={20} color="#fff" strokeWidth={2.5} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.alertTitle}>Agent hors zone</Text>
+          <Text style={styles.alertBody} numberOfLines={1}>
+            {pendingAlert
+              ? `${pendingAlert.agentName} est à ${pendingAlert.distanceStr} du site`
+              : ''}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={dismissAlert}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.alertClose}>✕</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* ── RE-CENTER FAB ── */}
+      {showFollowBtn && (
+        <TouchableOpacity
+          style={styles.reCenterFab}
+          onPress={handleReCenter}
+          activeOpacity={0.8}
+        >
+          <Target size={20} color={colors.primary} strokeWidth={2} />
+        </TouchableOpacity>
       )}
 
-      {/* ── Bottom info card ── */}
+      {/* ── BOTTOM CARD ── */}
       <View style={styles.card}>
+        {/* Agent row */}
         <View style={styles.cardRow}>
-          {/* Agent info */}
-          <View style={styles.agentAvatar}>
-            <Text style={styles.agentAvatarText}>{agentInitials}</Text>
+          <View style={styles.avatarBubble}>
+            <Text style={styles.avatarTxt}>{agentInitials}</Text>
           </View>
-          <View style={styles.cardInfo}>
-            <Text style={styles.cardAgentName}>{agentName}</Text>
+          <View style={styles.cardMeta}>
+            <Text style={styles.cardName}>{agentName}</Text>
             <Text style={styles.cardAddress} numberOfLines={1}>{missionAddress}</Text>
           </View>
-
-          {/* Distance badge */}
           {distanceLabel && (
-            <View style={[styles.distanceBadge, !inZone && styles.distanceBadgeAlert]}>
+            <View style={[styles.distBadge, !inZone && styles.distBadgeAlert]}>
               {inZone
-                ? <CheckCircle2 size={13} color={colors.success} strokeWidth={2} />
-                : <AlertTriangle size={13} color={colors.danger} strokeWidth={2} />
+                ? <CheckCircle2 size={12} color={colors.success} strokeWidth={2.5} />
+                : <AlertTriangle size={12} color={colors.danger} strokeWidth={2.5} />
               }
-              <Text style={[styles.distanceText, !inZone && styles.distanceTextAlert]}>
+              <Text style={[styles.distTxt, !inZone && styles.distTxtAlert]}>
                 {distanceLabel}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Zone status */}
-        <View style={[styles.zoneStatus, !inZone && styles.zoneStatusAlert]}>
-          <Text style={[styles.zoneStatusText, !inZone && styles.zoneStatusTextAlert]}>
+        {/* Zone status strip */}
+        <View style={[styles.zoneStrip, !inZone && styles.zoneStripAlert]}>
+          <Text style={[styles.zoneTxt, !inZone && styles.zoneTxtAlert]}>
             {inZone
-              ? `✓ Agent dans la zone (${GEOFENCE_RADIUS_M}m)`
-              : `⚠ Agent hors zone — alerte envoyée`
-            }
+              ? `✓ Agent dans la zone (rayon ${GEOFENCE_RADIUS_M} m)`
+              : `⚠ Agent hors zone — client notifié`}
           </Text>
         </View>
 
-        {/* Control buttons */}
-        <View style={styles.btnRow}>
-          <TouchableOpacity style={styles.mapBtn} onPress={centerOnSite} activeOpacity={0.75}>
+        {/* Controls */}
+        <View style={styles.ctrlRow}>
+          <TouchableOpacity
+            style={styles.ctrlBtn}
+            onPress={() => {
+              followingRef.current = false;
+              setShowFollowBtn(true);
+              mapRef.current?.animateCamera({
+                center: { latitude: siteLat, longitude: siteLng },
+                zoom: 17,
+              }, { duration: 500 });
+            }}
+            activeOpacity={0.75}
+          >
             <MapPin size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.mapBtnTxt}>Site</Text>
+            <Text style={styles.ctrlTxt}>Site</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.mapBtn, styles.mapBtnPrimary, !agentPos && styles.mapBtnDisabled]}
-            onPress={centerOnAgent}
-            disabled={!agentPos}
+            style={[styles.ctrlBtn, styles.ctrlBtnPrimary, !agentPosition && styles.ctrlBtnDisabled]}
+            onPress={handleReCenter}
+            disabled={!agentPosition}
             activeOpacity={0.75}
           >
-            <Target size={15} color="#fff" strokeWidth={2} />
-            <Text style={[styles.mapBtnTxt, styles.mapBtnTxtPrimary]}>Suivre l'agent</Text>
+            <Navigation2 size={15} color="#fff" strokeWidth={2} />
+            <Text style={[styles.ctrlTxt, styles.ctrlTxtPrimary]}>Suivre l'agent</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.mapBtn} onPress={() => socketService.joinMission(missionId)} activeOpacity={0.75}>
+          <TouchableOpacity
+            style={styles.ctrlBtn}
+            onPress={() => socketService.joinMission(missionId)}
+            activeOpacity={0.75}
+          >
             <RefreshCw size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.mapBtnTxt}>Sync</Text>
+            <Text style={styles.ctrlTxt}>Sync</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -391,84 +417,120 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0C0F' },
+  container: { flex: 1, backgroundColor: palette.obsidian },
 
-  // Attribution
-  attribution:     { position: 'absolute', bottom: 280, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  attributionText: { fontSize: 9, color: 'rgba(255,255,255,0.7)' },
-
-  // Status bar
-  statusBar: {
-    position: 'absolute', top: 100, left: 16, right: 16,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: 'rgba(10,12,15,0.85)',
-    borderRadius: radius.full, paddingVertical: 8, paddingHorizontal: 14,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
+  attribution: {
+    position: 'absolute', bottom: 290, right: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
   },
-  statusText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: '#fff', flex: 1 },
+  attributionTxt: { fontSize: 9, color: 'rgba(255,255,255,0.65)', fontFamily: fontFamily.body },
 
-  // Alert banner
+  // Status bar — sits just below the ScreenHeader
+  statusBar: {
+    position: 'absolute', top: 68, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: 'rgba(10,12,15,0.88)',
+    borderRadius: radius.full,
+    paddingVertical: spacing[2], paddingHorizontal: spacing[3],
+    borderWidth: 1, borderColor: palette.white10,
+  },
+  statusTxt:    { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white, flex: 1 },
+  statusTxtOff: { color: colors.danger },
+
+  // Alert banner — slides down from top when geofence breached
   alertBanner: {
-    position: 'absolute', top: 150, left: 16, right: 16,
-    backgroundColor: colors.danger, borderRadius: radius.xl,
-    overflow: 'hidden',
+    position: 'absolute', top: 120, left: 16, right: 16,
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.danger,
+    borderRadius: radius.xl,
+    padding: spacing[4],
+    zIndex: 50,
     ...Platform.select({
-      ios:     { shadowColor: colors.danger, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12 },
-      android: { elevation: 12 },
+      ios:     { shadowColor: colors.danger, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 14 },
+      android: { elevation: 14 },
     }),
   },
-  alertContent:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], padding: spacing[4] },
-  alertTitle:    { fontFamily: fontFamily.display, fontSize: fontSize.base, color: '#fff', letterSpacing: -0.2 },
-  alertBody:     { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: 'rgba(255,255,255,0.85)' },
-  alertDismiss:  { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: 'rgba(255,255,255,0.8)' },
+  alertTitle: { fontFamily: fontFamily.display, fontSize: fontSize.base, color: '#fff', letterSpacing: -0.2 },
+  alertBody:  { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: 'rgba(255,255,255,0.82)', marginTop: 2 },
+  alertClose: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: 'rgba(255,255,255,0.75)' },
 
   // Site marker
-  siteMarker:      { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
-  siteMarkerAlert: { backgroundColor: colors.danger },
+  sitePin:      { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
+  sitePinAlert: { backgroundColor: colors.danger },
 
-  // Agent marker
-  agentMarkerWrap: { alignItems: 'center', justifyContent: 'center', width: 56, height: 56 },
-  headingArrow:    { position: 'absolute', top: 0, left: '50%', marginLeft: -6 },
-  agentBubble:     { width: 42, height: 42, borderRadius: 21, backgroundColor: '#1E40AF', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
-  agentBubbleAlert:{ backgroundColor: '#7F1D1D', borderColor: colors.danger },
-  agentInitials:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: '#fff' },
-  onlineDotWrap:   { position: 'absolute', bottom: 2, right: 2 },
-  onlineDot:       { width: 10, height: 10, borderRadius: 5, backgroundColor: palette.emerald, borderWidth: 2, borderColor: '#fff' },
-  onlineDotAlert:  { backgroundColor: colors.danger },
+  // Re-center FAB
+  reCenterFab: {
+    position: 'absolute', right: 16, bottom: 300,
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: palette.obsidian80,
+    borderWidth: 1, borderColor: palette.white10,
+    alignItems: 'center', justifyContent: 'center',
+    ...Platform.select({
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 8 },
+      android: { elevation: 8 },
+    }),
+  },
 
   // Bottom card
   card: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(10,12,15,0.97)',
-    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: spacing[4], gap: spacing[3],
-    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopLeftRadius: radius['2xl'],
+    borderTopRightRadius: radius['2xl'],
+    padding: spacing[5],
+    gap: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: palette.white10,
     ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.3, shadowRadius: 16 },
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.35, shadowRadius: 20 },
       android: { elevation: 24 },
     }),
   },
-  cardRow:       { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  agentAvatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: palette.azureDim, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  agentAvatarText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: '#fff' },
-  cardInfo:      { flex: 1 },
-  cardAgentName: { fontFamily: fontFamily.display, fontSize: fontSize.base, color: '#fff', letterSpacing: -0.2 },
-  cardAddress:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
 
-  distanceBadge:      { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.successSurface, borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[1], borderWidth: 1, borderColor: colors.success + '60' },
-  distanceBadgeAlert: { backgroundColor: colors.dangerSurface, borderColor: colors.danger + '60' },
-  distanceText:       { fontFamily: fontFamily.monoMedium, fontSize: fontSize.xs, color: colors.success },
-  distanceTextAlert:  { color: colors.danger },
+  cardRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  avatarBubble: {
+    width: 46, height: 46, borderRadius: 23,
+    backgroundColor: palette.azureDim,
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  avatarTxt:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: '#fff' },
+  cardMeta:    { flex: 1 },
+  cardName:    { fontFamily: fontFamily.display, fontSize: fontSize.base, color: palette.white, letterSpacing: -0.2 },
+  cardAddress: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: palette.white30, marginTop: 2 },
 
-  zoneStatus:          { backgroundColor: colors.successSurface, borderRadius: radius.lg, paddingVertical: spacing[2], paddingHorizontal: spacing[3], borderWidth: 1, borderColor: colors.success + '40' },
-  zoneStatusAlert:     { backgroundColor: colors.dangerSurface, borderColor: colors.danger + '40' },
-  zoneStatusText:      { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success, textAlign: 'center' },
-  zoneStatusTextAlert: { color: colors.danger },
+  distBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: palette.emeraldDim,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[1],
+    borderWidth: 1, borderColor: palette.emerald + '55',
+  },
+  distBadgeAlert: { backgroundColor: palette.crimsonDim, borderColor: palette.crimson + '55' },
+  distTxt:        { fontFamily: fontFamily.monoMedium, fontSize: fontSize.xs, color: colors.success },
+  distTxtAlert:   { color: colors.danger },
 
-  btnRow:          { flexDirection: 'row', gap: spacing[2] },
-  mapBtn:          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1], paddingVertical: spacing[3], borderRadius: radius.lg, backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
-  mapBtnPrimary:   { backgroundColor: palette.azure, borderColor: palette.azure, flex: 2 },
-  mapBtnDisabled:  { opacity: 0.35 },
-  mapBtnTxt:       { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: 'rgba(255,255,255,0.7)' },
-  mapBtnTxtPrimary:{ color: '#fff' },
+  zoneStrip: {
+    backgroundColor: palette.emeraldDim,
+    borderRadius: radius.lg,
+    paddingVertical: spacing[2], paddingHorizontal: spacing[3],
+    borderWidth: 1, borderColor: palette.emerald + '44',
+    alignItems: 'center',
+  },
+  zoneStripAlert:  { backgroundColor: palette.crimsonDim, borderColor: palette.crimson + '44' },
+  zoneTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
+  zoneTxtAlert:    { color: colors.danger },
+
+  ctrlRow:         { flexDirection: 'row', gap: spacing[2] },
+  ctrlBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing[1], paddingVertical: spacing[3], borderRadius: radius.lg,
+    backgroundColor: palette.white05,
+    borderWidth: 1, borderColor: palette.white10,
+  },
+  ctrlBtnPrimary:  { backgroundColor: palette.azure, borderColor: palette.azure, flex: 2 },
+  ctrlBtnDisabled: { opacity: 0.35 },
+  ctrlTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white60 },
+  ctrlTxtPrimary:  { color: '#fff' },
 });

@@ -14,28 +14,34 @@ class FcmService {
   }
 
   async registerToken(): Promise<void> {
-    const token = await this.requestPermissionAndGetToken();
-    if (!token) return;
     try {
+      const token = await this.requestPermissionAndGetToken();
+      if (!token) return;
       await apiClient.post('/notifications/fcm-token', { fcmToken: token });
-    } catch { /* silent */ }
-    messaging().onTokenRefresh(async (t) => {
-      try { await apiClient.post('/notifications/fcm-token', { fcmToken: t }); } catch { /* silent */ }
-    });
+      messaging().onTokenRefresh(async (t) => {
+        try { await apiClient.post('/notifications/fcm-token', { fcmToken: t }); } catch { /* silent */ }
+      });
+    } catch { /* silent — Firebase not configured */ }
   }
 
   onForegroundMessage(cb: (type: string, title: string, body: string) => void) {
-    return messaging().onMessage(async (msg) => {
-      cb(
-        (msg.data?.type as string) ?? 'GENERIC',
-        msg.notification?.title ?? 'SecurBook',
-        msg.notification?.body ?? '',
-      );
-    });
+    try {
+      return messaging().onMessage(async (msg) => {
+        cb(
+          (msg.data?.type as string) ?? 'GENERIC',
+          msg.notification?.title ?? 'SecurBook',
+          msg.notification?.body ?? '',
+        );
+      });
+    } catch {
+      return () => {}; // no-op unsubscribe
+    }
   }
 
   setBackgroundMessageHandler() {
-    messaging().setBackgroundMessageHandler(async () => {});
+    try {
+      messaging().setBackgroundMessageHandler(async () => {});
+    } catch { /* silent — Firebase not configured */ }
   }
 
   async unregisterToken() {

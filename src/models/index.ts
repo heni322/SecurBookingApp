@@ -255,6 +255,8 @@ export interface CreatePaymentIntentPayload {
 
 export interface PaymentIntentResponse {
   clientSecret:  string;
+  /** 'payment_intent' for CARD, 'setup_intent' for SEPA */
+  type?:          'payment_intent' | 'setup_intent';
   paymentId:     string;
   invoiceNumber: string;
   breakdown: {
