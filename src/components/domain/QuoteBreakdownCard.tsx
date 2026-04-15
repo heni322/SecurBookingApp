@@ -1,4 +1,4 @@
-/**
+﻿/**
  * QuoteBreakdownCard — détail financier d'un devis.
  * Adapté aux champs plats du backend (pas d'objet breakdown imbriqué).
  */
@@ -84,7 +84,7 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
             onPress={onAccept}
             loading={loading}
             fullWidth
-            variant="primary"
+            variant="filled"
           />
           <Text style={styles.expiryNote}>
             Valable jusqu'au {formatDate(quote.expiresAt)}

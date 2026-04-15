@@ -32,7 +32,15 @@ export type AuthStackParamList = {
 
 export type MissionStackParamList = {
   MissionList:    undefined;
-  MissionCreate:  { serviceTypeId: string };
+  MissionCreate:  {
+    bookingLines: Array<{
+      serviceTypeId: string;
+      agentCount:    number;
+      name:          string;
+      accent:        string;
+      agentUniforms: string[];
+    }>;
+  };
   ServicePicker:  undefined;
   MissionDetail:  { missionId: string };
   QuoteDetail:    { missionId: string };

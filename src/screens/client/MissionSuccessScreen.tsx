@@ -1,232 +1,117 @@
 /**
- * MissionSuccessScreen — confirmation visuelle post-paiement avec timeline animée.
- * Icônes : lucide-react-native
+ * MissionSuccessScreen — Payment confirmation + mission timeline.
  */
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, StyleSheet, ScrollView } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ShieldCheck, Megaphone, Users, Shield, Check } from 'lucide-react-native';
+import { ShieldCheck, Megaphone, Users, Shield, CheckCircle2, Info, ArrowRight } from 'lucide-react-native';
 import { Button }  from '@components/ui/Button';
-import { colors, palette } from '@theme/colors';
-import { spacing, radius, layout, shadow } from '@theme/spacing';
+import { Card }    from '@components/ui/Card';
+import { colors }  from '@theme/colors';
+import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList } from '@models/index';
+import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionSuccess'>;
-
 type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
 
-const STEPS: Array<{
-  Icon:  LucideIconComp;
-  label: string;
-  done:  boolean;
-  color: string;
-}> = [
-  { Icon: ShieldCheck, label: 'Mission confirmée & payée',              done: true,  color: colors.success  },
-  { Icon: Megaphone,   label: 'Publication aux agents de votre secteur', done: false, color: colors.primary  },
-  { Icon: Users,       label: 'Sélection de vos agents',                done: false, color: colors.primary  },
-  { Icon: Shield,      label: 'Mission opérationnelle',                  done: false, color: colors.primary  },
-];
+export const MissionSuccessScreen: React.FC<Props> = ({ navigation }) => {
+  const { t } = useTranslation('missions');
 
-export const MissionSuccessScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { missionId } = route.params;
-
-  const heroScale    = useRef(new Animated.Value(0.4)).current;
-  const heroOpacity  = useRef(new Animated.Value(0)).current;
-  const stepsOpacity = useRef(new Animated.Value(0)).current;
-  const stepsTranslY = useRef(new Animated.Value(24)).current;
-
-  useEffect(() => {
-    Animated.sequence([
-      Animated.parallel([
-        Animated.spring(heroScale,   { toValue: 1, friction: 5, useNativeDriver: true }),
-        Animated.timing(heroOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(stepsOpacity,  { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.timing(stepsTranslY,  { toValue: 0, duration: 300, useNativeDriver: true }),
-      ]),
-    ]).start();
-  }, []);
+  const STEPS: Array<{ Icon: LucideIconComp; label: string; done: boolean; color: string }> = [
+    { Icon: ShieldCheck, label: t('success.step_confirmed'),  done: true,  color: colors.success },
+    { Icon: Megaphone,   label: t('success.step_published'),  done: false, color: colors.primary },
+    { Icon: Users,       label: t('success.step_selection'),  done: false, color: colors.primary },
+    { Icon: Shield,      label: t('success.step_operational'),done: false, color: colors.primary },
+  ];
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Hero */}
-      <Animated.View style={[styles.hero, { opacity: heroOpacity, transform: [{ scale: heroScale }] }]}>
-        <View style={styles.glowRing}>
-          <View style={styles.checkCircle}>
-            <ShieldCheck size={52} color={colors.primary} strokeWidth={1.5} />
-          </View>
-        </View>
-        <Text style={styles.title}>Mission lancée !</Text>
-        <Text style={styles.subtitle}>
-          Votre paiement a été confirmé. Les agents de votre secteur vont recevoir une notification immédiatement.
-        </Text>
-      </Animated.View>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-      {/* Timeline */}
-      <Animated.View style={[
-        styles.timeline,
-        { opacity: stepsOpacity, transform: [{ translateY: stepsTranslY }] },
-      ]}>
-        {STEPS.map((step, i) => (
-          <View key={i} style={styles.stepWrap}>
-            {i < STEPS.length - 1 && (
-              <View style={[styles.connector, step.done && styles.connectorDone]} />
-            )}
-            <View style={styles.stepRow}>
-              <View style={[styles.stepDot, step.done && styles.stepDotDone]}>
-                {step.done
-                  ? <Check size={18} color={colors.primary} strokeWidth={2.5} />
-                  : <step.Icon size={18} color={colors.textMuted} strokeWidth={1.6} />
-                }
-              </View>
-              <View style={styles.stepTextWrap}>
-                <Text style={[styles.stepLabel, step.done && styles.stepLabelDone]}>
-                  {step.label}
-                </Text>
-                {step.done && <Text style={styles.stepBadge}>Complété</Text>}
+        {/* Hero */}
+        <View style={styles.hero}>
+          <View style={styles.glowOuter}>
+            <View style={styles.glowMid}>
+              <View style={styles.checkCircle}>
+                <CheckCircle2 size={44} color={colors.primary} strokeWidth={1.6} />
               </View>
             </View>
           </View>
-        ))}
-      </Animated.View>
+          <Text style={styles.title}>{t('success.title')}</Text>
+          <Text style={styles.subtitle}>{t('success.subtitle')}</Text>
+        </View>
 
-      {/* Info box */}
-      <Animated.View style={[styles.infoBox, { opacity: stepsOpacity }]}>
-        <Text style={styles.infoText}>
-          💡 Vous recevrez une notification dès qu'un agent postule. Vous pourrez alors consulter les candidatures et sélectionner votre équipe.
-        </Text>
-      </Animated.View>
+        {/* Timeline */}
+        <Card elevated style={styles.timelineCard}>
+          <Text style={styles.timelineTitle}>{t('success.timeline_title')}</Text>
+          <View style={styles.timeline}>
+            {STEPS.map((step, idx) => {
+              const isLast = idx === STEPS.length - 1;
+              return (
+                <View key={idx} style={styles.stepWrap}>
+                  <View style={styles.stepRow}>
+                    <View style={styles.dotCol}>
+                      <View style={[styles.stepDot, step.done ? { backgroundColor: step.color + '20', borderColor: step.color } : { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        {step.done
+                          ? <step.Icon size={16} color={step.color}       strokeWidth={1.8} />
+                          : <step.Icon size={16} color={colors.textMuted} strokeWidth={1.8} />
+                        }
+                      </View>
+                      {!isLast && <View style={[styles.connector, step.done && { backgroundColor: colors.primary }]} />}
+                    </View>
+                    <View style={styles.stepTextWrap}>
+                      <Text style={[styles.stepLabel, step.done && { color: colors.textPrimary, fontFamily: fontFamily.bodyMedium }]}>
+                        {step.label}
+                      </Text>
+                      {step.done && <Text style={styles.stepBadge}>{t('success.step_done')}</Text>}
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </Card>
 
-      {/* Actions */}
-      <Animated.View style={[styles.actions, { opacity: stepsOpacity }]}>
+        {/* Info box */}
+        <View style={styles.infoBox}>
+          <Info size={16} color={colors.info} strokeWidth={2} />
+          <Text style={styles.infoText}>{t('success.info')}</Text>
+        </View>
+
+        {/* CTA */}
         <Button
-          label="Voir ma mission"
-          onPress={() => navigation.navigate('MissionDetail', { missionId })}
-          fullWidth
-          size="lg"
+          label={t('success.home')}
+          onPress={() => navigation.popToTop()}
+          fullWidth size="lg"
+          rightIcon={<ArrowRight size={18} color={colors.textInverse} strokeWidth={2} />}
         />
-        <Button
-          label="Retour à l'accueil"
-          onPress={() => navigation.reset({ index: 0, routes: [{ name: 'MissionList' }] })}
-          fullWidth
-          variant="ghost"
-          size="md"
-        />
-      </Animated.View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: colors.background },
-  content: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop:        spacing[12],
-    paddingBottom:     spacing[10],
-    gap:               spacing[8],
-  },
-
-  hero:       { alignItems: 'center', gap: spacing[4] },
-  glowRing: {
-    width:           128,
-    height:          128,
-    borderRadius:    64,
-    backgroundColor: 'rgba(245,166,35,0.10)',
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1.5,
-    borderColor:     'rgba(245,166,35,0.25)',
-  },
-  checkCircle: {
-    width:           96,
-    height:          96,
-    borderRadius:    48,
-    backgroundColor: colors.primarySurface,
-    borderWidth:     2,
-    borderColor:     colors.primary,
-    alignItems:      'center',
-    justifyContent:  'center',
-    ...shadow.amber,
-  },
-  title: {
-    fontFamily:    fontFamily.display,
-    fontSize:      fontSize['3xl'],
-    color:         colors.textPrimary,
-    letterSpacing: -1,
-    textAlign:     'center',
-  },
-  subtitle: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.base,
-    color:      colors.textSecondary,
-    textAlign:  'center',
-    lineHeight: fontSize.base * 1.65,
-  },
-
-  timeline: { gap: 0 },
-  stepWrap: { position: 'relative' },
-  connector: {
-    position:        'absolute',
-    left:            19,
-    top:             44,
-    width:           2,
-    height:          28,
-    backgroundColor: colors.border,
-    zIndex:          0,
-  },
-  connectorDone: { backgroundColor: colors.primary },
-  stepRow: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             spacing[4],
-    paddingVertical: spacing[3],
-    zIndex:          1,
-  },
-  stepDot: {
-    width:           40,
-    height:          40,
-    borderRadius:    20,
-    backgroundColor: colors.surface,
-    borderWidth:     1.5,
-    borderColor:     colors.border,
-    alignItems:      'center',
-    justifyContent:  'center',
-    flexShrink:      0,
-  },
-  stepDotDone: { backgroundColor: colors.primarySurface, borderColor: colors.primary },
-  stepTextWrap: { flex: 1, gap: 2 },
-  stepLabel: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.base,
-    color:      colors.textMuted,
-  },
-  stepLabelDone: { fontFamily: fontFamily.bodyMedium, color: colors.textPrimary },
-  stepBadge: {
-    fontFamily:    fontFamily.bodyMedium,
-    fontSize:      fontSize.xs,
-    color:         colors.primary,
-    letterSpacing: 0.3,
-  },
-
-  infoBox: {
-    backgroundColor: colors.infoSurface,
-    borderRadius:    radius.xl,
-    padding:         spacing[4],
-    borderWidth:     1,
-    borderColor:     colors.info,
-  },
-  infoText: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.info,
-    lineHeight: fontSize.sm * 1.65,
-  },
-
-  actions: { gap: spacing[3] },
+  screen:       { flex: 1, backgroundColor: colors.background },
+  content:      { paddingHorizontal: layout.screenPaddingH, paddingVertical: spacing[10], gap: spacing[6] },
+  hero:         { alignItems: 'center', gap: spacing[4] },
+  glowOuter:    { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(188,147,59,0.06)', borderWidth: 1, borderColor: 'rgba(188,147,59,0.12)', alignItems: 'center', justifyContent: 'center' },
+  glowMid:      { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(188,147,59,0.10)', borderWidth: 1, borderColor: 'rgba(188,147,59,0.20)', alignItems: 'center', justifyContent: 'center' },
+  checkCircle:  { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primarySurface, borderWidth: 1.5, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center' },
+  title:        { fontFamily: fontFamily.display, fontSize: fontSize['2xl'], color: colors.textPrimary, letterSpacing: -0.6, textAlign: 'center' },
+  subtitle:     { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  timelineCard: { padding: spacing[5], gap: spacing[4] },
+  timelineTitle:{ fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2 },
+  timeline:     { gap: 0 },
+  stepWrap:     {},
+  stepRow:      { flexDirection: 'row', gap: spacing[3] },
+  dotCol:       { alignItems: 'center', width: 32 },
+  stepDot:      { width: 32, height: 32, borderRadius: 16, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  connector:    { width: 2, flex: 1, minHeight: spacing[4], backgroundColor: colors.border, marginVertical: 3 },
+  stepTextWrap: { flex: 1, paddingVertical: spacing[2], gap: 3 },
+  stepLabel:    { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textMuted },
+  stepBadge:    { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.success, letterSpacing: 0.5 },
+  infoBox:      { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], backgroundColor: colors.infoSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.info + '40' },
+  infoText:     { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
 });

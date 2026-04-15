@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network Security Config
+  ───────────────────────
+  • Production (https) → no special rules needed, TLS is always allowed.
+  • Debug / local dev  → allow cleartext HTTP to the LAN dev server only.
+    192.168.1.0/24 covers the typical home/office subnet where the
+    NestJS backend runs on the developer's machine (192.168.1.13:3000).
+
+  NEVER add <base-config cleartextTrafficPermitted="true"> — that would
+  open cleartext to the whole internet, which is a security risk.
+-->
+<network-security-config>
+
+  <!-- ── Release: strict TLS everywhere (Android default, stated explicitly) -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <!-- ── Debug: allow plain HTTP to local LAN subnet only -->
+  <debug-overrides>
+    <trust-anchors>
+      <!-- also trust user-installed CAs so devs can inspect HTTPS traffic -->
+      <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </debug-overrides>
+
+  <!-- Explicit cleartext whitelist: LAN subnet for local dev server -->
+  <domain-config cleartextTrafficPermitted="true">
+    <!-- IPv4 LAN — covers 192.168.1.x (change subnet if your network differs) -->
+    <domain includeSubdomains="false">192.168.1.13</domain>
+    <!-- localhost / emulator alias -->
+    <domain includeSubdomains="false">localhost</domain>
+    <domain includeSubdomains="false">10.0.2.2</domain>
+  </domain-config>
+
+</network-security-config>

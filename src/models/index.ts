@@ -51,21 +51,27 @@ export interface TwoFaSetupResponse {
 // USER
 // ─────────────────────────────────────────────────────────────────────────────
 export interface User {
-  id:         string;
-  email:      string;
-  fullName:   string;
-  phone?:     string;
-  avatarUrl?: string;
-  role:       UserRole;
-  status:     UserStatus;
-  createdAt:  string;
-  updatedAt:  string;
+  id:             string;
+  email:          string;
+  fullName:       string;
+  phone?:         string;
+  avatarUrl?:     string;
+  role:           UserRole;
+  status:         UserStatus;
+  twoFaEnabled?:  boolean;
+  createdAt:      string;
+  updatedAt:      string;
 }
 
 export interface UpdateUserPayload {
   fullName?:  string;
   phone?:     string;
   avatarUrl?: string;
+}
+
+export interface DeleteAccountPayload {
+  password:        string;
+  confirmPhrase:   string;   // must equal "SUPPRIMER MON COMPTE"
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,21 +173,31 @@ export interface AgentSummary {
 }
 
 export interface Booking {
-  id:             string;
-  missionId:      string;
-  mission?:       Mission;
-  agentId?:       string;
-  agent?:         AgentSummary;
-  serviceTypeId?: string;
-  serviceType?:   ServiceType;
-  status:         BookingStatus;
-  checkinAt?:     string;
-  checkoutAt?:    string;
-  durationMin?:   number;
-  incidents?:     Incident[];
-  applications?:  Application[];
-  createdAt:      string;
-  updatedAt:      string;
+  id:                string;
+  missionId:         string;
+  mission?:          Mission;
+  agentId?:          string;
+  agent?:            AgentSummary;
+  serviceTypeId?:    string;
+  serviceType?:      ServiceType;
+  status:            BookingStatus;
+  uniform?:          string;
+  checkinAt?:        string;
+  checkoutAt?:       string;
+  checkinLat?:       number;
+  checkinLng?:       number;
+  checkoutLat?:      number;
+  checkoutLng?:      number;
+  checkinPhotoUrl?:  string;
+  checkinPhotoUrl2?: string;
+  checkoutPhotoUrl?: string;
+  checkoutPhotoUrl2?:string;
+  durationMin?:      number;
+  rating?:           Rating;
+  incidents?:        Incident[];
+  applications?:     Application[];
+  createdAt:         string;
+  updatedAt:         string;
 }
 
 export interface Application {
@@ -214,7 +230,7 @@ export interface Incident {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DISPUTE  ← FIX: was missing — caused TS2305 in disputes.ts
+// DISPUTE
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Dispute {
   id:          string;
@@ -227,7 +243,7 @@ export interface Dispute {
   createdAt:   string;
 }
 
-export interface CreateDisputePayload {  // ← FIX: was missing — caused TS2724 in disputes.ts
+export interface CreateDisputePayload {
   missionId:   string;
   bookingId?:  string;
   reason:      string;
@@ -235,17 +251,39 @@ export interface CreateDisputePayload {  // ← FIX: was missing — caused TS27
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYMENT METHOD (Stripe saved card / SEPA)
+// ─────────────────────────────────────────────────────────────────────────────
+export interface PaymentMethod {
+  id:       string;
+  type:     'card' | 'sepa_debit';
+  card?: {
+    brand:    string;
+    last4:    string;
+    expMonth: number;
+    expYear:  number;
+  };
+  sepa?: {
+    last4:   string;
+    country: string;
+  };
+  created:  number;
+}
+
 // PAYMENT
 // ─────────────────────────────────────────────────────────────────────────────
 export interface Payment {
-  id:             string;
-  missionId:      string;
-  stripeIntentId: string;
-  amount:         number;
-  method:         'CARD' | 'SEPA' | 'TRANSFER';
-  status:         PaymentStatus;
-  invoiceNumber:  string;
-  createdAt:      string;
+  id:              string;
+  missionId:       string;
+  mission?:        Pick<Mission, 'id' | 'title' | 'city' | 'startAt'>;
+  stripeIntentId:  string;
+  amount:          number;
+  method:          'CARD' | 'SEPA' | 'TRANSFER';
+  status:          PaymentStatus;
+  invoiceNumber:   string;
+  invoicePdfUrl?:  string;
+  paidAt?:         string;
+  createdAt:       string;
 }
 
 export interface CreatePaymentIntentPayload {
@@ -309,7 +347,6 @@ export interface SendMessagePayload {
 // ─────────────────────────────────────────────────────────────────────────────
 // RATING
 // ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
 export interface Rating {
   id:        string;
   raterId:   string;
@@ -322,30 +359,38 @@ export interface Rating {
   createdAt: string;
 }
 
-
 export interface CreateRatingPayload {
-  /** ratedId est optionnel — le backend le dérive auto depuis booking+direction */
   ratedId?:  string;
   bookingId: string;
   direction: 'CLIENT_TO_AGENT' | 'AGENT_TO_CLIENT';
   score:     number;
   comment?:  string;
-  /** Net Promoter Score 0-10 (spec §11 — NPS tracking) */
   npsScore?:  number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOS
+// ─────────────────────────────────────────────────────────────────────────────
+export interface SosPayload {
+  missionId?: string;
+  latitude?:  number;
+  longitude?: number;
+  message?:   string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NAVIGATION
 // ─────────────────────────────────────────────────────────────────────────────
 export type RootStackParamList = {
-  Auth: undefined;
-  Main: undefined;
+  Onboarding: undefined;
+  Auth:       undefined;
+  Main:       undefined;
 };
 
 export type AuthStackParamList = {
   Login:    undefined;
   Register: undefined;
-  TwoFa:    { tempToken: string };   // ← FIX: was missing → caused "TwoFa not assignable" errors
+  TwoFa:    { tempToken: string };
 };
 
 export type MainTabParamList = {
@@ -355,19 +400,44 @@ export type MainTabParamList = {
   Profile:       undefined;
 };
 
+export type ProfileStackParamList = {
+  ProfileMain:    undefined;
+  ProfileEdit:    undefined;
+  PaymentHistory: undefined;
+  Analytics:      undefined;
+  TwoFaSetup:     undefined;
+  DeleteAccount:      undefined;
+  PaymentMethods:        undefined;
+  AddPaymentMethod:      undefined;
+};
+
 export type MissionStackParamList = {
   MissionList:    undefined;
-  MissionCreate:  { serviceTypeId: string };
+  MissionCreate:  {
+    bookingLines: Array<{
+      serviceTypeId: string;
+      agentCount:    number;
+      name:          string;
+      accent:        string;
+      agentUniforms: string[];
+    }>;
+  };
   ServicePicker:  undefined;
   MissionDetail:  { missionId: string };
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
   SelectAgent:    { bookingId: string };
-  PaymentScreen:  { missionId: string; clientSecret: string; totalTTC: number; paymentMethod?: 'CARD' | 'SEPA'; intentType?: 'payment_intent' | 'setup_intent' };
+  PaymentScreen:  {
+    missionId:     string;
+    clientSecret:  string;
+    totalTTC:      number;
+    paymentMethod?: 'CARD' | 'SEPA';
+    intentType?:   'payment_intent' | 'setup_intent';
+  };
   MissionSuccess: { missionId: string };
   Conversation:   { missionId: string };
   RateAgent:      { bookingId: string; agentId: string; agentName: string; missionTitle: string };
-  LiveTracking:   {             // ← FIX: was missing → caused "LiveTracking not assignable"
+  LiveTracking:   {
     missionId:      string;
     bookingId:      string;
     agentName:      string;
@@ -375,7 +445,7 @@ export type MissionStackParamList = {
     siteLat:        number;
     siteLng:        number;
   };
-  Dispute:        {             // ← FIX: was missing → caused "Dispute not assignable"
+  Dispute:        {
     missionId:    string;
     bookingId?:   string;
     missionTitle: string;

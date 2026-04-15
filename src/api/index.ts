@@ -24,3 +24,6 @@ export { disputesApi }       from './endpoints/disputes';
 // Upload fichiers
 export { uploadApi }         from './endpoints/upload';
 export type { UploadDocumentResponse } from './endpoints/upload';
+
+// SOS
+export { sosApi }            from './endpoints/sos';

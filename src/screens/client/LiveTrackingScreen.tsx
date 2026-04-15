@@ -1,4 +1,4 @@
-/**
+﻿/**
  * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
  * Architecture:
@@ -12,6 +12,7 @@
  *  • Pulsing geofence ring animation
  *  • Last known position shown at reduced opacity when signal lost
  */
+ 
 
 import React, {
   useEffect, useRef, useState, useCallback,
@@ -52,7 +53,7 @@ interface AgentMarkerProps {
 }
 
 const AgentMarker: React.FC<AgentMarkerProps> = ({ initials, heading, inZone, signalLost }) => {
-  const bubbleColor = signalLost ? palette.slate30 : (inZone ? palette.azure : palette.crimson);
+  const bubbleColor = signalLost ? palette.white30 : (inZone ? palette.azure : palette.crimson);
   const size = 56;
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', opacity: signalLost ? 0.5 : 1 }}>
@@ -68,7 +69,7 @@ const AgentMarker: React.FC<AgentMarkerProps> = ({ initials, heading, inZone, si
         <SvgCircle cx="28" cy="28" r="16" fill="none" stroke="#fff" strokeWidth="3" />
         {/* Online dot */}
         {!signalLost && (
-          <SvgCircle cx="40" cy="16" r="5" fill={inZone ? palette.emerald : palette.amber} />
+          <SvgCircle cx="40" cy="16" r="5" fill={inZone ? palette.emerald : palette.gold} />
         )}
       </Svg>
       {/* Initials label — drawn outside SVG for font rendering */}
@@ -94,7 +95,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   const followingRef = useRef(true);
   const [showFollowBtn, setShowFollowBtn] = useState(false);
 
-  // ── Tracking state (all socket logic isolated in hook) ────────────────────
+  // ── Tracking state (all socket logic isolated in hook) ─────────────────────────
   const {
     agentPosition, lastSeenLabel, connected, signalLost,
     distanceM, inZone, pendingAlert, dismissAlert,
@@ -104,7 +105,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     onMissionEnd: () => navigation.goBack(),
   });
 
-  // ── Animations ────────────────────────────────────────────────────────────
+  // ── Animations ───────────────────────────────────────────────────────────────
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const alertSlide = useRef(new Animated.Value(-160)).current;
   const headingRef = useRef<number>(0);
@@ -140,7 +141,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     if (inZone && pendingAlert) dismissAlert();
   }, [inZone, pendingAlert, dismissAlert]);
 
-  // ── Camera follow ─────────────────────────────────────────────────────────
+  // ── Camera follow ─────────────────────────────────────────────────────────────
   const animateToAgent = useCallback(() => {
     if (!agentPosition || !mapRef.current) return;
     mapRef.current.animateCamera({
@@ -170,7 +171,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  // ── Derived ───────────────────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────────
   const agentInitials = agentName
     .split(' ')
     .map((w: string) => w[0] ?? '')
@@ -182,12 +183,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     ? distanceM < 1000 ? `${distanceM} m` : `${(distanceM / 1000).toFixed(1)} km`
     : null;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader title="Suivi en direct" onBack={() => navigation.goBack()} />
 
-      {/* ── MAP ─────────────────────────────────────────────────────── */}
+      {/* ── MAP ─────────────────────────────────────────────────────────────── */}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
@@ -283,7 +284,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         <Text style={styles.attributionTxt}>{OSM_ATTRIBUTION}</Text>
       </View>
 
-      {/* ── CONNECTION STATUS BAR ── */}
+      {/* ── CONNECTION STATUS BAR ───────────────────────────────────────────── */}
       <View style={styles.statusBar}>
         {connected
           ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
@@ -417,7 +418,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: palette.obsidian },
+  container: { flex: 1, backgroundColor: palette.navy },
 
   attribution: {
     position: 'absolute', bottom: 290, right: 10,
@@ -463,7 +464,7 @@ const styles = StyleSheet.create({
   reCenterFab: {
     position: 'absolute', right: 16, bottom: 300,
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: palette.obsidian80,
+    backgroundColor: palette.navy80,
     borderWidth: 1, borderColor: palette.white10,
     alignItems: 'center', justifyContent: 'center',
     ...Platform.select({
@@ -534,3 +535,4 @@ const styles = StyleSheet.create({
   ctrlTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white60 },
   ctrlTxtPrimary:  { color: '#fff' },
 });
+

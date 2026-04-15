@@ -1,23 +1,36 @@
 /**
- * EmptyState — illustration + message quand une liste est vide.
+ * EmptyState — illustration + message when a list is empty.
+ *
+ * Accepts a Lucide icon component via the `Icon` prop.
+ * Renders the icon inside a styled circle container with brand colors.
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Search } from 'lucide-react-native';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { Button } from './Button';
 
+type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
+
 interface Props {
-  icon?:       string;   // emoji ou caractère unicode
-  title:       string;
-  subtitle?:   string;
+  /** Lucide icon component — e.g. Icon={Shield}  */
+  Icon?:        LucideIcon;
+  /** Icon size (default 28) */
+  iconSize?:    number;
+  /** Icon color (default colors.textMuted) */
+  iconColor?:   string;
+  title:        string;
+  subtitle?:    string;
   actionLabel?: string;
-  onAction?:   () => void;
+  onAction?:    () => void;
 }
 
 export const EmptyState: React.FC<Props> = ({
-  icon       = '📭',
+  Icon       = Search,
+  iconSize   = 28,
+  iconColor  = colors.textMuted,
   title,
   subtitle,
   actionLabel,
@@ -25,7 +38,7 @@ export const EmptyState: React.FC<Props> = ({
 }) => (
   <View style={styles.container}>
     <View style={styles.iconWrap}>
-      <Text style={styles.icon}>{icon}</Text>
+      <Icon size={iconSize} color={iconColor} strokeWidth={1.6} />
     </View>
     <Text style={styles.title}>{title}</Text>
     {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -43,12 +56,12 @@ export const EmptyState: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
+    flex:              1,
+    alignItems:        'center',
+    justifyContent:    'center',
     paddingHorizontal: spacing[8],
     paddingVertical:   spacing[12],
-    gap:            spacing[3],
+    gap:               spacing[3],
   },
   iconWrap: {
     width:           72,
@@ -60,9 +73,6 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     marginBottom:    spacing[2],
-  },
-  icon: {
-    fontSize: 32,
   },
   title: {
     fontFamily: fontFamily.displayMedium,

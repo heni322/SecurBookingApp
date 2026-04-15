@@ -9,14 +9,7 @@
  *  • Exposes clean, typed state to the screen — zero raw socket calls needed in UI
  *
  * Usage:
- *   const tracking = useSocketTracking({ missionId, bookingId, token });
- *   tracking.agentPosition   → latest GPS fix (or null)
- *   tracking.connected       → WebSocket live
- *   tracking.signalLost      → no update > 30s
- *   tracking.distanceM       → server-computed distance
- *   tracking.inZone          → server-confirmed geofence
- *   tracking.pendingAlert    → GeofenceAlert to show (cleared after dismissal)
- *   tracking.dismissAlert()  → clears pendingAlert
+ *   const tracking = useSocketTracking({ missionId, bookingId });
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -35,9 +28,9 @@ const SIGNAL_LOST_TIMEOUT_MS = 30_000;
 
 export interface SocketTrackingState {
   agentPosition:  AgentPosition | null;
-  lastSeenLabel:  string | null;         // e.g. "Vu à 14:32"
+  lastSeenLabel:  string | null;
   connected:      boolean;
-  signalLost:     boolean;               // no update for > 30s while connected
+  signalLost:     boolean;
   distanceM:      number | null;
   inZone:         boolean;
   pendingAlert:   GeofenceAlert | null;
@@ -47,7 +40,7 @@ export interface SocketTrackingState {
 interface UseSocketTrackingParams {
   missionId:  string;
   bookingId:  string;
-  onMissionEnd?: () => void;             // called when mission status → COMPLETED/CANCELLED
+  onMissionEnd?: () => void;
 }
 
 export function useSocketTracking({
@@ -64,7 +57,9 @@ export function useSocketTracking({
   const [inZone,        setInZone]        = useState(true);
   const [pendingAlert,  setPendingAlert]  = useState<GeofenceAlert | null>(null);
 
-  // Ref for signal-lost timer — avoids stale closure issues
+  // FIX — ref keeps agentPosition accessible inside event callbacks
+  // without stale closure issues
+  const agentPositionRef = useRef<AgentPosition | null>(null);
   const signalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetSignalTimer = useCallback(() => {
@@ -75,25 +70,29 @@ export function useSocketTracking({
 
   const dismissAlert = useCallback(() => setPendingAlert(null), []);
 
-  // ── Connect + subscribe ───────────────────────────────────────────────────
+  // ── Connect + subscribe ─────────────────────────────────────────────────────
   useEffect(() => {
+    // Token is kept in sync by client.ts after each refresh via
+    // useAuthStore.setState({ accessToken })
     const token = useAuthStore.getState().accessToken;
     if (token) socketService.connect(token);
 
-    // Join mission room (will auto-rejoin on reconnect via socketService)
+    // Join mission room (auto-rejoined on reconnect by socketService)
     socketService.joinMission(missionId);
 
-    // Connection state → drives the `connected` pill
+    // Connection state → drives the `connected` indicator
     const unsubConn = socketService.onConnectionState((state: ConnectionState) => {
       const isConn = state === 'connected';
       setConnected(isConn);
-      // If reconnected and we had a position before, restart the signal timer
-      if (isConn && agentPosition) resetSignalTimer();
+      // FIX — read from ref to avoid stale closure (agentPosition state is stale
+      // inside this callback because it was captured at mount time)
+      if (isConn && agentPositionRef.current) resetSignalTimer();
     });
 
     // Agent GPS position
     const unsubPos = socketService.onAgentPosition((pos: AgentPosition) => {
       if (pos.missionId !== missionId) return;
+      agentPositionRef.current = pos;
       setAgentPosition(pos);
       setLastSeenLabel(`Vu à ${formatTime(new Date(pos.timestamp).toISOString())}`);
       resetSignalTimer();

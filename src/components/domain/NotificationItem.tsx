@@ -1,4 +1,4 @@
-/**
+﻿/**
  * NotificationItem — ligne de notification avec statut lu/non-lu.
  * Icônes : lucide-react-native (fallback emoji pour les types non couverts)
  */
@@ -30,7 +30,7 @@ const TYPE_META: Record<string, NotifMeta> = {
   BOOKING_CHECKOUT:  { Icon: LogOut,       color: colors.primary,  bgColor: colors.primarySurface },
   PAYMENT_CONFIRMED: { Icon: CreditCard,   color: colors.success,  bgColor: colors.successSurface },
   INCIDENT_REPORTED: { Icon: AlertTriangle,color: colors.warning,  bgColor: colors.warningSurface },
-  RATING_RECEIVED:   { Icon: Star,         color: '#EAB308',       bgColor: '#713F1215'            },
+  RATING_RECEIVED:   { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface            },
   DOCUMENT_APPROVED: { Icon: FileCheck,    color: colors.success,  bgColor: colors.successSurface },
   DOCUMENT_REJECTED: { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface  },
 };
@@ -122,3 +122,4 @@ const styles = StyleSheet.create({
     color:      colors.textMuted,
   },
 });
+

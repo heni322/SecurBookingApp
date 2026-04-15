@@ -17,7 +17,7 @@ export const spacing = {
   16:  64,
   20:  80,
 
-  // ─── Named aliases — fix all TS2339 for spacing.xs/sm/md/lg/xl/xxl ───
+  // ─── Named aliases ────────────────────────────────────────────────────────
   xs:  4,
   sm:  8,
   md:  16,
@@ -38,32 +38,41 @@ export const radius = {
 
 export const shadow = {
   sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowColor:   '#000',
+    shadowOffset:  { width: 0, height: 1 },
+    shadowOpacity: 0.35,
+    shadowRadius:  3,
+    elevation:     2,
   },
   md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor:   '#000',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius:  8,
+    elevation:     5,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowColor:   '#000',
+    shadowOffset:  { width: 0, height: 8 },
+    shadowOpacity: 0.55,
+    shadowRadius:  16,
+    elevation:     10,
   },
+  // Gold glow — used for primary buttons, focused inputs, cards
+  gold: {
+    shadowColor:   '#bc933b',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.40,
+    shadowRadius:  14,
+    elevation:     6,
+  },
+  // Legacy alias — keeps backward-compat with old `shadow.amber` references
   amber: {
-    shadowColor: '#F5A623',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowColor:   '#bc933b',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.40,
+    shadowRadius:  14,
+    elevation:     6,
   },
 } as const;
 

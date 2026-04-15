@@ -1,0 +1,51 @@
+import type { AccountNS } from '../types';
+
+const account: AccountNS = {
+  edit: {
+    title: 'Modifier le profil', avatar_hint: 'Photo de profil',
+    full_name_label: 'NOM COMPLET', phone_label: 'TÉLÉPHONE',
+    full_name_placeholder: 'Jean Dupont', phone_placeholder: '+33 6 12 34 56 78',
+    name_required_title: 'Nom requis', name_required_body: 'Veuillez saisir votre nom complet.',
+    save: 'Enregistrer les modifications', saved: '✓ Enregistré', error: 'Impossible de mettre à jour le profil.',
+  },
+  delete: {
+    title: 'Supprimer mon compte', screen_title: 'Supprimer le compte',
+    warning_title: 'Action irréversible',
+    warning_body: 'La suppression de votre compte effacera définitivement toutes vos données (missions, paiements, historique). Cette opération est conforme au RGPD et ne peut pas être annulée.',
+    deleted_items_title: 'CE QUI SERA SUPPRIMÉ',
+    item_personal: 'Vos informations personnelles', item_missions: 'Votre historique de missions',
+    item_payments: 'Vos paiements et factures', item_conversations: 'Vos conversations', item_ratings: 'Vos évaluations',
+    password_label: 'MOT DE PASSE ACTUEL', password_placeholder: 'Votre mot de passe',
+    phrase_label: 'TAPEZ : « SUPPRIMER MON COMPTE »', phrase_error: 'La phrase ne correspond pas',
+    confirm_phrase: 'SUPPRIMER MON COMPTE',
+    confirm_title: 'Suppression définitive',
+    confirm_body: 'Cette action est irréversible. Toutes vos données seront effacées conformément au RGPD.',
+    cancel: 'Annuler', delete_btn: 'Supprimer définitivement', deleting: 'Suppression…', error: 'Mot de passe incorrect.',
+  },
+  two_fa: {
+    title: 'Double authentification', loading: 'Chargement…',
+    status_enabled: '2FA activé', status_disabled: '2FA désactivé',
+    status_body_enabled: 'Votre compte est protégé par une authentification à deux facteurs.',
+    status_body_disabled: 'Activez le 2FA pour renforcer la sécurité de votre compte.',
+    setup_btn: 'Configurer le 2FA',
+    scan_title: 'Scannez le QR code',
+    scan_subtitle: 'Scannez ce QR code avec votre application (Google Authenticator, Authy…)',
+    secret_label: 'Ou saisissez ce code manuellement :',
+    scanned_btn: "J'ai scanné le QR code",
+    verify_title: 'Vérifier le code', verify_subtitle: "Entrez le code à 6 chiffres généré par l'app",
+    code_placeholder: '000000', verify_btn: 'Activer le 2FA', verifying: 'Vérification…',
+    code_required_title: 'Code requis', code_required_body: 'Saisissez le code à 6 chiffres.',
+    invalid_title: 'Code invalide', invalid_body: 'Le code est incorrect ou expiré.',
+    done_title: '2FA activé', done_subtitle: 'Votre compte est désormais protégé par une double authentification.', done_close: 'Fermer',
+    disable_title: 'Désactiver le 2FA',
+    disable_body: "Vous allez désactiver l'authentification à deux facteurs. Votre compte sera moins sécurisé.",
+    disable_cancel: 'Annuler', disable_confirm: 'Désactiver',
+    disable_code_title: 'Code 2FA', disable_code_body: 'Entrez votre code 2FA pour confirmer la désactivation',
+    disabled_title: '2FA désactivé', disabled_body: "L'authentification à deux facteurs est désactivée.",
+    perk_code_title: "Entrez le code à 6 chiffres généré par l'app",
+    perk_code_body: 'À chaque connexion, un code temporaire vous sera demandé',
+    error_setup: 'Impossible de configurer le 2FA.',
+  },
+};
+
+export default account;

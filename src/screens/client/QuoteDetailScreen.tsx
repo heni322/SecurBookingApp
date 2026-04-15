@@ -1,11 +1,10 @@
 /**
- * QuoteDetailScreen — affiche le devis et déclenche le paiement Stripe.
- * Icônes : lucide-react-native
+ * QuoteDetailScreen — displays the quote and triggers Stripe payment.
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Clock, CheckCircle2, CreditCard, Lock, Info, Landmark } from 'lucide-react-native';
+import { Clock, CheckCircle2, CreditCard, FileText, Lock, Info, Landmark } from 'lucide-react-native';
 import { quotesApi }          from '@api/endpoints/quotes';
 import { paymentsApi }        from '@api/endpoints/payments';
 import { useApi }             from '@hooks/useApi';
@@ -18,15 +17,19 @@ import { colors }             from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList } from '@models/index';
+import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'QuoteDetail'>;
 
 export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
+  const { t }     = useTranslation('quote');
+  const { t: tc } = useTranslation('common');
+
   const { missionId }                     = route.params;
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
   const [accepting, setAccepting]         = useState(false);
   const [paying,    setPaying]            = useState(false);
-  const [payMethod, setPayMethod]          = useState<'CARD' | 'SEPA'>('CARD');
+  const [payMethod, setPayMethod]         = useState<'CARD' | 'SEPA'>('CARD');
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
@@ -38,8 +41,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       await quotesApi.accept(quote.id);
       await load();
     } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.message ?? "Impossible d'accepter le devis";
-      Alert.alert('Erreur', msg);
+      Alert.alert(tc('error'), (err as any)?.response?.data?.message ?? t('error_accept'));
     } finally {
       setAccepting(false);
     }
@@ -49,10 +51,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!quote) return;
     setPaying(true);
     try {
-      const { data: res } = await paymentsApi.createIntent({
-        missionId,
-        method: payMethod,
-      });
+      const { data: res } = await paymentsApi.createIntent({ missionId, method: payMethod });
       const intent = (res as any).data;
       navigation.navigate('PaymentScreen', {
         missionId,
@@ -60,8 +59,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         totalTTC:     quote.totalWithVat,
       });
     } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.message ?? "Impossible d'initier le paiement";
-      Alert.alert('Erreur', msg);
+      Alert.alert(tc('error'), (err as any)?.response?.data?.message ?? t('error_pay'));
     } finally {
       setPaying(false);
     }
@@ -70,77 +68,68 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="Devis"
+        title={t('title')}
         subtitle={quote ? `Réf. #${missionId.slice(-6).toUpperCase()}` : ''}
         onBack={() => navigation.goBack()}
       />
 
       {loading && !quote ? (
-        <LoadingState message="Génération du devis…" />
+        <LoadingState message={t('loading')} />
       ) : !quote ? (
-        <EmptyState
-          icon="📄"
-          title="Devis introuvable"
-          subtitle="Le devis n'a pas encore été généré pour cette mission."
-        />
+        <EmptyState Icon={FileText} title={t('empty_title')} subtitle={t('empty_subtitle')} />
       ) : (
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Bandeaux contextuels */}
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+          {/* Pending banner */}
           {quote.status === 'PENDING' && (
             <View style={styles.infoBanner}>
               <Clock size={18} color={colors.info} strokeWidth={1.8} />
-              <Text style={styles.bannerText}>
-                Vérifiez le détail tarifaire et acceptez le devis pour procéder au paiement.
-              </Text>
+              <Text style={styles.bannerText}>{t('pending_banner')}</Text>
             </View>
           )}
 
-          {/* ── Sélecteur mode de paiement ── */}
+          {/* Payment method selector */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.methodSection}>
-              <Text style={styles.methodTitle}>Mode de paiement</Text>
+              <Text style={styles.methodTitle}>{t('payment_method')}</Text>
               <View style={styles.methodRow}>
                 <TouchableOpacity
                   style={[styles.methodChip, payMethod === 'CARD' && styles.methodChipActive]}
-                  onPress={() => setPayMethod('CARD')}
-                  activeOpacity={0.75}
+                  onPress={() => setPayMethod('CARD')} activeOpacity={0.75}
                 >
                   <CreditCard size={16} color={payMethod === 'CARD' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-                  <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>Carte bancaire</Text>
+                  <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>{t('card')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.methodChip, payMethod === 'SEPA' && styles.methodChipActive]}
-                  onPress={() => setPayMethod('SEPA')}
-                  activeOpacity={0.75}
+                  onPress={() => setPayMethod('SEPA')} activeOpacity={0.75}
                 >
                   <Landmark size={16} color={payMethod === 'SEPA' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-                  <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>Virement SEPA</Text>
+                  <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>{t('sepa')}</Text>
                 </TouchableOpacity>
               </View>
               {payMethod === 'SEPA' && (
                 <View style={styles.sepaNote}>
                   <Info size={13} color={colors.primary} strokeWidth={2} />
                   <Text style={styles.sepaText}>
-                    Le virement SEPA est traité sous 1–2 jours ouvrés. Votre IBAN sera collecté sur la page suivante via Stripe.
+                    SEPA transfer processed in 1–2 business days. Your IBAN will be collected on the next page via Stripe.
                   </Text>
                 </View>
               )}
             </View>
           )}
 
+          {/* Accepted banner */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.successBanner}>
               <CheckCircle2 size={18} color={colors.success} strokeWidth={2} />
               <Text style={[styles.bannerText, { color: colors.success }]}>
-                Devis accepté — procédez au paiement pour valider votre mission.
+                Quote accepted — proceed to payment to confirm your mission.
               </Text>
             </View>
           )}
 
-          {/* Carte de breakdown */}
+          {/* Breakdown card */}
           <QuoteBreakdownCard
             quote={quote}
             onAccept={handleAccept}
@@ -148,22 +137,21 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             readonly={quote.status !== 'PENDING'}
           />
 
-          
-
+          {/* Pay button */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.paySection}>
               <View style={styles.secureRow}>
                 <Lock size={13} color={colors.textMuted} strokeWidth={2} />
                 <Text style={styles.secureNote}>
-                  Paiement sécurisé via Stripe — vos données bancaires ne transitent jamais par nos serveurs.
+                  Secure payment via Stripe — your bank details never pass through our servers.
                 </Text>
               </View>
               <Button
-                label={paying ? 'Redirection…' : 'Payer maintenant'}
-                onPress={paying ? undefined : handlePay}
+                label={paying ? t('paying') : payMethod === 'CARD' ? t('pay_card') : t('pay_sepa')}
+                onPress={handlePay}
+                disabled={paying}
                 loading={paying}
-                fullWidth
-                size="lg"
+                fullWidth size="lg"
               />
             </View>
           )}
@@ -174,56 +162,21 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  screen:  { flex: 1, backgroundColor: colors.background },
-  content: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop:        spacing[4],
-    paddingBottom:     spacing[12],
-    gap:               spacing[4],
-  },
-  infoBanner: {
-    flexDirection:   'row',
-    alignItems:      'flex-start',
-    backgroundColor: colors.infoSurface,
-    borderRadius:    radius.xl,
-    padding:         spacing[4],
-    borderWidth:     1,
-    borderColor:     colors.info,
-    gap:             spacing[3],
-  },
-  successBanner: {
-    flexDirection:   'row',
-    alignItems:      'flex-start',
-    backgroundColor: colors.successSurface,
-    borderRadius:    radius.xl,
-    padding:         spacing[4],
-    borderWidth:     1,
-    borderColor:     colors.success,
-    gap:             spacing[3],
-  },
-  bannerText: {
-    flex:       1,
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.info,
-    lineHeight: fontSize.sm * 1.6,
-  },
-  paySection: { gap: spacing[3] },
-  secureRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  secureNote: {
-    flex:       1,
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.xs,
-    color:      colors.textMuted,
-    lineHeight: fontSize.xs * 1.7,
-  },
-  methodSection:      { marginTop: spacing[2], marginBottom: spacing[2] },
-  methodTitle:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing[3], textTransform: 'uppercase', letterSpacing: 0.5 },
-  methodRow:          { flexDirection: 'row', gap: spacing[3] },
-  methodChip:         { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], height: 46, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  methodChipActive:   { backgroundColor: colors.primarySurface, borderColor: colors.primary, borderWidth: 1.5 },
-  methodChipText:     { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted },
+  screen:              { flex: 1, backgroundColor: colors.background },
+  content:             { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[12], gap: spacing[4] },
+  infoBanner:          { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.infoSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.info, gap: spacing[3] },
+  successBanner:       { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.successSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.success, gap: spacing[3] },
+  bannerText:          { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.info, lineHeight: fontSize.sm * 1.6 },
+  paySection:          { gap: spacing[3] },
+  secureRow:           { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  secureNote:          { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, lineHeight: fontSize.xs * 1.7 },
+  methodSection:       { marginTop: spacing[2], marginBottom: spacing[2] },
+  methodTitle:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing[3], textTransform: 'uppercase', letterSpacing: 0.5 },
+  methodRow:           { flexDirection: 'row', gap: spacing[3] },
+  methodChip:          { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], height: 46, borderRadius: radius.lg, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  methodChipActive:    { backgroundColor: colors.primarySurface, borderColor: colors.primary, borderWidth: 1.5 },
+  methodChipText:      { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted },
   methodChipTextActive:{ color: colors.primary },
-  sepaNote:           { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], marginTop: spacing[3], backgroundColor: colors.primarySurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary },
-  sepaText:           { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primary, lineHeight: fontSize.xs * 1.6 },
+  sepaNote:            { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], marginTop: spacing[3], backgroundColor: colors.primarySurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary },
+  sepaText:            { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primary, lineHeight: fontSize.xs * 1.6 },
 });

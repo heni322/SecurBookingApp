@@ -22,7 +22,9 @@
       "@theme":        ["src/theme/index.ts"],
       "@theme/*":      ["src/theme/*"],
       "@navigation/*": ["src/navigation/*"],
-      "@assets/*":     ["src/assets/*"]
+      "@assets/*":     ["src/assets/*"],
+      "@i18n":         ["src/i18n/index.ts"],
+      "@i18n/*":       ["src/i18n/*"]
     }
   },
   "include": ["**/*.ts", "**/*.tsx"],

@@ -1,7 +1,7 @@
 // ─── Roles ────────────────────────────────────────────────────────────────────
 export const UserRole = {
   CLIENT: 'CLIENT',
-  AGENT:  'AGENT',       // conservé pour lire le rôle retourné par l'API
+  AGENT:  'AGENT',
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
@@ -9,6 +9,7 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const UserStatus = {
   PENDING:   'PENDING',
   ACTIVE:    'ACTIVE',
+  INACTIVE:  'INACTIVE',
   SUSPENDED: 'SUSPENDED',
   BANNED:    'BANNED',
 } as const;
@@ -38,10 +39,11 @@ export type BookingStatus = (typeof BookingStatus)[keyof typeof BookingStatus];
 
 // ─── Paiements ────────────────────────────────────────────────────────────────
 export const PaymentStatus = {
-  PENDING:  'PENDING',
-  PAID:     'PAID',
-  FAILED:   'FAILED',
-  REFUNDED: 'REFUNDED',
+  PENDING:    'PENDING',
+  PROCESSING: 'PROCESSING',
+  PAID:       'PAID',
+  FAILED:     'FAILED',
+  REFUNDED:   'REFUNDED',
 } as const;
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus];
 
@@ -60,3 +62,13 @@ export const DocumentStatus = {
   EXPIRED:  'EXPIRED',
 } as const;
 export type DocumentStatus = (typeof DocumentStatus)[keyof typeof DocumentStatus];
+
+// ─── Tenue agent ──────────────────────────────────────────────────────────────
+export const UniformType = {
+  STANDARD:     'STANDARD',
+  CIVIL:        'CIVIL',
+  EVENEMENTIEL: 'EVENEMENTIEL',
+  SSIAP:        'SSIAP',
+  CYNOPHILE:    'CYNOPHILE',
+} as const;
+export type UniformType = (typeof UniformType)[keyof typeof UniformType];

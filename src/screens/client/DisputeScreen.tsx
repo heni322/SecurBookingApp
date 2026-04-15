@@ -1,6 +1,7 @@
 /**
  * DisputeScreen — Ouverture d'un litige client après une mission.
  * 6 motifs prédéfinis · Description libre · Soumission → Admin review 48h
+ * Icônes : lucide-react-native (toutes — plus aucun emoji)
  */
 import React, { useState } from 'react';
 import {
@@ -8,7 +9,10 @@ import {
   TextInput, TouchableOpacity,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react-native';
+import {
+  AlertTriangle, CheckCircle2,
+  UserX, Clock, ThumbsDown, ReceiptEuro, Ban, ClipboardList,
+} from 'lucide-react-native';
 import { ScreenHeader } from '@components/ui/ScreenHeader';
 import { Button }       from '@components/ui/Button';
 import { Card }         from '@components/ui/Card';
@@ -20,13 +24,22 @@ import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'Dispute'>;
 
-const REASONS = [
-  { id: 'agent_absent',  icon: '❌', label: 'Agent absent',          desc: "L'agent ne s'est pas présenté" },
-  { id: 'agent_late',    icon: '⏰', label: 'Agent en retard',       desc: 'Retard significatif sans prévenir' },
-  { id: 'quality',       icon: '👎', label: 'Qualité insuffisante',  desc: 'Prestation non conforme aux attentes' },
-  { id: 'billing',       icon: '💶', label: 'Problème facturation',  desc: 'Montant incorrect ou double facturation' },
-  { id: 'behavior',      icon: '🚫', label: 'Comportement',          desc: "Comportement inapproprié de l'agent" },
-  { id: 'other',         icon: '📋', label: 'Autre motif',           desc: 'Autre motif de litige' },
+type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
+
+// ── Motifs avec icônes Lucide ─────────────────────────────────────────────────
+const REASONS: ReadonlyArray<{
+  id:    string;
+  Icon:  LucideIcon;
+  label: string;
+  desc:  string;
+  color: string;
+}> = [
+  { id: 'agent_absent', Icon: UserX,         label: 'Agent absent',         desc: "L'agent ne s'est pas présenté",          color: colors.danger   },
+  { id: 'agent_late',   Icon: Clock,         label: 'Agent en retard',      desc: 'Retard significatif sans prévenir',       color: colors.warning  },
+  { id: 'quality',      Icon: ThumbsDown,    label: 'Qualité insuffisante', desc: 'Prestation non conforme aux attentes',    color: colors.warning  },
+  { id: 'billing',      Icon: ReceiptEuro,   label: 'Problème facturation', desc: 'Montant incorrect ou double facturation', color: colors.info     },
+  { id: 'behavior',     Icon: Ban,           label: 'Comportement',         desc: "Comportement inapproprié de l'agent",     color: colors.danger   },
+  { id: 'other',        Icon: ClipboardList, label: 'Autre motif',          desc: 'Autre motif de litige',                   color: colors.textMuted},
 ] as const;
 
 type ReasonId = (typeof REASONS)[number]['id'];
@@ -119,7 +132,11 @@ export default function DisputeScreen({ navigation, route }: Props) {
               onPress={() => setReason(r.id)}
               activeOpacity={0.75}
             >
-              <Text style={styles.reasonIcon}>{r.icon}</Text>
+              {/* Lucide icon in a small tinted circle */}
+              <View style={[styles.reasonIconWrap, { backgroundColor: active ? colors.primarySurface : colors.surface }]}>
+                <r.Icon size={18} color={active ? colors.primary : r.color} strokeWidth={1.8} />
+              </View>
+
               <View style={styles.reasonText}>
                 <Text style={[styles.reasonLabel, active && styles.reasonLabelOn]}>{r.label}</Text>
                 <Text style={styles.reasonDesc}>{r.desc}</Text>
@@ -227,32 +244,44 @@ const styles = StyleSheet.create({
     borderWidth:     1.5,
     borderColor:     colors.border,
   },
-  reasonCardOn:   { borderColor: colors.primary, backgroundColor: colors.primarySurface },
-  reasonIcon:     { fontSize: 22, flexShrink: 0 },
-  reasonText:     { flex: 1 },
-  reasonLabel:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textSecondary },
-  reasonLabelOn:  { color: colors.primary },
-  reasonDesc:     { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
-  reasonCheck:    { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, flexShrink: 0 },
+  reasonCardOn: { borderColor: colors.primary, backgroundColor: colors.primarySurface },
 
-  textareaCard:   { padding: 0, overflow: 'hidden', backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border },
+  // Lucide icon container — replaces the emoji Text
+  reasonIconWrap: {
+    width:           40,
+    height:          40,
+    borderRadius:    radius.md,
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1,
+    borderColor:     colors.border,
+    flexShrink:      0,
+  },
+
+  reasonText:    { flex: 1 },
+  reasonLabel:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textSecondary },
+  reasonLabelOn: { color: colors.primary },
+  reasonDesc:    { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, marginTop: 2 },
+  reasonCheck:   { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, flexShrink: 0 },
+
+  textareaCard: { padding: 0, overflow: 'hidden', backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border },
   textarea: {
-    fontFamily:  fontFamily.body,
-    fontSize:    fontSize.base,
-    color:       colors.textPrimary,
-    minHeight:   140,
-    padding:     spacing[4],
-    lineHeight:  fontSize.base * 1.6,
+    fontFamily: fontFamily.body,
+    fontSize:   fontSize.base,
+    color:      colors.textPrimary,
+    minHeight:  140,
+    padding:    spacing[4],
+    lineHeight: fontSize.base * 1.6,
   },
   textareaFooter: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    alignItems:     'center',
+    flexDirection:     'row',
+    justifyContent:    'space-between',
+    alignItems:        'center',
     paddingHorizontal: spacing[4],
-    paddingBottom:  spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop:     spacing[2],
+    paddingBottom:     spacing[3],
+    borderTopWidth:    1,
+    borderTopColor:    colors.border,
+    paddingTop:        spacing[2],
   },
   charCount:   { fontFamily: fontFamily.mono, fontSize: fontSize.xs, color: colors.textMuted },
   charWarning: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning },

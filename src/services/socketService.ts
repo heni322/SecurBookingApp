@@ -1,12 +1,11 @@
 /**
  * socketService.ts — Bulletproof WebSocket client (CLIENT app).
  *
- * Improvements over v1:
- *  ● Observable ConnectionState — any component can subscribe
- *  ● reconnectionAttempts: Infinity + exponential jitter backoff
- *  ● Auto-rejoin tracked mission rooms on reconnect
- *  ● All subscriptions return typed () => void unsubscribe functions
- *  ● Guards against null socket (never throws if connect() not yet called)
+ * Changes vs previous version:
+ *  ● reconnect(token) — called by the Axios interceptor after a token refresh so
+ *    the socket always holds a valid JWT. Prevents the `io server disconnect`
+ *    that occurred when rehydrate() connected with an expired token.
+ *  ● All other APIs remain identical.
  */
 
 import { io, Socket } from 'socket.io-client';
@@ -51,8 +50,8 @@ type ConnectionListener = (state: ConnectionState) => void;
 
 // ── SocketService ─────────────────────────────────────────────────────────────
 class SocketService {
-  private socket:           Socket | null = null;
-  private connectionState:  ConnectionState = 'disconnected';
+  private socket:          Socket | null = null;
+  private connectionState: ConnectionState = 'disconnected';
   private connectionListeners = new Set<ConnectionListener>();
 
   /** Mission rooms to rejoin on reconnect */
@@ -65,11 +64,6 @@ class SocketService {
     this.connectionListeners.forEach(cb => cb(s));
   }
 
-  /**
-   * Subscribe to connection state changes.
-   * Callback is fired immediately with current state, then on each change.
-   * Returns an unsubscribe function.
-   */
   onConnectionState(cb: ConnectionListener): () => void {
     cb(this.connectionState);
     this.connectionListeners.add(cb);
@@ -80,10 +74,33 @@ class SocketService {
     return this.connectionState === 'connected';
   }
 
-  // ── Connect / Disconnect ──────────────────────────────────────────────────
+  // ── Connect ───────────────────────────────────────────────────────────────
   connect(accessToken: string) {
     if (this.socket?.connected) return;
+    this._createSocket(accessToken);
+  }
 
+  /**
+   * reconnect() — Disconnect any existing socket and open a new one with a
+   * fresh access token. Called automatically by the Axios 401 interceptor
+   * after a successful token refresh so the gateway always receives a valid JWT.
+   *
+   * Previously tracked mission rooms are re-joined after the new connection
+   * is established (same behaviour as the auto-rejoin on any reconnect).
+   */
+  reconnect(accessToken: string) {
+    // Tear down old socket cleanly without clearing joinedRooms
+    if (this.socket) {
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
+    this.setState('disconnected');
+    console.log('[WS-Client] Reconnecting with fresh token...');
+    this._createSocket(accessToken);
+  }
+
+  private _createSocket(accessToken: string) {
     this.setState('connecting');
 
     this.socket = io(`${WS_URL}/events`, {
@@ -98,7 +115,7 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('[WS-Client] Connected');
       this.setState('connected');
-      // Rejoin all tracked mission rooms after reconnect
+      // Rejoin all tracked mission rooms after connect / reconnect
       this.joinedRooms.forEach(mid => {
         this.socket?.emit('join_mission', { missionId: mid });
         console.log(`[WS-Client] Rejoined mission:${mid}`);
@@ -116,6 +133,7 @@ class SocketService {
     });
   }
 
+  // ── Disconnect ────────────────────────────────────────────────────────────
   disconnect() {
     this.socket?.disconnect();
     this.socket = null;
@@ -131,7 +149,6 @@ class SocketService {
 
   leaveMission(missionId: string) {
     this.joinedRooms.delete(missionId);
-    // Socket.io auto-removes on disconnect; explicit leave not needed by server
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────

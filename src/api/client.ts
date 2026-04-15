@@ -2,6 +2,7 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosE
 import { API_BASE_URL, API_TIMEOUT } from '@constants/config';
 import { tokenStorage }  from '@services/tokenStorage';
 import { useAuthStore }  from '@store/authStore';
+import { socketService } from '@services/socketService';
 import { resetToRoot }   from '@services/navigationRef';
 
 // ─── Dev Logger ───────────────────────────────────────────────────────────────
@@ -89,6 +90,7 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
+        // Queue concurrent requests that arrived while refresh is in flight
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         }).then((token) => {
@@ -103,23 +105,38 @@ apiClient.interceptors.response.use(
 
       try {
         const refreshToken = tokenStorage.getRefreshToken();
-        // POST /auth/refresh — uses JwtRefreshGuard (sends refresh token in body)
         const { data } = await axios.post(
           `${API_BASE_URL}/auth/refresh`,
           { refreshToken },
           { headers: { Authorization: `Bearer ${refreshToken}` } },
         );
         const { accessToken, refreshToken: newRT } = data.data ?? data;
+
+        // 1. Persist fresh tokens in storage + in-memory cache
         tokenStorage.setTokens({ accessToken, refreshToken: newRT });
+
+        // 2. Sync the Zustand store so any hook reading
+        //    useAuthStore.getState().accessToken gets the fresh value.
+        //    (e.g. useSocketTracking reads it to reconnect the socket)
+        useAuthStore.setState({ accessToken });
+
+        // 3. Drain the queue of concurrent 401 requests
         processQueue(null, accessToken);
         original.headers.Authorization = `Bearer ${accessToken}`;
+
+        // 4. Reconnect WebSocket with the fresh token.
+        //    The socket connected during rehydrate() with the expired token
+        //    → the gateway's JwtService.verify() failed → `io server disconnect`.
+        //    Now we transparently reconnect with a valid JWT.
+        console.log(`${TAG} 🔌 Reconnecting WebSocket with fresh token...`);
+        socketService.reconnect(accessToken);
+
         console.log(`${TAG} ✅ Token refreshed — retrying original request`);
         return apiClient(original);
       } catch (refreshErr) {
         console.error(`${TAG} ❌ Token refresh failed — logging out`, refreshErr);
         processQueue(refreshErr, null);
         useAuthStore.getState().logout();
-        // Navigation impérative vers Auth (depuis un service, pas un composant)
         resetToRoot('Auth');
         return Promise.reject(refreshErr);
       } finally {

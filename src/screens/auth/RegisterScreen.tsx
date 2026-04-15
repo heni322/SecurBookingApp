@@ -1,6 +1,5 @@
 /**
- * RegisterScreen — création de compte client.
- * Icônes : lucide-react-native
+ * RegisterScreen — Premium account creation.
  */
 import React, { useState } from 'react';
 import {
@@ -8,19 +7,25 @@ import {
   KeyboardAvoidingView, Platform, StyleSheet, Alert,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ArrowLeft, User, Building2, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react-native';
+import {
+  ArrowLeft, User, Building2, Mail, Phone,
+  Lock, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2,
+} from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
 import { useAuthStore } from '@store/authStore';
-import { Button }  from '@components/ui/Button';
-import { Input }   from '@components/ui/Input';
-import { colors }  from '@theme/colors';
+import { Button }       from '@components/ui/Button';
+import { Input }        from '@components/ui/Input';
+import { colors }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
-import { fontSize, fontFamily } from '@theme/typography';
+import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User as UserModel } from '@models/index';
+import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
+  const { t } = useTranslation('auth');
+
   const [fullName,   setFullName]   = useState('');
   const [email,      setEmail]      = useState('');
   const [phone,      setPhone]      = useState('');
@@ -29,15 +34,14 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const [clientType, setClientType] = useState<'INDIVIDUAL' | 'COMPANY'>('INDIVIDUAL');
   const [loading,    setLoading]    = useState(false);
   const [errors,     setErrors]     = useState<Record<string, string>>({});
-
   const { hydrate } = useAuthStore();
 
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!fullName.trim())           e.fullName = 'Nom complet requis';
-    if (!email.trim())              e.email    = 'Email requis';
-    if (!/\S+@\S+\.\S+/.test(email)) e.email  = 'Email invalide';
-    if (password.length < 8)        e.password = '8 caractères minimum';
+    if (!fullName.trim())             e.fullName = t('register.errors.full_name_required');
+    if (!email.trim())                e.email    = t('register.errors.email_required');
+    if (!/\S+@\S+\.\S+/.test(email)) e.email    = t('register.errors.email_invalid');
+    if (password.length < 8)          e.password = t('register.errors.password_length');
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -47,11 +51,11 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     try {
       const { data: res } = await authApi.register({
-        fullName:   fullName.trim(),
-        email:      email.trim().toLowerCase(),
+        fullName: fullName.trim(),
+        email:    email.trim().toLowerCase(),
         password,
-        phone:      phone.trim() || undefined,
-        role:       'CLIENT' as const,
+        phone:    phone.trim() || undefined,
+        role:     'CLIENT' as const,
         clientType,
       });
       const { user, accessToken, refreshToken } = (res as any).data as {
@@ -60,116 +64,144 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       const tokens: AuthTokens = { accessToken, refreshToken, expiresIn: 900 };
       hydrate(user, tokens);
     } catch (err: unknown) {
-      const message =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-        ?? 'Erreur lors de la création du compte';
-      Alert.alert('Inscription impossible', message);
+      const message = (err as any)?.response?.data?.message ?? t('register.errors.generic');
+      Alert.alert(t('register.alert.title'), message);
     } finally {
       setLoading(false);
     }
   };
 
+  const TYPE_OPTIONS: Array<{ type: 'INDIVIDUAL' | 'COMPANY'; label: string; sub: string; Icon: typeof User }> = [
+    { type: 'INDIVIDUAL', label: t('register.individual'), sub: t('register.individual_sub'), Icon: User      },
+    { type: 'COMPANY',    label: t('register.company'),    sub: t('register.company_sub'),    Icon: Building2 },
+  ];
+
+  const PERKS = [
+    t('register.perks.verified'),
+    t('register.perks.quote'),
+    t('register.perks.payment'),
+  ];
+
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* ── Header ──────────────────────────────────────────────────────── */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ArrowLeft size={20} color={colors.textPrimary} strokeWidth={2} />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+            <ArrowLeft size={18} color={colors.textPrimary} strokeWidth={2.2} />
           </TouchableOpacity>
-          <Text style={styles.title}>Créer un compte</Text>
-          <Text style={styles.subtitle}>Rejoignez SecurBook en tant que client</Text>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>{t('register.title')}</Text>
+            <Text style={styles.subtitle}>{t('register.subtitle')}</Text>
+          </View>
         </View>
 
-        {/* Type de client */}
-        <View style={styles.typeRow}>
-          {([
-            { type: 'INDIVIDUAL', label: 'Particulier', Icon: User     },
-            { type: 'COMPANY',    label: 'Entreprise',  Icon: Building2 },
-          ] as const).map(({ type, label, Icon }) => (
-            <TouchableOpacity
-              key={type}
-              style={[styles.typeBtn, clientType === type && styles.typeBtnActive]}
-              onPress={() => setClientType(type)}
-            >
-              <Icon
-                size={24}
-                color={clientType === type ? colors.primary : colors.textSecondary}
-                strokeWidth={1.8}
-              />
-              <Text style={[styles.typeLabel, clientType === type && styles.typeLabelActive]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
+        {/* ── Perks ───────────────────────────────────────────────────────── */}
+        <View style={styles.perksRow}>
+          {PERKS.map((p, i) => (
+            <View key={i} style={styles.perkItem}>
+              <CheckCircle2 size={12} color={colors.success} strokeWidth={2.5} />
+              <Text style={styles.perkText}>{p}</Text>
+            </View>
           ))}
         </View>
 
-        {/* Form */}
-        <View style={styles.form}>
+        {/* ── Account type ────────────────────────────────────────────────── */}
+        <View style={styles.typeSection}>
+          <Text style={styles.sectionLabel}>{t('register.account_type')}</Text>
+          <View style={styles.typeRow}>
+            {TYPE_OPTIONS.map(({ type, label, sub, Icon }) => {
+              const active = clientType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.typeCard, active && styles.typeCardActive]}
+                  onPress={() => setClientType(type)}
+                  activeOpacity={0.78}
+                >
+                  <View style={[styles.typeIconWrap, { backgroundColor: active ? colors.primarySurface : colors.surface }]}>
+                    <Icon size={22} color={active ? colors.primary : colors.textSecondary} strokeWidth={1.8} />
+                  </View>
+                  <Text style={[styles.typeLabel, active && styles.typeLabelActive]}>{label}</Text>
+                  <Text style={styles.typeSub}>{sub}</Text>
+                  {active && <View style={styles.typeCheck} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ── Form card ─────────────────────────────────────────────────── */}
+        <View style={styles.formCard}>
           <Input
-            label="Nom complet"
+            label={t('register.full_name_label')}
             value={fullName}
             onChangeText={setFullName}
             autoCapitalize="words"
-            placeholder="Jean Dupont"
+            placeholder={t('register.full_name_placeholder')}
             error={errors.fullName}
-            leftIcon={<User size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            leftIcon={<User size={16} color={errors.fullName ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
-            label="Adresse email"
+            label={t('register.email_label' as any) ?? 'Email'}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
-            placeholder="vous@exemple.com"
+            placeholder={t('login.email_placeholder')}
             error={errors.email}
-            leftIcon={<Mail size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            leftIcon={<Mail size={16} color={errors.email ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
-            label="Téléphone (optionnel)"
+            label={t('register.phone_label')}
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
-            placeholder="+33 6 00 00 00 00"
+            placeholder={t('register.phone_placeholder')}
             leftIcon={<Phone size={16} color={colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
-            label="Mot de passe"
+            label={t('login.password_label')}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPass}
-            placeholder="8 caractères minimum"
+            placeholder={t('register.password_placeholder')}
             error={errors.password}
-            leftIcon={<Lock size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            hint={!errors.password ? t('register.password_hint') : undefined}
+            leftIcon={<Lock size={16} color={errors.password ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
             rightIcon={
               showPass
-                ? <EyeOff size={18} color={colors.textMuted} strokeWidth={1.8} />
-                : <Eye    size={18} color={colors.textMuted} strokeWidth={1.8} />
+                ? <EyeOff size={16} color={colors.textMuted} strokeWidth={1.8} />
+                : <Eye    size={16} color={colors.textMuted} strokeWidth={1.8} />
             }
-            onRightPress={() => setShowPass((v) => !v)}
+            onRightPress={() => setShowPass(v => !v)}
           />
 
           <Button
-            label="Créer mon compte"
+            label={t('register.submit')}
             onPress={handleRegister}
             loading={loading}
             fullWidth
             size="lg"
             style={styles.submitBtn}
+            rightIcon={!loading ? <ArrowRight size={18} color={colors.textInverse} strokeWidth={2} /> : undefined}
           />
+
+          <View style={styles.rgpdRow}>
+            <ShieldCheck size={12} color={colors.textMuted} strokeWidth={2} />
+            <Text style={styles.rgpdText}>{t('register.rgpd')}</Text>
+          </View>
         </View>
 
+        {/* ── Footer ────────────────────────────────────────────────────── */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Déjà inscrit ? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.footerLink}>Se connecter</Text>
+          <Text style={styles.footerText}>{t('register.has_account')} </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Login')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.footerLink}>{t('register.login_link')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -178,70 +210,77 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  flex:   { flex: 1, backgroundColor: colors.background },
+  root:   { flex: 1, backgroundColor: colors.background },
   scroll: {
-    flexGrow:          1,
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop:        spacing[8],
-    paddingBottom:     spacing[8],
+    flexGrow: 1, paddingHorizontal: layout.screenPaddingH,
+    paddingTop: spacing[10], paddingBottom: spacing[10], gap: spacing[5],
   },
-  header: {
-    marginBottom: spacing[6],
-    gap:          spacing[2],
-  },
+  header:  { gap: spacing[4] },
   backBtn: {
-    width:           40,
-    height:          40,
-    borderRadius:    20,
-    backgroundColor: colors.surface,
-    borderWidth:     1,
-    borderColor:     colors.border,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    spacing[3],
+    width: 38, height: 38, borderRadius: radius.lg,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
+  headerText: { gap: spacing[1] },
   title: {
-    fontFamily:    fontFamily.display,
-    fontSize:      fontSize['2xl'],
-    color:         colors.textPrimary,
-    letterSpacing: -0.8,
+    fontFamily: fontFamily.display, fontSize: fontSize['2xl'],
+    color: colors.textPrimary, letterSpacing: -0.8,
   },
-  subtitle: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.sm,
-    color:      colors.textSecondary,
+  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
+
+  perksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
+  perkItem: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
+    backgroundColor: colors.successSurface, borderRadius: radius.full,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[1] + 2,
+    borderWidth: 1, borderColor: colors.success + '40',
   },
-  typeRow: {
-    flexDirection: 'row',
-    gap:           spacing[3],
-    marginBottom:  spacing[6],
+  perkText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.success },
+
+  typeSection: { gap: spacing[3] },
+  sectionLabel: {
+    fontFamily: fontFamily.bodyMedium, fontSize: 10,
+    color: colors.textMuted, letterSpacing: 1.2,
   },
-  typeBtn: {
-    flex:            1,
-    alignItems:      'center',
-    paddingVertical: spacing[4],
-    borderRadius:    14,
-    backgroundColor: colors.surface,
-    borderWidth:     1,
-    borderColor:     colors.border,
-    gap:             spacing[2],
+  typeRow: { flexDirection: 'row', gap: spacing[3] },
+  typeCard: {
+    flex: 1, alignItems: 'center', paddingVertical: spacing[4],
+    paddingHorizontal: spacing[3], borderRadius: radius.xl,
+    backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.border,
+    gap: spacing[1] + 2, position: 'relative',
   },
-  typeBtnActive: {
-    borderColor:     colors.primary,
-    backgroundColor: colors.primarySurface,
+  typeCardActive:  { borderColor: colors.primary, backgroundColor: colors.primarySurface },
+  typeIconWrap: {
+    width: 48, height: 48, borderRadius: radius.lg,
+    alignItems: 'center', justifyContent: 'center', marginBottom: spacing[1],
   },
   typeLabel: {
-    fontFamily: fontFamily.bodyMedium,
-    fontSize:   fontSize.sm,
-    color:      colors.textSecondary,
+    fontFamily: fontFamily.display, fontSize: fontSize.base,
+    color: colors.textSecondary, letterSpacing: -0.2,
   },
   typeLabelActive: { color: colors.primary },
-  form:            { gap: spacing[1] },
-  submitBtn:       { marginTop: spacing[3] },
+  typeSub: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
+  typeCheck: {
+    position: 'absolute', top: spacing[2], right: spacing[2],
+    width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary,
+  },
+
+  formCard: {
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radius['2xl'], borderWidth: 1, borderColor: colors.border,
+    padding: spacing[5],
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28, shadowRadius: 16, elevation: 8, gap: 0,
+  },
+  submitBtn: { marginTop: spacing[3], marginBottom: spacing[3] },
+  rgpdRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  rgpdText: {
+    flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs,
+    color: colors.textMuted, lineHeight: fontSize.xs * 1.6,
+  },
+
   footer: {
-    flexDirection:  'row',
-    justifyContent: 'center',
-    marginTop:      spacing[6],
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4,
   },
   footerText: { fontFamily: fontFamily.body,         fontSize: fontSize.sm, color: colors.textSecondary },
   footerLink: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },

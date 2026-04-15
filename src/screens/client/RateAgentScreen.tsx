@@ -1,4 +1,4 @@
-/**
+﻿/**
  * RateAgentScreen — évaluation agent par le client.
  *
  * Deux niveaux de notation :
@@ -119,7 +119,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
           </View>
           <View style={styles.starsRowDone}>
             {STARS.map(v => (
-              <Star key={v} size={28} color={v <= score ? palette.amber : colors.border} fill={v <= score ? palette.amber : 'transparent'} strokeWidth={1.5} />
+              <Star key={v} size={28} color={v <= score ? palette.gold : colors.border} fill={v <= score ? palette.gold : 'transparent'} strokeWidth={1.5} />
             ))}
           </View>
           {npsCategory && (
@@ -179,8 +179,8 @@ export default function RateAgentScreen({ navigation, route }: Props) {
                   <Animated.View style={{ transform: [{ scale: starAnims[val - 1] }] }}>
                     <Star
                       size={48}
-                      color={val <= score ? palette.amber : colors.border}
-                      fill={val <= score ? palette.amber : 'transparent'}
+                      color={val <= score ? palette.gold : colors.border}
+                      fill={val <= score ? palette.gold : 'transparent'}
                       strokeWidth={1.5}
                     />
                   </Animated.View>
@@ -260,7 +260,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
           </Animated.View>
         )}
 
-        {/* ── STEP 3: Comment ── */}
+        {/* ── STEP 3: Commentaire ── */}
         {step === 'comment' && (
           <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
             <Text style={styles.stepTitle}>Un commentaire ?</Text>
@@ -284,7 +284,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
             <TextInput
               style={styles.textarea}
-              placeholder="Partagez votre expérience avec cet agent…"
+              placeholder="Partagez votre expériences avec cet agent…"
               placeholderTextColor={colors.textMuted}
               value={comment}
               onChangeText={setComment}
@@ -298,7 +298,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
             <View style={styles.navRow}>
               <Button label="Retour"    onPress={() => setStep('nps')} variant="ghost" size="md" style={{ flex: 1 }} />
               <Button
-                label={busy ? 'Envoi…' : "Envoyer l'évaluation"}
+                label={busy ? 'Envoi…' : "Envoyer l' évaluation"}
                 onPress={handleSubmit}
                 loading={busy}
                 size="md"
@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   stepSub:     { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center' },
 
   starsRow:   { flexDirection: 'row', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[2] },
-  scoreLabel: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: palette.amber, textAlign: 'center' },
+  scoreLabel: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: palette.gold, textAlign: 'center' },
   ctaBtn:     { marginTop: spacing[2] },
 
   npsGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], justifyContent: 'center' },
@@ -375,3 +375,4 @@ const styles = StyleSheet.create({
   skipBtn: { alignItems: 'center', paddingVertical: spacing[3] },
   skipTxt: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
 });
+

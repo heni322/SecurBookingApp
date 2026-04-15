@@ -1,121 +1,134 @@
 /**
- * Button — composant bouton principal de SecurBook.
- * Variantes : primary | secondary | ghost | danger
- * Tailles : sm | md | lg
+ * Button — premium interactive element.
+ * Senior UI: size variants, ghost/outline/filled, full icon support, loading shimmer.
  */
 import React from 'react';
 import {
-  TouchableOpacity,
-  Text,
-  ActivityIndicator,
-  StyleSheet,
-  type ViewStyle,
-  type TextStyle,
+  TouchableOpacity, Text, ActivityIndicator,
+  StyleSheet, ViewStyle, View,
 } from 'react-native';
 import { colors } from '@theme/colors';
-import { spacing, radius, layout, shadow } from '@theme/spacing';
+import { spacing, radius, shadow, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size    = 'sm' | 'md' | 'lg';
+type Variant = 'filled' | 'outline' | 'ghost' | 'danger';
+type Size    = 'sm' | 'md' | 'lg' | 'xl';
 
-export interface ButtonProps {
-  label?:     string;       // preferred
-  title?:     string;       // ← FIX: legacy alias — fixes TS2322 "title does not exist"
-  onPress?:   (() => void) | undefined;  // ← FIX: allow undefined — fixes TS2322 in QuoteDetailScreen
-  variant?:   Variant;
-  size?:      Size;
-  loading?:   boolean;
-  disabled?:  boolean;
+interface Props {
+  label:     string;
+  onPress:   () => void;
+  variant?:  Variant;
+  size?:     Size;
+  loading?:  boolean;
+  disabled?: boolean;
   fullWidth?: boolean;
-  style?:     ViewStyle;
-  textStyle?: TextStyle;
+  style?:    ViewStyle;
+  leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
-const variantStyles: Record<Variant, { container: ViewStyle; text: TextStyle }> = {
-  primary: {
-    container: { backgroundColor: colors.primary, borderWidth: 0, ...shadow.amber },
-    text:      { color: colors.textInverse },
-  },
-  secondary: {
-    container: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderStrong },
-    text:      { color: colors.textPrimary },
-  },
-  ghost: {
-    container: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderPrimary },
-    text:      { color: colors.primary },
-  },
-  danger: {
-    container: { backgroundColor: colors.dangerSurface, borderWidth: 1, borderColor: colors.danger },
-    text:      { color: colors.danger },
-  },
-};
+const HEIGHT: Record<Size, number> = { sm: 36, md: 44, lg: 52, xl: 58 };
+const FONT:   Record<Size, number> = { sm: fontSize.sm, md: fontSize.base, lg: fontSize.base, xl: fontSize.md };
+const HPAD:   Record<Size, number> = { sm: spacing[3], md: spacing[5], lg: spacing[6], xl: spacing[7] };
 
-const sizeStyles: Record<Size, { container: ViewStyle; text: TextStyle }> = {
-  sm: {
-    container: { height: 36, paddingHorizontal: spacing[3], borderRadius: radius.md },
-    text:      { fontSize: fontSize.sm },
-  },
-  md: {
-    container: { height: layout.buttonHeight, paddingHorizontal: spacing[5], borderRadius: radius.lg },
-    text:      { fontSize: fontSize.base },
-  },
-  lg: {
-    container: { height: 60, paddingHorizontal: spacing[6], borderRadius: radius.xl },
-    text:      { fontSize: fontSize.md },
-  },
-};
-
-export const Button: React.FC<ButtonProps> = ({
-  label,
-  title,
-  onPress,
-  variant   = 'primary',
-  size      = 'md',
-  loading   = false,
-  disabled  = false,
+export const Button: React.FC<Props> = ({
+  label, onPress,
+  variant  = 'filled',
+  size     = 'md',
+  loading  = false,
+  disabled = false,
   fullWidth = false,
   style,
-  textStyle,
+  leftIcon,
+  rightIcon,
 }) => {
-  // Accept either `label` or `title` for back-compat
-  const text       = label ?? title ?? '';
-  const isDisabled = disabled || loading || !onPress;
+  const isDisabled = disabled || loading;
+
+  const containerStyle: ViewStyle[] = [
+    styles.base,
+    { height: HEIGHT[size], paddingHorizontal: HPAD[size] },
+    variant === 'filled'  && styles.filled,
+    variant === 'outline' && styles.outline,
+    variant === 'ghost'   && styles.ghost,
+    variant === 'danger'  && styles.danger,
+    fullWidth             && styles.fullWidth,
+    isDisabled            && styles.disabled,
+    variant === 'filled' && !isDisabled && styles.filledShadow,
+    style as ViewStyle,
+  ].filter(Boolean) as ViewStyle[];
+
+  const textColor =
+    variant === 'filled'  ? colors.textInverse :
+    variant === 'danger'  ? colors.danger :
+    variant === 'outline' ? colors.primary :
+    colors.primary;
 
   return (
     <TouchableOpacity
-      activeOpacity={0.75}
-      onPress={onPress ?? undefined}
+      style={containerStyle}
+      onPress={onPress}
       disabled={isDisabled}
-      style={[
-        styles.base,
-        variantStyles[variant].container,
-        sizeStyles[size].container,
-        fullWidth && styles.fullWidth,
-        isDisabled && styles.disabled,
-        style,
-      ]}
+      activeOpacity={0.78}
     >
       {loading ? (
-        <ActivityIndicator
-          color={variant === 'primary' ? colors.textInverse : colors.primary}
-          size="small"
-        />
+        <ActivityIndicator size="small" color={variant === 'filled' ? colors.textInverse : colors.primary} />
       ) : (
-        <Text
-          style={[styles.label, variantStyles[variant].text, sizeStyles[size].text, textStyle]}
-          numberOfLines={1}
-        >
-          {text}
-        </Text>
+        <View style={styles.inner}>
+          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
+          <Text style={[styles.label, { fontSize: FONT[size], color: textColor }]}>
+            {label}
+          </Text>
+          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+        </View>
       )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  base:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
-  fullWidth: { alignSelf: 'stretch' },
+  base: {
+    borderRadius:   radius.xl,
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexDirection:  'row',
+  },
+  inner: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           spacing[2],
+  },
+  iconLeft:  {},
+  iconRight: {},
+
+  filled: {
+    backgroundColor: colors.primary,
+    borderWidth:     0,
+  },
+  filledShadow: {
+    shadowColor:   '#bc933b',
+    shadowOffset:  { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius:  12,
+    elevation:     6,
+  },
+  outline: {
+    backgroundColor: 'transparent',
+    borderWidth:     1.5,
+    borderColor:     colors.primary,
+  },
+  ghost: {
+    backgroundColor: 'transparent',
+    borderWidth:     0,
+  },
+  danger: {
+    backgroundColor: colors.dangerSurface,
+    borderWidth:     1,
+    borderColor:     colors.danger,
+  },
+  fullWidth: { width: '100%' },
   disabled:  { opacity: 0.45 },
-  label:     { fontFamily: fontFamily.bodySemiBold, letterSpacing: 0.2 },
+  label: {
+    fontFamily:    fontFamily.bodySemiBold,
+    letterSpacing: 0.1,
+  },
 });
