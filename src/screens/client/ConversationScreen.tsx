@@ -1,6 +1,5 @@
 /**
- * ConversationScreen — messagerie temps réel entre client et agent.
- * Icônes : lucide-react-native
+ * ConversationScreen — real-time client ↔ agent messaging.
  */
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import {
@@ -9,13 +8,14 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SendHorizonal } from 'lucide-react-native';
-import { conversationsApi } from '@api/endpoints/conversations';
-import { useApi }           from '@hooks/useApi';
-import { useAuthStore }     from '@store/authStore';
-import { Avatar }           from '@components/ui/Avatar';
-import { LoadingState }     from '@components/ui/LoadingState';
-import { ScreenHeader }     from '@components/ui/ScreenHeader';
-import { colors }           from '@theme/colors';
+import { useTranslation }       from 'react-i18next';
+import { conversationsApi }     from '@api/endpoints/conversations';
+import { useApi }               from '@hooks/useApi';
+import { useAuthStore }         from '@store/authStore';
+import { Avatar }               from '@components/ui/Avatar';
+import { LoadingState }         from '@components/ui/LoadingState';
+import { ScreenHeader }         from '@components/ui/ScreenHeader';
+import { colors }               from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { Message, MissionStackParamList } from '@models/index';
@@ -25,6 +25,7 @@ type Props = NativeStackScreenProps<MissionStackParamList, 'Conversation'>;
 export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
   const { missionId }                            = route.params;
   const { user }                                 = useAuthStore();
+  const { t }                                    = useTranslation('conversation');
   const { data: conversation, loading, execute } = useApi(conversationsApi.getByMission);
   const [text,    setText]    = useState('');
   const [sending, setSending] = useState(false);
@@ -37,7 +38,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
 
   useEffect(() => { load(); }, [load]);
 
-  // Polling toutes les 5s (remplacer par WebSocket/SSE en production)
+  // Polling every 5s (replace with WebSocket/SSE in production)
   useEffect(() => {
     const interval = setInterval(() => {
       execute(missionId).catch(() => {});
@@ -86,7 +87,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
             {item.content}
           </Text>
           <Text style={[msgStyles.time, isMe && msgStyles.timeMe]}>
-            {new Date(item.createdAt).toLocaleTimeString('fr-FR', {
+            {new Date(item.createdAt).toLocaleTimeString(undefined, {
               hour: '2-digit', minute: '2-digit',
             })}
           </Text>
@@ -105,13 +106,13 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
       keyboardVerticalOffset={0}
     >
       <ScreenHeader
-        title="Messagerie"
+        title={t('screen_title')}
         subtitle={`Mission #${missionId.slice(-6).toUpperCase()}`}
         onBack={() => navigation.goBack()}
       />
 
       {loading && !conversation ? (
-        <LoadingState message="Chargement des messages…" />
+        <LoadingState message={t('loading')} />
       ) : (
         <FlatList
           ref={listRef}
@@ -122,9 +123,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>
-                Démarrez la conversation avec votre agent.
-              </Text>
+              <Text style={styles.emptyText}>{t('empty_subtitle')}</Text>
             </View>
           }
         />
@@ -136,7 +135,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Votre message…"
+          placeholder={t('placeholder')}
           placeholderTextColor={colors.textMuted}
           multiline
           maxLength={1000}

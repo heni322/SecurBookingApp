@@ -1,9 +1,7 @@
 /**
- * locales/types.ts — Complete namespace shape definitions.
- * Both EN and FR implement these interfaces — no literal-type cross-lock.
+ * locales/types.ts � Complete namespace shape definitions.
+ * Both EN and FR implement these interfaces � no literal-type cross-lock.
  */
-
-// ── Existing namespaces ───────────────────────────────────────────────────────
 
 export interface CommonNS {
   cancel:        string;
@@ -101,6 +99,9 @@ export interface MissionsNS {
     title: string; subtitle: string; timeline_title: string;
     step_confirmed: string; step_published: string; step_selection: string; step_operational: string;
     step_done: string; info: string; home: string;
+    pending_title: string; pending_subtitle: string;
+    timeout_title: string; timeout_subtitle: string; timeout_info: string;
+    follow_mission: string;
   };
   select_agent: {
     title: string; subtitle_one: string; subtitle_other: string;
@@ -114,6 +115,7 @@ export interface MissionsNS {
     service_required_title: string; service_required_body: string;
     map_position_required: string; start_required: string;
     duration_min: string; duration_max: string; end_before_start: string;
+    start_min_future: string; radius_min: string; radius_max: string;
     error_create: string;
     title_placeholder: string; instructions_placeholder: string;
     schedule_title: string; start_label: string; start_hint: string;
@@ -140,8 +142,6 @@ export interface NavigationNS {
   tabs: { home: string; missions: string; notifications: string; profile: string; };
 }
 
-// ── New namespaces ────────────────────────────────────────────────────────────
-
 export interface NotificationsNS {
   title: string;
   all_up_to_date: string;
@@ -159,10 +159,16 @@ export interface QuoteNS {
   title: string; loading: string;
   empty_title: string; empty_subtitle: string;
   pending_banner: string;
-  payment_method: string; card: string; sepa: string;
+  payment_method: string; card: string; sepa: string; offline: string;
   accept: string; accepting: string;
-  pay_card: string; pay_sepa: string; paying: string;
+  pay_card: string; pay_sepa: string; pay_offline: string; paying: string;
+  expired_title: string; expired_body: string; recalculate: string;
+  countdown_warning: string; countdown_urgent: string;
   error_accept: string; error_pay: string;
+  accepted_banner: string;
+  secure_note: string;
+  sepa_note: string;
+  offline_note: string;
 }
 
 export interface PaymentNS {
@@ -179,11 +185,26 @@ export interface PaymentNS {
   };
   history: {
     title: string; empty_subtitle: string;
-    status: { paid: string; failed: string; refunded: string; };
+    status: { paid: string; failed: string; refunded: string; pending: string; processing: string; };
   };
   methods: {
     title: string; delete_error: string;
     security_1: string; security_2: string; security_3: string;
+  };
+  offline: {
+    title: string; subtitle: string;
+    method_virement: string; method_cheque: string;
+    method_bank: string; method_postal: string;
+    confirm_virement: string; confirm_cheque: string; confirming: string;
+    delay_title: string; delay_virement: string; delay_cheque: string;
+    info_virement: string; info_cheque: string;
+    declared_title: string; declared_subtitle_virement: string; declared_subtitle_cheque: string;
+    iban_label: string; bic_label: string; ref_label: string;
+    beneficiary_label: string; payable_label: string; address_label: string;
+    amount_exact: string; amount_cheque: string;
+    bank_coords_title: string; cheque_title: string;
+    follow_mission: string;
+    copied: string;
   };
 }
 
@@ -225,7 +246,78 @@ export interface AccountNS {
   };
 }
 
-/** Union of all namespaces — drives i18next CustomTypeOptions. */
+export interface BookingNS {
+  screen_title: string;
+  agent: { assigned_label: string; cnaps_badge: string; missions_count: string; follow_live: string; rating_empty: string; };
+  applications: {
+    section_title: string; more: string; more_plural: string; waiting: string;
+    select_title: string; select_subtitle: string; select_subtitle_plural: string;
+    choose_btn: string; selecting: string;
+    selected_title: string; selected_body: string; select_error: string;
+  };
+  checkins: { section_title: string; date_label: string; checkin_label: string; checkout_label: string; };
+  photos: { section_title: string; verified_badge: string; no_photos_title: string; caption: string; };
+  incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; };
+  actions: { rate_agent: string; already_rated: string; open_dispute: string; };
+  uniforms: { STANDARD: string; CIVIL: string; EVENEMENTIEL: string; SSIAP: string; CYNOPHILE: string; };
+  errors: { load: string; generic: string; };
+}
+
+export interface RatingNS {
+  screen_title: string;
+  steps: { rating: string; nps: string; comment: string; };
+  star_labels: string[]; // 6 entries � index 0 unused, 1-5 = star labels
+  step_rating: { title: string; subtitle: string; };
+  step_nps: { title: string; subtitle: string; detractors: string; passives: string; promoters: string; };
+  step_comment: { title: string; subtitle: string; placeholder: string; char_count: string; skip: string; tags: string[]; };
+  nps_scale: string[]; // 11 entries, index 0-10
+  nps_categories: { promoter: string; passive: string; detractor: string; };
+  done: { title: string; back_btn: string; };
+  nav: { back: string; continue: string; submit: string; sending: string; };
+  errors: { score_required_title: string; score_required_body: string; nps_required_title: string; nps_required_body: string; generic: string; };
+}
+
+export interface DisputeNS {
+  screen_title: string; done_title: string; back_btn: string;
+  reasons: {
+    agent_absent: { label: string; desc: string; };
+    agent_late:   { label: string; desc: string; };
+    quality:      { label: string; desc: string; };
+    billing:      { label: string; desc: string; };
+    behavior:     { label: string; desc: string; };
+    other:        { label: string; desc: string; };
+  };
+  form: { description_placeholder: string; };
+  submit: string; submitting: string;
+  errors: { reason_required_title: string; reason_required_body: string; desc_too_short_title: string; desc_too_short_body: string; generic: string; };
+}
+
+export interface TrackingNS {
+  screen_title: string; status_offline: string; status_live: string; status_waiting: string;
+  in_zone: string; out_of_zone: string;
+  follow_agent_btn: string; view_site_btn: string; sync_btn: string;
+  last_seen: string; attribution: string;
+}
+
+export interface ConversationNS {
+  screen_title: string; loading: string; placeholder: string;
+  send: string; empty_title: string; empty_subtitle: string;
+}
+
+export interface ServicesNS {
+  screen_title: string; subtitle: string; continue_btn: string;
+  summary_agents: string; summary_agents_plural: string;
+  empty: { title: string; subtitle: string; };
+  agent_config: { hide_detail: string; configure_agents: string; };
+  uniforms: {
+    STANDARD:     { label: string; desc: string; emoji: string; };
+    CIVIL:        { label: string; desc: string; emoji: string; };
+    EVENEMENTIEL: { label: string; desc: string; emoji: string; };
+    SSIAP:        { label: string; desc: string; emoji: string; };
+    CYNOPHILE:    { label: string; desc: string; emoji: string; };
+  };
+}
+/** Union of all namespaces � drives i18next CustomTypeOptions. */
 export interface LocaleResources {
   common:        CommonNS;
   auth:          AuthNS;
@@ -237,4 +329,10 @@ export interface LocaleResources {
   quote:         QuoteNS;
   payment:       PaymentNS;
   account:       AccountNS;
+  booking:       BookingNS;
+  rating:        RatingNS;
+  dispute:       DisputeNS;
+  tracking:      TrackingNS;
+  conversation:  ConversationNS;
+  services:      ServicesNS;
 }

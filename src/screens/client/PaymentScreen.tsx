@@ -85,25 +85,31 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
 
+  // FIX #1 — isSepa MUST be declared before any usage (TDZ: const is not
+  // hoisted). Previously declared after compatibleSaved/usingSaved/canConfirm
+  // which all reference it -> ReferenceError crash on every SEPA render.
+  const isSepa = paymentMethod === 'SEPA' || intentType === 'setup_intent';
+
+  const compatibleSaved = savedMethods.filter((m: PaymentMethod) =>
+    isSepa ? m.type === 'sepa_debit' : m.type === 'card',
+  );
+  const usingSaved = !isSepa && selectedMethodId !== null;
+  const canConfirm = isSepa ? ibanValid : (usingSaved || cardComplete);
+
   useEffect(() => {
     paymentsApi.getMyMethods().then(({ data: res }) => {
       const list = (res as any)?.data ?? (res as any) ?? [];
-      const arr = Array.isArray(list) ? list : [];
+      const arr  = Array.isArray(list) ? list : [];
       setSavedMethods(arr);
-      // Auto-select first compatible saved method
+      // Auto-select first compatible saved method only for CARD flow
       if (!isSepa) {
         const first = arr.find((m: PaymentMethod) => m.type === 'card');
         if (first) setSelectedMethodId(first.id);
       }
     }).catch(() => {});
+  // isSepa is derived from route.params — stable for the lifetime of this screen
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const compatibleSaved = savedMethods.filter(m =>
-    isSepa ? m.type === 'sepa_debit' : m.type === 'card'
-  );
-  const isSepa     = paymentMethod === 'SEPA' || intentType === 'setup_intent';
-  const usingSaved = !isSepa && selectedMethodId !== null;
-  const canConfirm = isSepa ? ibanValid : (usingSaved || cardComplete);
 
   const handleCardChange = (details: CardFieldInput.Details) => {
     setCardComplete(details.complete);

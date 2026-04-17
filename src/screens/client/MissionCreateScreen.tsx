@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MissionCreateScreen — multi-step mission creation.
  *
  * Step 1 : Prestations & tenues par agent + titre / notes / rayon
@@ -15,6 +15,7 @@ import {
   ClipboardList, MapPin, CalendarClock,
   Radius, FileText, Pencil, Clock, Zap, Users, Plus, Minus, Check,
 } from 'lucide-react-native';
+import { useTranslation }    from '@i18n';
 import { missionsApi }       from '@api/endpoints/missions';
 import { quotesApi }         from '@api/endpoints/quotes';
 import { Button }            from '@components/ui/Button';
@@ -29,7 +30,6 @@ import { colors }            from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList } from '@models/index';
-import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionCreate'>;
 type Step  = 1 | 2 | 3;
@@ -40,7 +40,7 @@ interface BookingLineLocal {
   agentCount:     number;
   name:           string;
   accent:         string;
-  agentUniforms:  string[];   // one entry per agent
+  agentUniforms:  (string | null)[];   // one entry per agent, null = not specified
 }
 
 // ── Form ──────────────────────────────────────────────────────────────────────
@@ -57,20 +57,17 @@ interface FormData {
   endAt:     string;
 }
 const INITIAL: FormData = {
-  radiusKm:'50', title:'', notes:'', address:'', city:'', zipCode:'',
-  latitude:null, longitude:null, startAt:'', endAt:'',
-};
-
-const STEP_TITLES: Record<Step,string>    = { 1:'Prestations',    2:'Lieu de mission', 3:'Dates & horaires' };
-const STEP_SUBTITLES: Record<Step,string> = {
-  1:'Étape 1 sur 3 · Tenues & agents',
-  2:'Étape 2 sur 3 · Localisation',
-  3:'Étape 3 sur 3 · Planification',
+  radiusKm: '50', title: '', notes: '', address: '', city: '', zipCode: '',
+  latitude: null, longitude: null, startAt: '', endAt: '',
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const UNIFORM_EMOJI: Record<string,string> = {
-  STANDARD:'🦺', CIVIL:'👔', EVENEMENTIEL:'🤵', SSIAP:'🔥', CYNOPHILE:'🐕',
+const UNIFORM_EMOJI: Record<string, string> = {
+  STANDARD:     '🦺',
+  CIVIL:        '👔',
+  EVENEMENTIEL: '🤵',
+  SSIAP:        '🔥',
+  CYNOPHILE:    '🐕',
 };
 
 function durationHours(start: string, end: string): number {
@@ -78,41 +75,45 @@ function durationHours(start: string, end: string): number {
   if (isNaN(s) || isNaN(e) || e <= s) return 0;
   return (e - s) / 3_600_000;
 }
+
 function isToday(iso: string): boolean {
   if (!iso) return false;
   const d = new Date(iso), t = new Date();
-  return d.getDate()===t.getDate() && d.getMonth()===t.getMonth() && d.getFullYear()===t.getFullYear();
+  return d.getDate() === t.getDate()
+    && d.getMonth()  === t.getMonth()
+    && d.getFullYear() === t.getFullYear();
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t } = useTranslation('missions');
+
   // Normalise incoming bookingLines → agentUniforms[]
   const initialLines: BookingLineLocal[] = (route.params.bookingLines ?? []).map(l => ({
     serviceTypeId: l.serviceTypeId,
     agentCount:    l.agentCount,
     name:          l.name,
     accent:        l.accent,
-    agentUniforms: l.agentUniforms ?? Array(l.agentCount).fill('STANDARD'),
+    agentUniforms: l.agentUniforms ?? Array(l.agentCount).fill(null),
   }));
 
   const [step,    setStep]    = useState<Step>(1);
   const [form,    setForm]    = useState<FormData>(INITIAL);
   const [lines,   setLines]   = useState<BookingLineLocal[]>(initialLines);
-  const [errors,  setErrors]  = useState<Partial<Record<keyof FormData,string>>>({});
+  const [errors,  setErrors]  = useState<Partial<Record<keyof FormData, string>>>({});
   const [loading, setLoading] = useState(false);
 
   const setField = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) =>
     setForm(p => ({ ...p, [k]: v })), []);
 
-  const totalAgents = useMemo(() => lines.reduce((s,l) => s + l.agentCount, 0), [lines]);
+  const totalAgents = useMemo(() => lines.reduce((s, l) => s + l.agentCount, 0), [lines]);
 
   // ── Per-line mutations ────────────────────────────────────────────────────
   const changeCount = useCallback((id: string, delta: number) => {
     setLines(prev => prev.map(l => {
       if (l.serviceTypeId !== id) return l;
-      const count        = Math.min(20, Math.max(1, l.agentCount + delta));
-      const agentUniforms = Array.from({ length: count }, (_, i) => l.agentUniforms[i] ?? 'STANDARD');
+      const count         = Math.min(20, Math.max(1, l.agentCount + delta));
+      const agentUniforms = Array.from({ length: count }, (_, i) => l.agentUniforms[i] ?? null);
       return { ...l, agentCount: count, agentUniforms };
     }));
   }, []);
@@ -149,54 +150,92 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     setErrors(e => ({ ...e, address: undefined, latitude: undefined }));
   }, []);
 
-  const handleMapSelect = useCallback((coords: { latitude:number; longitude:number }, addr?: string) => {
+  const handleMapSelect = useCallback((coords: { latitude: number; longitude: number }, addr?: string) => {
     setForm(p => ({ ...p, latitude: coords.latitude, longitude: coords.longitude, address: addr ?? p.address }));
     setErrors(e => ({ ...e, latitude: undefined }));
   }, []);
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): boolean => {
-    const e: Partial<Record<keyof FormData,string>> = {};
-    if (step === 1 && lines.length === 0) { Alert.alert('Prestation requise', 'Sélectionnez au moins une prestation.'); return false; }
+    const e: Partial<Record<keyof FormData, string>> = {};
+
+    if (step === 1 && lines.length === 0) {
+      Alert.alert(t('create.service_required_title'), t('create.service_required_body'));
+      return false;
+    }
+    if (step === 1) {
+      const km = parseInt(form.radiusKm, 10);
+      if (isNaN(km) || km < 5)  e.radiusKm = t('create.radius_min');
+      else if (km > 500)        e.radiusKm = t('create.radius_max');
+    }
     if (step === 2) {
-      if (!form.address.trim()) e.address  = 'Adresse requise';
-      if (!form.city.trim())    e.city     = 'Ville requise';
-      if (form.latitude == null) e.latitude = 'Sélectionnez une position sur la carte';
+      if (!form.address.trim())  e.address  = 'Adresse requise';
+      if (!form.city.trim())     e.city     = 'Ville requise';
+      if (form.latitude == null) e.latitude = t('create.map_position_required');
     }
     if (step === 3) {
-      if (!form.startAt) e.startAt = 'Date de début requise';
+      if (!form.startAt) e.startAt = t('create.start_required');
       if (!form.endAt)   e.endAt   = 'Date de fin requise';
+      if (form.startAt) {
+        const start    = new Date(form.startAt);
+        const minStart = new Date(Date.now() + 3_600_000);
+        if (start < minStart) e.startAt = t('create.start_min_future');
+      }
       if (form.startAt && form.endAt) {
         const d = durationHours(form.startAt, form.endAt);
-        if (d < 6)   e.endAt = 'Durée minimum : 6 heures (obligation légale)';
-        if (d > 240) e.endAt = 'Durée maximum : 10 jours';
-        if (new Date(form.endAt) <= new Date(form.startAt)) e.endAt = 'La fin doit être après le début';
+        if (d < 6)   e.endAt = t('create.duration_min');
+        if (d > 240) e.endAt = t('create.duration_max');
+        if (new Date(form.endAt) <= new Date(form.startAt)) e.endAt = t('create.end_before_start');
       }
     }
+
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
   const handleNext = () => {
     if (!validate()) return;
-    if (step < 3) { setStep(s => (s+1) as Step); return; }
+    if (step < 3) { setStep(s => (s + 1) as Step); return; }
     handleSubmit();
   };
 
+  // FIX Mobile B1 — navigate back to ServicePicker carrying current lines so
+  // the user can add more services without losing their existing selection.
+  const handleAddMore = useCallback(() => {
+    navigation.navigate('ServicePicker', {
+      existingLines: lines.map(l => ({
+        serviceTypeId: l.serviceTypeId,
+        agentCount:    l.agentCount,
+        name:          l.name,
+        accent:        l.accent,
+        agentUniforms: l.agentUniforms,
+      })),
+    });
+  }, [navigation, lines]);
+
   const handleSubmit = async () => {
     setLoading(true);
+    let createdMissionId: string | null = null;
     try {
       const durH = durationHours(form.startAt, form.endAt);
+      const clampedDurH = Math.max(6, Math.round(durH * 10) / 10);
+
       const { data: mRes } = await missionsApi.create({
-        address: form.address.trim(), city: form.city.trim(),
-        zipCode: form.zipCode.trim() || undefined,
-        latitude: form.latitude ?? 0, longitude: form.longitude ?? 0,
-        startAt: new Date(form.startAt).toISOString(), endAt: new Date(form.endAt).toISOString(),
-        durationHours: Math.round(durH * 10) / 10,
-        title: form.title.trim() || undefined, notes: form.notes.trim() || undefined,
-        radiusKm: parseInt(form.radiusKm, 10) || 50,
+        address:       form.address.trim(),
+        city:          form.city.trim(),
+        zipCode:       form.zipCode.trim() || undefined,
+        latitude:      form.latitude  ?? 0,
+        longitude:     form.longitude ?? 0,
+        startAt:       new Date(form.startAt).toISOString(),
+        endAt:         new Date(form.endAt).toISOString(),
+        durationHours: clampedDurH,
+        title:         form.title.trim() || undefined,
+        notes:         form.notes.trim() || undefined,
+        radiusKm:      Math.min(500, Math.max(5, parseInt(form.radiusKm, 10) || 50)),
       });
       const mission = (mRes as any).data;
+      createdMissionId = mission.id;
+
       await quotesApi.calculate({
         missionId:    mission.id,
         bookingLines: lines.map(l => ({
@@ -205,27 +244,35 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           agentUniforms: l.agentUniforms,
         })) as any,
       });
+
       navigation.replace('QuoteDetail', { missionId: mission.id });
     } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.message ?? 'Erreur lors de la création';
+      if (createdMissionId) {
+        await missionsApi.cancel(createdMissionId).catch(() => {
+          console.warn('[MissionCreate] Could not cancel orphan mission', createdMissionId);
+        });
+      }
+      const msg = (err as any)?.response?.data?.message ?? t('create.error_create');
       Alert.alert('Erreur', Array.isArray(msg) ? msg.join('\n') : msg);
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const durH    = form.startAt && form.endAt ? durationHours(form.startAt, form.endAt) : 0;
-  const minDate = new Date();
+  const minDate = new Date(Date.now() + 3_600_000);
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScreenHeader
-        title={STEP_TITLES[step]}
-        subtitle={STEP_SUBTITLES[step]}
-        onBack={() => step > 1 ? setStep(s => (s-1) as Step) : navigation.goBack()}
+        title={['', t('create.step_one'), t('create.step_two'), t('create.step_three')][step]}
+        subtitle={['', t('create.step_one'), t('create.step_two'), t('create.step_three')][step]}
+        onBack={() => step > 1 ? setStep(s => (s - 1) as Step) : navigation.goBack()}
       />
 
       {/* Progress bar */}
       <View style={styles.progressBar}>
-        {([1,2,3] as Step[]).map(s => (
+        {([1, 2, 3] as Step[]).map(s => (
           <View key={s} style={[styles.progressSeg, step >= s && styles.progressSegActive]} />
         ))}
       </View>
@@ -237,13 +284,12 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         keyboardDismissMode="on-drag"
       >
 
-        {/* ═══════════════ STEP 1 — Prestations & tenues ════════════════ */}
+        {/* ── STEP 1 — Prestations & tenues ────────────────────────── */}
         {step === 1 && (
           <View style={styles.stepContent}>
             <StepHero Icon={ClipboardList} title="Prestations & tenues" color={colors.primary} />
 
-            {/* Lines */}
-            {lines.map((line, lineIdx) => (
+            {lines.map((line) => (
               <View key={line.serviceTypeId} style={[styles.lineCard, { borderColor: line.accent + '60' }]}>
 
                 {/* Line header */}
@@ -257,24 +303,27 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                       style={[styles.stepBtn, line.agentCount <= 1 && styles.stepBtnDim]}
                       onPress={() => changeCount(line.serviceTypeId, -1)}
                       disabled={line.agentCount <= 1}
-                      hitSlop={{ top:8, bottom:8, left:8, right:8 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Minus size={12} color={line.agentCount<=1 ? colors.textMuted : line.accent} strokeWidth={2.5} />
+                      <Minus size={12} color={line.agentCount <= 1 ? colors.textMuted : line.accent} strokeWidth={2.5} />
                     </TouchableOpacity>
                     <Text style={[styles.stepCountText, { color: line.accent }]}>{line.agentCount}</Text>
                     <TouchableOpacity
                       style={[styles.stepBtn, line.agentCount >= 20 && styles.stepBtnDim]}
                       onPress={() => changeCount(line.serviceTypeId, +1)}
                       disabled={line.agentCount >= 20}
-                      hitSlop={{ top:8, bottom:8, left:8, right:8 }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Plus size={12} color={line.agentCount>=20 ? colors.textMuted : line.accent} strokeWidth={2.5} />
+                      <Plus size={12} color={line.agentCount >= 20 ? colors.textMuted : line.accent} strokeWidth={2.5} />
                     </TouchableOpacity>
                   </View>
 
                   {/* Remove */}
                   {lines.length > 1 && (
-                    <TouchableOpacity onPress={() => removeLine(line.serviceTypeId)} hitSlop={{ top:8, bottom:8, left:8, right:8 }}>
+                    <TouchableOpacity
+                      onPress={() => removeLine(line.serviceTypeId)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
                       <Text style={styles.removeText}>✕</Text>
                     </TouchableOpacity>
                   )}
@@ -285,12 +334,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={[styles.agentsBlockTitle, { color: line.accent }]}>TENUE PAR AGENT</Text>
                   {line.agentUniforms.map((uniform, agentIdx) => (
                     <View key={agentIdx} style={styles.agentRow}>
-                      {/* Agent badge */}
                       <View style={[styles.agentBadge, { backgroundColor: line.accent + '20', borderColor: line.accent + '50' }]}>
                         <Text style={[styles.agentBadgeNum, { color: line.accent }]}>{agentIdx + 1}</Text>
                       </View>
 
-                      {/* Uniform chips */}
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -306,7 +353,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                                 active && { backgroundColor: line.accent + '20', borderColor: line.accent },
                               ]}
                               onPress={() => changeAgentUniform(line.serviceTypeId, agentIdx, opt.value)}
-                              hitSlop={{ top:6, bottom:6, left:4, right:4 }}
+                              hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                             >
                               <Text style={styles.uniformChipEmoji}>{opt.emoji}</Text>
                               <View>
@@ -336,8 +383,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.uniformSummary}>
                   <Users size={12} color={colors.textMuted} strokeWidth={1.8} />
                   <Text style={styles.uniformSummaryText}>
-                    {line.agentUniforms.map((u,i) =>
-                      `Agent ${i+1}: ${UNIFORM_EMOJI[u] ?? '🦺'} ${UNIFORM_OPTIONS.find(o => o.value === u)?.label ?? u}`
+                    {line.agentUniforms.map((u, i) =>
+                      `Agent ${i + 1}: ${u
+                        ? (UNIFORM_EMOJI[u] + ' ' + (UNIFORM_OPTIONS.find(o => o.value === u)?.label ?? u))
+                        : '—'}`
                     ).join('  ·  ')}
                   </Text>
                 </View>
@@ -348,12 +397,12 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.totalRow}>
               <Users size={14} color={colors.textMuted} strokeWidth={1.8} />
               <Text style={styles.totalText}>
-                {totalAgents} agent{totalAgents>1?'s':''} au total · {lines.length} prestation{lines.length>1?'s':''}
+                {totalAgents} agent{totalAgents > 1 ? 's' : ''} au total · {lines.length} prestation{lines.length > 1 ? 's' : ''}
               </Text>
             </View>
 
             {/* Add more */}
-            <TouchableOpacity style={styles.addMoreBtn} onPress={() => navigation.goBack()} activeOpacity={0.75}>
+            <TouchableOpacity style={styles.addMoreBtn} onPress={handleAddMore} activeOpacity={0.75}>
               <Plus size={14} color={colors.primary} strokeWidth={2.5} />
               <Text style={styles.addMoreText}>Ajouter une prestation</Text>
             </TouchableOpacity>
@@ -363,7 +412,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               label="Titre (optionnel)"
               value={form.title}
               onChangeText={v => setField('title', v)}
-              placeholder="Ex : Gardiennage soirée privée"
+              placeholder={t('create.title_placeholder')}
               leftIcon={<Pencil size={16} color={colors.textMuted} strokeWidth={1.8} />}
               maxLength={100}
             />
@@ -371,23 +420,25 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               label="Notes / consignes (optionnel)"
               value={form.notes}
               onChangeText={v => setField('notes', v)}
-              placeholder="Instructions particulières pour les agents…"
-              multiline numberOfLines={3}
+              placeholder={t('create.instructions_placeholder')}
+              multiline
+              numberOfLines={3}
               style={styles.textArea}
               leftIcon={<FileText size={16} color={colors.textMuted} strokeWidth={1.8} />}
             />
             <Input
               label="Rayon de recherche (km)"
               value={form.radiusKm}
-              onChangeText={v => setField('radiusKm', v)}
+              onChangeText={v => setField('radiusKm', v.replace(/[^0-9]/g, ''))}
               keyboardType="number-pad"
-              hint="Distance max pour trouver les agents"
+              hint="Entre 5 et 500 km"
+              error={errors.radiusKm}
               leftIcon={<Radius size={16} color={colors.textMuted} strokeWidth={1.8} />}
             />
           </View>
         )}
 
-        {/* ═══════════════ STEP 2 — Location ═══════════════════════════ */}
+        {/* ── STEP 2 — Location ────────────────────────────────────── */}
         {step === 2 && (
           <View style={styles.stepContent}>
             <StepHero Icon={MapPin} title="Lieu de la mission" color={colors.info} />
@@ -400,14 +451,24 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             />
             <View style={styles.row}>
               <View style={styles.half}>
-                <Input label="Ville *" value={form.city} onChangeText={v => setField('city', v)}
-                  placeholder="Paris" error={errors.city}
-                  leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />} />
+                <Input
+                  label="Ville *"
+                  value={form.city}
+                  onChangeText={v => setField('city', v)}
+                  placeholder="Paris"
+                  error={errors.city}
+                  leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />}
+                />
               </View>
               <View style={styles.half}>
-                <Input label="Code postal" value={form.zipCode} onChangeText={v => setField('zipCode', v)}
-                  keyboardType="number-pad" placeholder="75001"
-                  leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />} />
+                <Input
+                  label="Code postal"
+                  value={form.zipCode}
+                  onChangeText={v => setField('zipCode', v)}
+                  keyboardType="number-pad"
+                  placeholder="75001"
+                  leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />}
+                />
               </View>
             </View>
             <MapLocationPicker
@@ -423,20 +484,27 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* ═══════════════ STEP 3 — Schedule ═══════════════════════════ */}
+        {/* ── STEP 3 — Schedule ────────────────────────────────────── */}
         {step === 3 && (
           <View style={styles.stepContent}>
-            <StepHero Icon={CalendarClock} title="Quand se déroule la mission ?" color={colors.warning} />
+            <StepHero Icon={CalendarClock} title={t('create.schedule_title')} color={colors.warning} />
             <DateTimePicker
-              label="Début de mission *" value={form.startAt}
-              onChange={v => setField('startAt', v)} minDate={minDate}
-              error={errors.startAt} hint="Au plus tôt dans 1 heure"
+              label={t('create.start_label')}
+              value={form.startAt}
+              onChange={v => setField('startAt', v)}
+              minDate={minDate}
+              error={errors.startAt}
+              hint={t('create.start_hint')}
             />
             <DateTimePicker
-              label="Fin de mission *" value={form.endAt}
+              label="Fin de mission *"
+              value={form.endAt}
               onChange={v => setField('endAt', v)}
-              minDate={form.startAt ? new Date(new Date(form.startAt).getTime()+6*3_600_000) : minDate}
-              error={errors.endAt} hint="Durée minimum légale : 6 heures"
+              minDate={form.startAt
+                ? new Date(new Date(form.startAt).getTime() + 6 * 3_600_000)
+                : minDate}
+              error={errors.endAt}
+              hint={t('create.end_hint')}
             />
             {durH >= 6 && !errors.endAt && (
               <View style={styles.durationBadge}>
@@ -453,14 +521,28 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             )}
 
-            {/* Full summary */}
+            {/* Full recap */}
             {form.startAt && form.endAt && durH >= 6 && (
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryTitle}>RÉCAPITULATIF</Text>
-                <SummaryRow label="Lieu"   value={`${form.address}, ${form.city}`} />
-                <SummaryRow label="Début"  value={new Date(form.startAt).toLocaleString('fr-FR',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})} />
-                <SummaryRow label="Fin"    value={new Date(form.endAt).toLocaleString('fr-FR',{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})} />
-                <SummaryRow label="Durée"  value={`${durH.toFixed(1)} heures`} accent />
+                <SummaryRow label="Lieu"    value={`${form.address}, ${form.city}`} />
+                <SummaryRow
+                  label={t('create.summary_start')}
+                  value={new Date(form.startAt).toLocaleString('fr-FR', {
+                    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
+                <SummaryRow
+                  label="Fin"
+                  value={new Date(form.endAt).toLocaleString('fr-FR', {
+                    day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+                  })}
+                />
+                <SummaryRow
+                  label={t('create.summary_duration')}
+                  value={`${durH.toFixed(1)} heures`}
+                  accent
+                />
 
                 <View style={styles.recapLinesWrap}>
                   <Text style={styles.recapLinesTitle}>PRESTATIONS & TENUES</Text>
@@ -470,8 +552,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.recapLineName}>{l.name}</Text>
                         <Text style={styles.recapLineDetail}>
-                          {l.agentUniforms.map((u,i) =>
-                            `${UNIFORM_EMOJI[u]??'🦺'} Agent ${i+1}`
+                          {l.agentUniforms.map((u, i) =>
+                            `${u ? UNIFORM_EMOJI[u] : '—'} Agent ${i + 1}`
                           ).join('  ')}
                         </Text>
                       </View>
@@ -492,7 +574,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* Footer */}
       <View style={styles.footer}>
         <Button
-          label={step < 3 ? t("create.next_btn") : t("create.create_btn")}
+          label={step < 3 ? t('create.next_btn') : t('create.create_btn')}
           onPress={handleNext}
           loading={loading}
           fullWidth
@@ -504,44 +586,48 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-type LucideIcon = React.FC<{ size:number; color:string; strokeWidth:number }>;
-const StepHero: React.FC<{ Icon:LucideIcon; title:string; color:string }> = ({ Icon, title, color }) => (
+type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
+
+const StepHero: React.FC<{ Icon: LucideIcon; title: string; color: string }> = ({ Icon, title, color }) => (
   <View style={heroS.wrap}>
-    <View style={[heroS.box, { backgroundColor:color+'1A', borderColor:color+'44' }]}>
+    <View style={[heroS.box, { backgroundColor: color + '1A', borderColor: color + '44' }]}>
       <Icon size={22} color={color} strokeWidth={1.8} />
     </View>
     <Text style={heroS.title}>{title}</Text>
   </View>
 );
-const SummaryRow: React.FC<{ label:string; value:string; accent?:boolean }> = ({ label, value, accent }) => (
+
+const SummaryRow: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
   <View style={sumS.row}>
     <Text style={sumS.label}>{label}</Text>
     <Text style={[sumS.value, accent && sumS.valueAccent]} numberOfLines={2}>{value}</Text>
   </View>
 );
+
 const heroS = StyleSheet.create({
-  wrap:  { flexDirection:'row', alignItems:'center', gap:spacing[3], marginBottom:spacing[3] },
-  box:   { width:44, height:44, borderRadius:radius.lg, borderWidth:1, alignItems:'center', justifyContent:'center', flexShrink:0 },
-  title: { fontFamily:fontFamily.display, fontSize:fontSize.xl, color:colors.textPrimary, letterSpacing:-0.4, flex:1 },
+  wrap:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginBottom: spacing[3] },
+  box:   { width: 44, height: 44, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  title: { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4, flex: 1 },
 });
+
 const sumS = StyleSheet.create({
-  row:        { flexDirection:'row', justifyContent:'space-between', alignItems:'flex-start', paddingVertical:spacing[2], borderBottomWidth:1, borderBottomColor:colors.border },
-  label:      { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.textMuted, flex:1 },
-  value:      { fontFamily:fontFamily.body, fontSize:fontSize.sm, color:colors.textPrimary, flex:2, textAlign:'right' },
-  valueAccent:{ fontFamily:fontFamily.display, color:colors.primary, fontSize:fontSize.base },
+  row:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: spacing[2], borderBottomWidth: 1, borderBottomColor: colors.border },
+  label:       { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted, flex: 1 },
+  value:       { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textPrimary, flex: 2, textAlign: 'right' },
+  valueAccent: { fontFamily: fontFamily.display, color: colors.primary, fontSize: fontSize.base },
 });
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  flex: { flex:1, backgroundColor:colors.background },
-  progressBar: { flexDirection:'row', gap:4, paddingHorizontal:layout.screenPaddingH, paddingVertical:spacing[3] },
-  progressSeg:       { flex:1, height:3, borderRadius:2, backgroundColor:colors.border },
-  progressSegActive: { backgroundColor:colors.primary },
-  scroll: { paddingHorizontal:layout.screenPaddingH, paddingTop:spacing[4], paddingBottom:spacing[8] },
-  stepContent: { gap:spacing[3] },
-  row:  { flexDirection:'row', gap:spacing[3] },
-  half: { flex:1 },
-  textArea: { height:90, textAlignVertical:'top', paddingTop:spacing[3] },
+  flex:              { flex: 1, backgroundColor: colors.background },
+  progressBar:       { flexDirection: 'row', gap: 4, paddingHorizontal: layout.screenPaddingH, paddingVertical: spacing[3] },
+  progressSeg:       { flex: 1, height: 3, borderRadius: 2, backgroundColor: colors.border },
+  progressSegActive: { backgroundColor: colors.primary },
+  scroll:            { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[8] },
+  stepContent:       { gap: spacing[3] },
+  row:               { flexDirection: 'row', gap: spacing[3] },
+  half:              { flex: 1 },
+  textArea:          { height: 90, textAlignVertical: 'top', paddingTop: spacing[3] },
 
   // Line card
   lineCard: {
@@ -557,18 +643,17 @@ const styles = StyleSheet.create({
     paddingVertical:   spacing[3],
     gap:               spacing[3],
   },
-  lineDot:  { width:8, height:8, borderRadius:4, flexShrink:0 },
-  lineName: { flex:1, fontFamily:fontFamily.bodySemiBold, fontSize:fontSize.sm, color:colors.textPrimary },
-
-  stepper:       { flexDirection:'row', alignItems:'center', gap:spacing[2] },
+  lineDot:       { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+  lineName:      { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
+  stepper:       { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   stepBtn: {
-    width:26, height:26, borderRadius:13,
-    backgroundColor:colors.surface, borderWidth:1, borderColor:colors.border,
-    alignItems:'center', justifyContent:'center',
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    alignItems: 'center', justifyContent: 'center',
   },
-  stepBtnDim:    { opacity:0.35 },
-  stepCountText: { fontFamily:fontFamily.display, fontSize:fontSize.base, minWidth:22, textAlign:'center' },
-  removeText:    { fontFamily:fontFamily.bodySemiBold, fontSize:fontSize.sm, color:colors.danger, opacity:0.7, paddingHorizontal:spacing[1] },
+  stepBtnDim:    { opacity: 0.35 },
+  stepCountText: { fontFamily: fontFamily.display, fontSize: fontSize.base, minWidth: 22, textAlign: 'center' },
+  removeText:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.danger, opacity: 0.7, paddingHorizontal: spacing[1] },
 
   // Agents block
   agentsBlock: {
@@ -579,98 +664,83 @@ const styles = StyleSheet.create({
     borderTopColor:    colors.border,
     paddingTop:        spacing[3],
   },
-  agentsBlockTitle: {
-    fontFamily:fontFamily.bodyMedium, fontSize:9, letterSpacing:0.8, textTransform:'uppercase',
-  },
-  agentRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           spacing[2],
-  },
+  agentsBlockTitle: { fontFamily: fontFamily.bodyMedium, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase' },
+  agentRow:         { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   agentBadge: {
-    width:26, height:26, borderRadius:13, borderWidth:1,
-    alignItems:'center', justifyContent:'center', flexShrink:0,
+    width: 26, height: 26, borderRadius: 13, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  agentBadgeNum: { fontFamily:fontFamily.bodySemiBold, fontSize:fontSize.xs },
-  uniformChips:  { gap:spacing[2], alignItems:'center' },
+  agentBadgeNum:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
+  uniformChips:     { gap: spacing[2], alignItems: 'center' },
   uniformChip: {
-    flexDirection:'row', alignItems:'center', gap:spacing[1]+2,
-    paddingHorizontal:spacing[3], paddingVertical:spacing[2],
-    borderRadius:radius.xl, borderWidth:1, borderColor:colors.border,
-    backgroundColor:colors.surface, position:'relative',
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface, position: 'relative',
   },
-  uniformChipEmoji: { fontSize:15 },
-  uniformChipLabel: { fontFamily:fontFamily.bodySemiBold, fontSize:fontSize.xs, color:colors.textSecondary },
-  uniformChipDesc:  { fontFamily:fontFamily.body, fontSize:9, lineHeight:12, maxWidth:80 },
+  uniformChipEmoji:   { fontSize: 15 },
+  uniformChipLabel:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textSecondary },
+  uniformChipDesc:    { fontFamily: fontFamily.body, fontSize: 9, lineHeight: 12, maxWidth: 80 },
   uniformActiveCheck: {
-    position:'absolute', top:-4, right:-4,
-    width:14, height:14, borderRadius:7,
-    alignItems:'center', justifyContent:'center',
-    borderWidth:1.5, borderColor:colors.background,
+    position: 'absolute', top: -4, right: -4,
+    width: 14, height: 14, borderRadius: 7,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: colors.background,
   },
 
-  // Uniform summary bar
+  // Uniform summary
   uniformSummary: {
-    flexDirection:'row', alignItems:'flex-start', gap:spacing[2],
-    paddingHorizontal:spacing[4], paddingVertical:spacing[2],
-    backgroundColor:colors.surface, borderTopWidth:1, borderTopColor:colors.border,
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2],
+    paddingHorizontal: spacing[4], paddingVertical: spacing[2],
+    backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border,
   },
-  uniformSummaryText: {
-    flex:1, fontFamily:fontFamily.body, fontSize:fontSize.xs,
-    color:colors.textMuted, lineHeight:fontSize.xs*1.6,
-  },
+  uniformSummaryText: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, lineHeight: fontSize.xs * 1.6 },
 
   // Total + add more
-  totalRow: { flexDirection:'row', alignItems:'center', gap:spacing[2] },
-  totalText: { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.textMuted },
+  totalRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  totalText:   { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted },
   addMoreBtn: {
-    flexDirection:'row', alignItems:'center', justifyContent:'center', gap:spacing[2],
-    paddingVertical:spacing[3], borderRadius:radius.xl,
-    borderWidth:1, borderStyle:'dashed' as any, borderColor:colors.borderPrimary,
-    backgroundColor:colors.primarySurface,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2],
+    paddingVertical: spacing[3], borderRadius: radius.xl,
+    borderWidth: 1, borderStyle: 'dashed' as any, borderColor: colors.borderPrimary,
+    backgroundColor: colors.primarySurface,
   },
-  addMoreText: { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.primary },
+  addMoreText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.primary },
 
   // Error
-  errorBanner: {
-    backgroundColor:colors.dangerSurface, borderRadius:radius.lg,
-    padding:spacing[3], borderWidth:1, borderColor:colors.danger,
-  },
-  errorBannerText: { fontFamily:fontFamily.body, fontSize:fontSize.sm, color:colors.danger },
+  errorBanner:     { backgroundColor: colors.dangerSurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.danger },
+  errorBannerText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.danger },
 
   // Duration badge
   durationBadge: {
-    flexDirection:'row', alignItems:'flex-start', gap:spacing[3],
-    backgroundColor:colors.primarySurface, borderRadius:radius.xl,
-    padding:spacing[4], borderWidth:1, borderColor:colors.borderPrimary,
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3],
+    backgroundColor: colors.primarySurface, borderRadius: radius.xl,
+    padding: spacing[4], borderWidth: 1, borderColor: colors.borderPrimary,
   },
-  durationInfo:  { flex:1, gap:spacing[1] },
-  durationText:  { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.base, color:colors.primary },
-  urgencyRow:    { flexDirection:'row', alignItems:'center', gap:spacing[1] },
-  urgencyNote:   { fontFamily:fontFamily.body, fontSize:fontSize.xs, color:colors.warning },
+  durationInfo:  { flex: 1, gap: spacing[1] },
+  durationText:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.base, color: colors.primary },
+  urgencyRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  urgencyNote:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning },
 
   // Summary card
   summaryCard: {
-    backgroundColor:colors.backgroundElevated, borderRadius:radius.xl,
-    borderWidth:1, borderColor:colors.border, padding:spacing[4], marginTop:spacing[2],
+    backgroundColor: colors.backgroundElevated, borderRadius: radius.xl,
+    borderWidth: 1, borderColor: colors.border, padding: spacing[4], marginTop: spacing[2],
   },
-  summaryTitle: {
-    fontFamily:fontFamily.bodyMedium, fontSize:10, color:colors.textMuted,
-    letterSpacing:1.2, marginBottom:spacing[2],
-  },
-  recapLinesWrap: { marginTop:spacing[3], paddingTop:spacing[3], borderTopWidth:1, borderTopColor:colors.border, gap:spacing[2] },
-  recapLinesTitle:{ fontFamily:fontFamily.bodyMedium, fontSize:9, color:colors.textMuted, letterSpacing:1.0, textTransform:'uppercase', marginBottom:spacing[1] },
-  recapLine:      { flexDirection:'row', alignItems:'flex-start', gap:spacing[2] },
-  recapDot:       { width:6, height:6, borderRadius:3, flexShrink:0, marginTop:4 },
-  recapLineName:  { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.textPrimary },
-  recapLineDetail:{ fontFamily:fontFamily.body, fontSize:fontSize.xs, color:colors.textMuted, lineHeight:16, marginTop:2 },
-  recapLineCount: { fontFamily:fontFamily.bodySemiBold, fontSize:fontSize.base, flexShrink:0 },
-  recapTotal:     { flexDirection:'row', justifyContent:'space-between', paddingTop:spacing[2], borderTopWidth:1, borderTopColor:colors.border, marginTop:spacing[1] },
-  recapTotalLabel:{ fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.textMuted },
-  recapTotalValue:{ fontFamily:fontFamily.display, fontSize:fontSize.base, color:colors.primary },
+  summaryTitle:    { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 1.2, marginBottom: spacing[2] },
+  recapLinesWrap:  { marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border, gap: spacing[2] },
+  recapLinesTitle: { fontFamily: fontFamily.bodyMedium, fontSize: 9, color: colors.textMuted, letterSpacing: 1.0, textTransform: 'uppercase', marginBottom: spacing[1] },
+  recapLine:       { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  recapDot:        { width: 6, height: 6, borderRadius: 3, flexShrink: 0, marginTop: 4 },
+  recapLineName:   { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textPrimary },
+  recapLineDetail: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, lineHeight: 16, marginTop: 2 },
+  recapLineCount:  { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, flexShrink: 0 },
+  recapTotal:      { flexDirection: 'row', justifyContent: 'space-between', paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing[1] },
+  recapTotalLabel: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textMuted },
+  recapTotalValue: { fontFamily: fontFamily.display, fontSize: fontSize.base, color: colors.primary },
 
   footer: {
-    paddingHorizontal:layout.screenPaddingH, paddingVertical:spacing[4],
-    backgroundColor:colors.background, borderTopWidth:1, borderTopColor:colors.border,
+    paddingHorizontal: layout.screenPaddingH, paddingVertical: spacing[4],
+    backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border,
   },
 });

@@ -38,7 +38,7 @@ export type MissionStackParamList = {
       agentCount:    number;
       name:          string;
       accent:        string;
-      agentUniforms: string[];
+      agentUniforms: (string | null)[];
     }>;
   };
   ServicePicker:  undefined;

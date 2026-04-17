@@ -1,11 +1,11 @@
-﻿import {
+import {
   UserRole, UserStatus, MissionStatus, BookingStatus,
   DocumentStatus, PaymentStatus, ClientType,
 } from '@constants/enums';
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // GENERIC API WRAPPERS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface ApiResponse<T> {
   data:    T;
   message: string;
@@ -18,9 +18,9 @@ export interface ApiError {
   errors?:    Record<string, string[]>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // AUTH
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface AuthTokens {
   accessToken:  string;
   refreshToken: string;
@@ -47,9 +47,9 @@ export interface TwoFaSetupResponse {
   otpauthUrl: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // USER
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface User {
   id:             string;
   email:          string;
@@ -74,9 +74,9 @@ export interface DeleteAccountPayload {
   confirmPhrase:   string;   // must equal "SUPPRIMER MON COMPTE"
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SERVICE TYPES
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface ServiceType {
   id:              string;
   name:            string;
@@ -87,9 +87,9 @@ export interface ServiceType {
   createdAt:       string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // QUOTE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Quote {
   id:               string;
   missionId:        string;
@@ -117,9 +117,9 @@ export interface CreateQuotePayload {
   bookingLines: BookingLine[];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // MISSION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Mission {
   id:            string;
   clientId:      string;
@@ -160,9 +160,9 @@ export interface CreateMissionPayload {
 
 export type UpdateMissionPayload = Partial<CreateMissionPayload>;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // BOOKING
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface AgentSummary {
   id:             string;
   fullName:       string;
@@ -229,9 +229,9 @@ export interface Incident {
   createdAt:   string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // DISPUTE
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Dispute {
   id:          string;
   missionId:   string;
@@ -250,10 +250,10 @@ export interface CreateDisputePayload {
   description: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // PAYMENT METHOD (Stripe saved card / SEPA)
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface PaymentMethod {
   id:       string;
   type:     'card' | 'sepa_debit';
@@ -271,14 +271,14 @@ export interface PaymentMethod {
 }
 
 // PAYMENT
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Payment {
   id:              string;
   missionId:       string;
   mission?:        Pick<Mission, 'id' | 'title' | 'city' | 'startAt'>;
   stripeIntentId:  string;
   amount:          number;
-  method:          'CARD' | 'SEPA' | 'TRANSFER';
+  method:          'CARD' | 'SEPA' | 'VIREMENT' | 'CHEQUE';
   status:          PaymentStatus;
   invoiceNumber:   string;
   invoicePdfUrl?:  string;
@@ -288,7 +288,7 @@ export interface Payment {
 
 export interface CreatePaymentIntentPayload {
   missionId: string;
-  method:    'CARD' | 'SEPA' | 'TRANSFER';
+  method:    'CARD' | 'SEPA';
 }
 
 export interface PaymentIntentResponse {
@@ -307,9 +307,39 @@ export interface PaymentIntentResponse {
   };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
+// OFFLINE PAYMENT (Virement / Cheque)
+// -----------------------------------------------------------------------------
+export interface DeclareOfflinePayload {
+  missionId:  string;
+  method:     'VIREMENT' | 'CHEQUE';
+  reference?: string;
+}
+
+export interface OfflinePaymentInstructions {
+  type:         'VIREMENT' | 'CHEQUE';
+  iban?:        string;
+  bic?:         string;
+  reference?:   string;
+  beneficiary?: string;
+  payable?:     string;
+  address?:     string;
+  message:      string;
+}
+
+export interface OfflinePaymentResponse {
+  paymentId:     string;
+  invoiceNumber: string;
+  amount:        number;
+  method:        'VIREMENT' | 'CHEQUE';
+  status:        string;
+  instructions:  OfflinePaymentInstructions;
+}
+
+// -----------------------------------------------------------------------------
 // NOTIFICATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface AppNotification {
   id:        string;
   userId:    string;
@@ -321,9 +351,9 @@ export interface AppNotification {
   createdAt: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // CONVERSATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Message {
   id:        string;
   senderId:  string;
@@ -344,9 +374,9 @@ export interface SendMessagePayload {
   content: string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // RATING
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface Rating {
   id:        string;
   raterId:   string;
@@ -368,9 +398,9 @@ export interface CreateRatingPayload {
   npsScore?:  number;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // SOS
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export interface SosPayload {
   missionId?: string;
   latitude?:  number;
@@ -378,9 +408,9 @@ export interface SosPayload {
   message?:   string;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 // NAVIGATION
-// ─────────────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------------
 export type RootStackParamList = {
   Onboarding: undefined;
   Auth:       undefined;
@@ -419,10 +449,18 @@ export type MissionStackParamList = {
       agentCount:    number;
       name:          string;
       accent:        string;
-      agentUniforms: string[];
+      agentUniforms: (string | null)[];
     }>;
   };
-  ServicePicker:  undefined;
+  ServicePicker:  {
+    existingLines?: Array<{
+      serviceTypeId: string;
+      agentCount:    number;
+      name:          string;
+      accent:        string;
+      agentUniforms: (string | null)[];
+    }>;
+  };
   MissionDetail:  { missionId: string };
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
@@ -445,6 +483,7 @@ export type MissionStackParamList = {
     siteLat:        number;
     siteLng:        number;
   };
+  OfflinePayment: { missionId: string; totalTTC: number };
   Dispute:        {
     missionId:    string;
     bookingId?:   string;

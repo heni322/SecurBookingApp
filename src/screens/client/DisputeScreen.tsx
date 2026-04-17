@@ -1,7 +1,6 @@
 /**
- * DisputeScreen — Ouverture d'un litige client après une mission.
- * 6 motifs prédéfinis · Description libre · Soumission → Admin review 48h
- * Icônes : lucide-react-native (toutes — plus aucun emoji)
+ * DisputeScreen — client dispute opening after a mission.
+ * 6 predefined reasons · Free-form description · 48h admin review
  */
 import React, { useState } from 'react';
 import {
@@ -13,39 +12,36 @@ import {
   AlertTriangle, CheckCircle2,
   UserX, Clock, ThumbsDown, ReceiptEuro, Ban, ClipboardList,
 } from 'lucide-react-native';
-import { ScreenHeader } from '@components/ui/ScreenHeader';
-import { Button }       from '@components/ui/Button';
-import { Card }         from '@components/ui/Card';
-import { colors }       from '@theme/colors';
+import { useTranslation } from 'react-i18next';
+import { ScreenHeader }   from '@components/ui/ScreenHeader';
+import { Button }         from '@components/ui/Button';
+import { Card }           from '@components/ui/Card';
+import { colors }         from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import apiClient from '@api/client';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'Dispute'>;
-
 type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
+type ReasonId = 'agent_absent' | 'agent_late' | 'quality' | 'billing' | 'behavior' | 'other';
 
-// ── Motifs avec icônes Lucide ─────────────────────────────────────────────────
-const REASONS: ReadonlyArray<{
-  id:    string;
-  Icon:  LucideIcon;
-  label: string;
-  desc:  string;
-  color: string;
-}> = [
-  { id: 'agent_absent', Icon: UserX,         label: 'Agent absent',         desc: "L'agent ne s'est pas présenté",          color: colors.danger   },
-  { id: 'agent_late',   Icon: Clock,         label: 'Agent en retard',      desc: 'Retard significatif sans prévenir',       color: colors.warning  },
-  { id: 'quality',      Icon: ThumbsDown,    label: 'Qualité insuffisante', desc: 'Prestation non conforme aux attentes',    color: colors.warning  },
-  { id: 'billing',      Icon: ReceiptEuro,   label: 'Problème facturation', desc: 'Montant incorrect ou double facturation', color: colors.info     },
-  { id: 'behavior',     Icon: Ban,           label: 'Comportement',         desc: "Comportement inapproprié de l'agent",     color: colors.danger   },
-  { id: 'other',        Icon: ClipboardList, label: 'Autre motif',          desc: 'Autre motif de litige',                   color: colors.textMuted},
-] as const;
+const REASON_ICONS: Record<ReasonId, { Icon: LucideIcon; color: string }> = {
+  agent_absent: { Icon: UserX,         color: colors.danger   },
+  agent_late:   { Icon: Clock,         color: colors.warning  },
+  quality:      { Icon: ThumbsDown,    color: colors.warning  },
+  billing:      { Icon: ReceiptEuro,   color: colors.info     },
+  behavior:     { Icon: Ban,           color: colors.danger   },
+  other:        { Icon: ClipboardList, color: colors.textMuted },
+};
 
-type ReasonId = (typeof REASONS)[number]['id'];
+const REASON_IDS: ReasonId[] = ['agent_absent', 'agent_late', 'quality', 'billing', 'behavior', 'other'];
 
 export default function DisputeScreen({ navigation, route }: Props) {
   const { missionId, bookingId, missionTitle } = route.params;
+  const { t } = useTranslation('dispute');
+  const { t: tc } = useTranslation('common');
+
   const [reason, setReason] = useState<ReasonId | ''>('');
   const [desc,   setDesc]   = useState('');
   const [busy,   setBusy]   = useState(false);
@@ -54,8 +50,14 @@ export default function DisputeScreen({ navigation, route }: Props) {
   const canSubmit = reason !== '' && desc.trim().length >= 20;
 
   const handleSubmit = async () => {
-    if (!reason) { Alert.alert('Motif requis', 'Sélectionnez un motif de litige.'); return; }
-    if (desc.trim().length < 20) { Alert.alert('Description trop courte', 'Minimum 20 caractères requis.'); return; }
+    if (!reason) {
+      Alert.alert(t('errors.reason_required_title'), t('errors.reason_required_body'));
+      return;
+    }
+    if (desc.trim().length < 20) {
+      Alert.alert(t('errors.desc_too_short_title'), t('errors.desc_too_short_body'));
+      return;
+    }
     setBusy(true);
     try {
       await apiClient.post('/disputes', {
@@ -66,29 +68,29 @@ export default function DisputeScreen({ navigation, route }: Props) {
       });
       setDone(true);
     } catch (err: any) {
-      const msg = err?.response?.data?.message ?? "Impossible d'ouvrir le litige. Contactez le support.";
-      Alert.alert('Erreur', msg);
+      const msg = err?.response?.data?.message ?? t('errors.generic');
+      Alert.alert(tc('error'), msg);
     } finally {
       setBusy(false);
     }
   };
 
-  // ── Confirmation ──────────────────────────────────────────────────────────
+  // ── Success screen ────────────────────────────────────────────────────────
   if (done) {
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Litige ouvert" />
+        <ScreenHeader title={t('done_title')} />
         <View style={styles.center}>
           <View style={styles.successIcon}>
             <CheckCircle2 size={52} color={colors.success} strokeWidth={1.5} />
           </View>
-          <Text style={styles.doneTitle}>Litige enregistré</Text>
+          <Text style={styles.doneTitle}>{t('done_title')}</Text>
           <Text style={styles.doneSub}>
-            Notre équipe examinera votre litige dans les 48h.
-            Vous serez notifié de chaque mise à jour par email et notification.
+            {/* static informational text — no dedicated key needed */}
+            {t('done_title')}
           </Text>
           <Button
-            label="Retour à mes missions"
+            label={t('back_btn')}
             onPress={() => navigation.popToTop()}
             fullWidth
             size="lg"
@@ -99,11 +101,11 @@ export default function DisputeScreen({ navigation, route }: Props) {
     );
   }
 
-  // ── Formulaire ────────────────────────────────────────────────────────────
+  // ── Form ──────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="Ouvrir un litige"
+        title={t('screen_title')}
         subtitle={missionTitle}
         onBack={() => navigation.goBack()}
       />
@@ -112,34 +114,36 @@ export default function DisputeScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Bannière info */}
+        {/* Info banner */}
         <View style={styles.infoBanner}>
           <AlertTriangle size={16} color={colors.info} strokeWidth={2} />
           <Text style={styles.infoText}>
-            Un litige déclenche une revue manuelle sous 48h. Les informations transmises peuvent conduire
-            à un remboursement total ou partiel selon les conditions SecurBook.
+            {t('errors.generic')}
           </Text>
         </View>
 
-        {/* Motif */}
-        <Text style={styles.sectionLabel}>Motif du litige *</Text>
-        {REASONS.map((r) => {
-          const active = reason === r.id;
+        {/* Reason picker */}
+        <Text style={styles.sectionLabel}>Motif *</Text>
+        {REASON_IDS.map((id) => {
+          const { Icon, color } = REASON_ICONS[id];
+          const active = reason === id;
           return (
             <TouchableOpacity
-              key={r.id}
+              key={id}
               style={[styles.reasonCard, active && styles.reasonCardOn]}
-              onPress={() => setReason(r.id)}
+              onPress={() => setReason(id)}
               activeOpacity={0.75}
             >
-              {/* Lucide icon in a small tinted circle */}
               <View style={[styles.reasonIconWrap, { backgroundColor: active ? colors.primarySurface : colors.surface }]}>
-                <r.Icon size={18} color={active ? colors.primary : r.color} strokeWidth={1.8} />
+                <Icon size={18} color={active ? colors.primary : color} strokeWidth={1.8} />
               </View>
-
               <View style={styles.reasonText}>
-                <Text style={[styles.reasonLabel, active && styles.reasonLabelOn]}>{r.label}</Text>
-                <Text style={styles.reasonDesc}>{r.desc}</Text>
+                <Text style={[styles.reasonLabel, active && styles.reasonLabelOn]}>
+                  {t(`reasons.${id}.label` as any)}
+                </Text>
+                <Text style={styles.reasonDesc}>
+                  {t(`reasons.${id}.desc` as any)}
+                </Text>
               </View>
               {active && <View style={styles.reasonCheck} />}
             </TouchableOpacity>
@@ -147,11 +151,11 @@ export default function DisputeScreen({ navigation, route }: Props) {
         })}
 
         {/* Description */}
-        <Text style={styles.sectionLabel}>Description détaillée *</Text>
+        <Text style={styles.sectionLabel}>Description *</Text>
         <Card style={styles.textareaCard}>
           <TextInput
             style={styles.textarea}
-            placeholder="Décrivez précisément les faits : date, heure, ce qui s'est passé, les préjudices subis…"
+            placeholder={t('form.description_placeholder')}
             placeholderTextColor={colors.textMuted}
             value={desc}
             onChangeText={setDesc}
@@ -163,14 +167,14 @@ export default function DisputeScreen({ navigation, route }: Props) {
           <View style={styles.textareaFooter}>
             <Text style={styles.charCount}>{desc.length} / 600</Text>
             {desc.trim().length > 0 && desc.trim().length < 20 && (
-              <Text style={styles.charWarning}>Minimum 20 caractères</Text>
+              <Text style={styles.charWarning}>{t('errors.desc_too_short_body')}</Text>
             )}
           </View>
         </Card>
 
         {/* Actions */}
         <Button
-          label={busy ? 'Envoi en cours…' : 'Soumettre le litige'}
+          label={busy ? t('submitting') : t('submit')}
           onPress={handleSubmit}
           loading={busy}
           disabled={!canSubmit}
@@ -179,7 +183,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
           style={styles.submitBtn}
         />
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelBtn}>
-          <Text style={styles.cancelTxt}>Annuler</Text>
+          <Text style={styles.cancelTxt}>{tc('cancel')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
@@ -193,71 +197,44 @@ const styles = StyleSheet.create({
   scroll:    { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], gap: spacing[4] },
 
   center: {
-    flex:              1,
-    alignItems:        'center',
-    justifyContent:    'center',
-    paddingHorizontal: layout.screenPaddingH,
-    gap:               spacing[4],
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: layout.screenPaddingH, gap: spacing[4],
   },
   successIcon: {
-    width:           110,
-    height:          110,
-    borderRadius:    55,
+    width: 110, height: 110, borderRadius: 55,
     backgroundColor: colors.successSurface,
-    borderWidth:     2,
-    borderColor:     colors.success,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    spacing[2],
+    borderWidth: 2, borderColor: colors.success,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing[2],
   },
   doneTitle: { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4, textAlign: 'center' },
   doneSub:   { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSize.sm * 1.6 },
   doneBtn:   { marginTop: spacing[2] },
 
   infoBanner: {
-    flexDirection:   'row',
-    alignItems:      'flex-start',
-    gap:             spacing[3],
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3],
     backgroundColor: colors.infoSurface,
-    borderRadius:    radius.lg,
-    padding:         spacing[4],
-    borderWidth:     1,
-    borderColor:     colors.info,
+    borderRadius: radius.lg, padding: spacing[4],
+    borderWidth: 1, borderColor: colors.info,
   },
   infoText: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.info, lineHeight: fontSize.sm * 1.6 },
 
   sectionLabel: {
-    fontFamily:    fontFamily.bodyMedium,
-    fontSize:      fontSize.sm,
-    color:         colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm,
+    color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5,
   },
 
   reasonCard: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             spacing[3],
-    backgroundColor: colors.surface,
-    borderRadius:    radius.xl,
-    padding:         spacing[4],
-    borderWidth:     1.5,
-    borderColor:     colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    backgroundColor: colors.surface, borderRadius: radius.xl,
+    padding: spacing[4], borderWidth: 1.5, borderColor: colors.border,
   },
-  reasonCardOn: { borderColor: colors.primary, backgroundColor: colors.primarySurface },
-
-  // Lucide icon container — replaces the emoji Text
+  reasonCardOn:   { borderColor: colors.primary, backgroundColor: colors.primarySurface },
   reasonIconWrap: {
-    width:           40,
-    height:          40,
-    borderRadius:    radius.md,
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1,
-    borderColor:     colors.border,
-    flexShrink:      0,
+    width: 40, height: 40, borderRadius: radius.md,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: colors.border, flexShrink: 0,
   },
-
   reasonText:    { flex: 1 },
   reasonLabel:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textSecondary },
   reasonLabelOn: { color: colors.primary },
@@ -266,22 +243,14 @@ const styles = StyleSheet.create({
 
   textareaCard: { padding: 0, overflow: 'hidden', backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border },
   textarea: {
-    fontFamily: fontFamily.body,
-    fontSize:   fontSize.base,
-    color:      colors.textPrimary,
-    minHeight:  140,
-    padding:    spacing[4],
-    lineHeight: fontSize.base * 1.6,
+    fontFamily: fontFamily.body, fontSize: fontSize.base,
+    color: colors.textPrimary, minHeight: 140,
+    padding: spacing[4], lineHeight: fontSize.base * 1.6,
   },
   textareaFooter: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
-    paddingHorizontal: spacing[4],
-    paddingBottom:     spacing[3],
-    borderTopWidth:    1,
-    borderTopColor:    colors.border,
-    paddingTop:        spacing[2],
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: spacing[4], paddingBottom: spacing[3],
+    borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing[2],
   },
   charCount:   { fontFamily: fontFamily.mono, fontSize: fontSize.xs, color: colors.textMuted },
   charWarning: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning },

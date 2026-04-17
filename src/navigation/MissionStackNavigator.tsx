@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ServicePickerScreen }  from '@screens/client/ServicePickerScreen';
 import { MissionCreateScreen }  from '@screens/client/MissionCreateScreen';
@@ -12,6 +12,7 @@ import { MissionsScreen }       from '@screens/client/MissionsScreen';
 import { SelectAgentScreen }    from '@screens/client/SelectAgentScreen';
 import RateAgentScreen          from '@screens/client/RateAgentScreen';
 import LiveTrackingScreen       from '@screens/client/LiveTrackingScreen';
+import { OfflinePaymentScreen } from '@screens/client/OfflinePaymentScreen';
 import DisputeScreen            from '@screens/client/DisputeScreen';
 import type { MissionStackParamList } from '@models/index';
 
@@ -36,6 +37,7 @@ export const MissionStackNavigator: React.FC = () => (
       options={{ presentation: 'modal' }} />
     <Stack.Screen name="LiveTracking"   component={LiveTrackingScreen}
       options={{ presentation: 'fullScreenModal' }} />
+    <Stack.Screen name="OfflinePayment" component={OfflinePaymentScreen} />
     <Stack.Screen name="Dispute"        component={DisputeScreen}
       options={{ presentation: 'modal' }} />
   </Stack.Navigator>

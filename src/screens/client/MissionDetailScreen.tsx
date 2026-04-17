@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionDetailScreen — full mission view.
  */
 import React, { useEffect, useCallback } from 'react';
@@ -87,7 +87,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (mission.status === MissionStatus.CONFIRMED)
       return { label: t('detail.cta_pay'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
     if (mission.status === MissionStatus.PUBLISHED && hasApplications)
-      return { label: t('detail.cta_select'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
+      return { label: t('detail.cta_select'), onPress: () => { const b = openBookings.find(bk => (bk.applications?.length ?? 0) > 0); if (b) navigation.navigate('BookingDetail', { bookingId: b.id }); } };
     if (mission.status === MissionStatus.PUBLISHED)
       return { label: t('detail.cta_waiting'), onPress: () => {} };
     if (mission.status === MissionStatus.COMPLETED)

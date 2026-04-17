@@ -1,4 +1,4 @@
-﻿/**
+/**
  * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
  * Architecture:
@@ -8,11 +8,10 @@
  *  • Signal-lost banner: shown when no GPS update > 30 s while connected
  *  • Geofence alert: auto-dismissed on zone re-entry via inZone state
  *  • OSM tiles (free, no key) — Google Maps on Android, MapKit on iOS
- *  • "Suivre agent" / "Voir site" / "Sync" controls
+ *  • "Follow agent" / "View site" / "Sync" controls
  *  • Pulsing geofence ring animation
  *  • Last known position shown at reduced opacity when signal lost
  */
- 
 
 import React, {
   useEffect, useRef, useState, useCallback,
@@ -27,24 +26,22 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Navigation2, MapPin, Wifi, WifiOff,
   AlertTriangle, CheckCircle2, Target, RefreshCw,
-  WifiOff as SignalIcon, Radio,
+  WifiOff as SignalIcon,
 } from 'lucide-react-native';
-import { ScreenHeader }       from '@components/ui';
-import { colors, palette }    from '@theme/colors';
-import { spacing, radius }    from '@theme/spacing';
+import { useTranslation }       from 'react-i18next';
+import { ScreenHeader }         from '@components/ui';
+import { colors, palette }      from '@theme/colors';
+import { spacing, radius }      from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-import { socketService }      from '@services/socketService';
-import { useSocketTracking }  from '@hooks/useSocketTracking';
+import { socketService }        from '@services/socketService';
+import { useSocketTracking }    from '@hooks/useSocketTracking';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'LiveTracking'>;
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const GEOFENCE_RADIUS_M = 30;
 const OSM_TILE_URL      = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-const OSM_ATTRIBUTION   = '© OpenStreetMap contributors';
 
-// ── Agent SVG Marker ──────────────────────────────────────────────────────────
 interface AgentMarkerProps {
   initials:   string;
   heading:    number | null;
@@ -58,21 +55,17 @@ const AgentMarker: React.FC<AgentMarkerProps> = ({ initials, heading, inZone, si
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', opacity: signalLost ? 0.5 : 1 }}>
       <Svg width={size} height={size} viewBox="0 0 56 56">
-        {/* Heading cone — only when heading available */}
         {heading !== null && heading >= 0 && (
           <G rotation={heading} origin="28,28">
             <Path d="M28 12 L24 26 L28 22 L32 26 Z" fill={bubbleColor} opacity="0.8" />
           </G>
         )}
-        {/* Agent bubble */}
         <SvgCircle cx="28" cy="28" r="16" fill={bubbleColor} />
         <SvgCircle cx="28" cy="28" r="16" fill="none" stroke="#fff" strokeWidth="3" />
-        {/* Online dot */}
         {!signalLost && (
           <SvgCircle cx="40" cy="16" r="5" fill={inZone ? palette.emerald : palette.gold} />
         )}
       </Svg>
-      {/* Initials label — drawn outside SVG for font rendering */}
       <View style={{ position: 'absolute', width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
         <Text style={{ fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: '#fff' }}>
           {initials}
@@ -82,20 +75,18 @@ const AgentMarker: React.FC<AgentMarkerProps> = ({ initials, heading, inZone, si
   );
 };
 
-// ── Main Screen ───────────────────────────────────────────────────────────────
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const {
     missionId, bookingId, agentName,
     missionAddress, siteLat, siteLng,
   } = route.params;
 
-  const mapRef = useRef<MapView>(null);
+  const { t } = useTranslation('tracking');
 
-  // Use ref for follow mode — avoids triggering useEffect re-subscriptions
+  const mapRef       = useRef<MapView>(null);
   const followingRef = useRef(true);
   const [showFollowBtn, setShowFollowBtn] = useState(false);
 
-  // ── Tracking state (all socket logic isolated in hook) ─────────────────────────
   const {
     agentPosition, lastSeenLabel, connected, signalLost,
     distanceM, inZone, pendingAlert, dismissAlert,
@@ -105,12 +96,10 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     onMissionEnd: () => navigation.goBack(),
   });
 
-  // ── Animations ───────────────────────────────────────────────────────────────
   const pulseAnim  = useRef(new Animated.Value(1)).current;
   const alertSlide = useRef(new Animated.Value(-160)).current;
   const headingRef = useRef<number>(0);
 
-  // Geofence ring pulse loop
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -122,7 +111,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     return () => loop.stop();
   }, [pulseAnim]);
 
-  // Alert banner slide-in / slide-out
   useEffect(() => {
     if (pendingAlert) {
       Vibration.vibrate([0, 250, 100, 250]);
@@ -136,12 +124,10 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, [pendingAlert, alertSlide]);
 
-  // Dismiss alert when agent re-enters zone
   useEffect(() => {
     if (inZone && pendingAlert) dismissAlert();
   }, [inZone, pendingAlert, dismissAlert]);
 
-  // ── Camera follow ─────────────────────────────────────────────────────────────
   const animateToAgent = useCallback(() => {
     if (!agentPosition || !mapRef.current) return;
     mapRef.current.animateCamera({
@@ -151,7 +137,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }, { duration: 700 });
   }, [agentPosition]);
 
-  // Follow agent on each new position (if follow mode active)
   useEffect(() => {
     if (!followingRef.current || !agentPosition) return;
     headingRef.current = agentPosition.heading ?? 0;
@@ -171,7 +156,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, []);
 
-  // ── Derived ───────────────────────────────────────────────────────────────────
   const agentInitials = agentName
     .split(' ')
     .map((w: string) => w[0] ?? '')
@@ -183,22 +167,25 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     ? distanceM < 1000 ? `${distanceM} m` : `${(distanceM / 1000).toFixed(1)} km`
     : null;
 
-  // ── Render ─────────────────────────────────────────────────────────────────────
+  const statusText = !connected
+    ? t('status_offline')
+    : signalLost
+      ? `⚠ Signal GPS`
+      : agentPosition
+        ? lastSeenLabel ?? t('status_live')
+        : t('status_waiting');
+
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Suivi en direct" onBack={() => navigation.goBack()} />
+      <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
 
-      {/* ── MAP ─────────────────────────────────────────────────────────────── */}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFillObject}
         provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialCamera={{
           center:   { latitude: siteLat, longitude: siteLng },
-          zoom:     16,
-          heading:  0,
-          pitch:    0,
-          altitude: 0,
+          zoom:     16, heading: 0, pitch: 0, altitude: 0,
         }}
         onPanDrag={handlePanDrag}
         showsUserLocation={false}
@@ -207,7 +194,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         rotateEnabled={true}
         pitchEnabled={false}
       >
-        {/* OSM tiles */}
         <UrlTile
           urlTemplate={OSM_TILE_URL}
           maximumZ={19}
@@ -215,8 +201,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           tileSize={256}
           shouldReplaceMapContent={Platform.OS === 'ios'}
         />
-
-        {/* Geofence zone fill */}
         <Circle
           center={{ latitude: siteLat, longitude: siteLng }}
           radius={GEOFENCE_RADIUS_M}
@@ -225,8 +209,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           strokeWidth={2}
           zIndex={1}
         />
-
-        {/* Outer alert ring — breach only */}
         {!inZone && (
           <Circle
             center={{ latitude: siteLat, longitude: siteLng }}
@@ -237,8 +219,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             zIndex={1}
           />
         )}
-
-        {/* Accuracy circle */}
         {agentPosition && (agentPosition.accuracy ?? 0) > 0 && (
           <Circle
             center={{ latitude: agentPosition.latitude, longitude: agentPosition.longitude }}
@@ -249,8 +229,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             zIndex={2}
           />
         )}
-
-        {/* Mission site pin */}
         <Marker
           coordinate={{ latitude: siteLat, longitude: siteLng }}
           anchor={{ x: 0.5, y: 0.5 }}
@@ -260,8 +238,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             <MapPin size={18} color="#fff" strokeWidth={2.5} />
           </View>
         </Marker>
-
-        {/* Agent marker */}
         {agentPosition && (
           <Marker
             coordinate={{ latitude: agentPosition.latitude, longitude: agentPosition.longitude }}
@@ -279,26 +255,19 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         )}
       </MapView>
 
-      {/* OSM Attribution — license required */}
+      {/* OSM Attribution */}
       <View style={styles.attribution}>
-        <Text style={styles.attributionTxt}>{OSM_ATTRIBUTION}</Text>
+        <Text style={styles.attributionTxt}>{t('attribution')}</Text>
       </View>
 
-      {/* ── CONNECTION STATUS BAR ───────────────────────────────────────────── */}
+      {/* Connection status bar */}
       <View style={styles.statusBar}>
         {connected
           ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
           : <WifiOff size={12} color={colors.danger}  strokeWidth={2} />
         }
         <Text style={[styles.statusTxt, !connected && styles.statusTxtOff]}>
-          {!connected
-            ? 'Hors ligne — reconnexion…'
-            : signalLost
-              ? '⚠ Signal GPS perdu'
-              : agentPosition
-                ? lastSeenLabel ?? 'En direct'
-                : 'En attente de position…'
-          }
+          {statusText}
         </Text>
         {connected && !agentPosition && (
           <ActivityIndicator size="small" color={colors.primary} />
@@ -308,17 +277,17 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* ── GEOFENCE ALERT BANNER ── */}
+      {/* Geofence alert banner */}
       <Animated.View
         style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
         pointerEvents={pendingAlert ? 'auto' : 'none'}
       >
         <AlertTriangle size={20} color="#fff" strokeWidth={2.5} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.alertTitle}>Agent hors zone</Text>
+          <Text style={styles.alertTitle}>{t('out_of_zone')}</Text>
           <Text style={styles.alertBody} numberOfLines={1}>
             {pendingAlert
-              ? `${pendingAlert.agentName} est à ${pendingAlert.distanceStr} du site`
+              ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}`
               : ''}
           </Text>
         </View>
@@ -330,7 +299,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* ── RE-CENTER FAB ── */}
+      {/* Re-center FAB */}
       {showFollowBtn && (
         <TouchableOpacity
           style={styles.reCenterFab}
@@ -341,9 +310,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       )}
 
-      {/* ── BOTTOM CARD ── */}
+      {/* Bottom card */}
       <View style={styles.card}>
-        {/* Agent row */}
         <View style={styles.cardRow}>
           <View style={styles.avatarBubble}>
             <Text style={styles.avatarTxt}>{agentInitials}</Text>
@@ -365,16 +333,14 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           )}
         </View>
 
-        {/* Zone status strip */}
         <View style={[styles.zoneStrip, !inZone && styles.zoneStripAlert]}>
           <Text style={[styles.zoneTxt, !inZone && styles.zoneTxtAlert]}>
             {inZone
-              ? `✓ Agent dans la zone (rayon ${GEOFENCE_RADIUS_M} m)`
-              : `⚠ Agent hors zone — client notifié`}
+              ? `✓ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
+              : `⚠ ${t('out_of_zone')}`}
           </Text>
         </View>
 
-        {/* Controls */}
         <View style={styles.ctrlRow}>
           <TouchableOpacity
             style={styles.ctrlBtn}
@@ -389,7 +355,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             activeOpacity={0.75}
           >
             <MapPin size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.ctrlTxt}>Site</Text>
+            <Text style={styles.ctrlTxt}>{t('view_site_btn')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -399,7 +365,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             activeOpacity={0.75}
           >
             <Navigation2 size={15} color="#fff" strokeWidth={2} />
-            <Text style={[styles.ctrlTxt, styles.ctrlTxtPrimary]}>Suivre l'agent</Text>
+            <Text style={[styles.ctrlTxt, styles.ctrlTxtPrimary]}>{t('follow_agent_btn')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -408,7 +374,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             activeOpacity={0.75}
           >
             <RefreshCw size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.ctrlTxt}>Sync</Text>
+            <Text style={styles.ctrlTxt}>{t('sync_btn')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -416,7 +382,6 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.navy },
 
@@ -427,7 +392,6 @@ const styles = StyleSheet.create({
   },
   attributionTxt: { fontSize: 9, color: 'rgba(255,255,255,0.65)', fontFamily: fontFamily.body },
 
-  // Status bar — sits just below the ScreenHeader
   statusBar: {
     position: 'absolute', top: 68, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
@@ -439,7 +403,6 @@ const styles = StyleSheet.create({
   statusTxt:    { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white, flex: 1 },
   statusTxtOff: { color: colors.danger },
 
-  // Alert banner — slides down from top when geofence breached
   alertBanner: {
     position: 'absolute', top: 120, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
@@ -456,11 +419,9 @@ const styles = StyleSheet.create({
   alertBody:  { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: 'rgba(255,255,255,0.82)', marginTop: 2 },
   alertClose: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: 'rgba(255,255,255,0.75)' },
 
-  // Site marker
   sitePin:      { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#fff' },
   sitePinAlert: { backgroundColor: colors.danger },
 
-  // Re-center FAB
   reCenterFab: {
     position: 'absolute', right: 16, bottom: 300,
     width: 48, height: 48, borderRadius: 24,
@@ -473,7 +434,6 @@ const styles = StyleSheet.create({
     }),
   },
 
-  // Bottom card
   card: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(10,12,15,0.97)',
@@ -535,4 +495,3 @@ const styles = StyleSheet.create({
   ctrlTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white60 },
   ctrlTxtPrimary:  { color: '#fff' },
 });
-

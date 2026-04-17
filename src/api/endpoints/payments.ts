@@ -1,6 +1,7 @@
 ﻿import apiClient from '@api/client';
 import type {
-  ApiResponse, Payment, PaymentMethod, PaymentIntentResponse, CreatePaymentIntentPayload,
+  ApiResponse, Payment, PaymentMethod, PaymentIntentResponse,
+  CreatePaymentIntentPayload, DeclareOfflinePayload, OfflinePaymentResponse,
 } from '@models/index';
 
 export const paymentsApi = {
@@ -34,4 +35,7 @@ export const paymentsApi = {
   /** [CLIENT] Télécharger la facture PDF d'un paiement (retourne URL signée) */
   getInvoiceUrl: (paymentId: string) =>
     apiClient.get<ApiResponse<{ url: string }>>(`/payments/${paymentId}/invoice`),
+  /** [CLIENT] Déclarer un virement bancaire ou chèque envoyé */
+  declareOffline: (payload: DeclareOfflinePayload) =>
+    apiClient.post<ApiResponse<OfflinePaymentResponse>>('/payments/offline', payload),
 };

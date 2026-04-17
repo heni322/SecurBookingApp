@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionsScreen — Mission list with status filtering, search, skeleton.
  */
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
@@ -109,7 +109,7 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
         </View>
         <TouchableOpacity
           style={styles.newBtn}
-          onPress={() => navigation.navigate('ServicePicker')}
+          onPress={() => navigation.navigate('ServicePicker', {})}
           activeOpacity={0.82}
         >
           <Plus size={16} color={colors.textInverse} strokeWidth={2.5} />
@@ -167,7 +167,7 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
               title={emptyTitle}
               subtitle={emptySubtitle}
               actionLabel={!search && filter === 'ALL' ? t('empty.action') : undefined}
-              onAction={!search && filter === 'ALL' ? () => navigation.navigate('ServicePicker') : undefined}
+              onAction={!search && filter === 'ALL' ? () => navigation.navigate('ServicePicker', {}) : undefined}
             />
           }
         />

@@ -1,10 +1,6 @@
-﻿/**
- * RateAgentScreen — évaluation agent par le client.
- *
- * Deux niveaux de notation :
- *  1. Score 1–5 étoiles (spec §5.7)
- *  2. NPS score 0–10 (spec §11 — Net Promoter Score)
- *     Promoteurs 9-10 / Passifs 7-8 / Détracteurs 0-6
+/**
+ * RateAgentScreen — client rates agent after a mission.
+ * Step 1: Star score 1–5  |  Step 2: NPS 0–10  |  Step 3: Comment
  */
 import React, { useState, useRef } from 'react';
 import {
@@ -15,73 +11,81 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Star, ThumbsUp, ThumbsDown, Minus, CheckCircle2,
 } from 'lucide-react-native';
-import { ScreenHeader } from '@components/ui/ScreenHeader';
-import { Button }       from '@components/ui/Button';
-import { colors, palette } from '@theme/colors';
+import { useTranslation }   from 'react-i18next';
+import { ScreenHeader }     from '@components/ui/ScreenHeader';
+import { Button }           from '@components/ui/Button';
+import { colors, palette }  from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import { ratingsApi }   from '@api/endpoints/ratings';
+import { ratingsApi }       from '@api/endpoints/ratings';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'RateAgent'>;
 
-const STARS = [1, 2, 3, 4, 5];
-const STAR_LABELS: Record<number, string> = {
-  1: 'Insuffisant', 2: 'Passable', 3: 'Bien', 4: 'Très bien', 5: 'Excellent !',
-};
+const STARS = [1, 2, 3, 4, 5] as const;
 
-const QUICK_COMMENTS = [
-  'Ponctuel et professionnel',
-  'Excellent travail',
-  'Communication parfaite',
-  'Je recommande',
-  'Très réactif',
-  'Travail soigné',
-];
-
-// NPS labels per score
-const NPS_LABEL: Record<number, string> = {
-  0:'Extrêmement improbable', 1:'', 2:'', 3:'', 4:'', 5:'',
-  6:'Peu probable', 7:'', 8:'Probable', 9:'Très probable', 10:'Extrêmement probable',
-};
-const getNpsCategory = (s: number): { label: string; color: string } => {
-  if (s >= 9)  return { label: 'Promoteur',   color: colors.success };
-  if (s >= 7)  return { label: 'Passif',       color: colors.warning };
-  return           { label: 'Détracteur',  color: colors.danger };
+const getNpsColors = (s: number): string => {
+  if (s >= 9) return colors.success;
+  if (s >= 7) return colors.warning;
+  return colors.danger;
 };
 
 export default function RateAgentScreen({ navigation, route }: Props) {
   const { bookingId, agentId, agentName, missionTitle } = route.params;
+  const { t }     = useTranslation('rating');
+  const { t: tc } = useTranslation('common');
 
-  const [score,    setScore]    = useState(0);
-  const [nps,      setNps]      = useState<number | null>(null);
-  const [comment,  setComment]  = useState('');
-  const [busy,     setBusy]     = useState(false);
-  const [done,     setDone]     = useState(false);
-  const [step,     setStep]     = useState<'rating' | 'nps' | 'comment'>('rating');
+  const [score,   setScore]   = useState(0);
+  const [nps,     setNps]     = useState<number | null>(null);
+  const [comment, setComment] = useState('');
+  const [busy,    setBusy]    = useState(false);
+  const [done,    setDone]    = useState(false);
+  const [step,    setStep]    = useState<'rating' | 'nps' | 'comment'>('rating');
 
   const starAnims = useRef(STARS.map(() => new Animated.Value(1))).current;
   const fadeAnim  = useRef(new Animated.Value(0)).current;
 
-  const fadeIn = () => Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+  // Resolved once — avoids calling t() inside loops
+  const npsScale  = t('nps_scale',   { returnObjects: true }) as string[];
+  const starLabels = t('star_labels', { returnObjects: true }) as string[]; // [0] unused
+  const quickTags = t('step_comment.tags', { returnObjects: true }) as string[];
+  const npsLabels = {
+    promoter:  t('nps_categories.promoter'),
+    passive:   t('nps_categories.passive'),
+    detractor: t('nps_categories.detractor'),
+  };
+
+  const getNpsCategory = (s: number) => ({
+    label: s >= 9 ? npsLabels.promoter : s >= 7 ? npsLabels.passive : npsLabels.detractor,
+    color: getNpsColors(s),
+  });
+
+  const fadeIn = () =>
+    Animated.timing(fadeAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
 
   const handleStarPress = (val: number) => {
     setScore(val);
     Animated.sequence([
       Animated.timing(starAnims[val - 1], { toValue: 1.4, duration: 100, useNativeDriver: true }),
-      Animated.spring(starAnims[val - 1],  { toValue: 1, friction: 4,  useNativeDriver: true }),
+      Animated.spring(starAnims[val - 1],  { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
   };
 
   const handleStarNext = () => {
-    if (!score) { Alert.alert('Note requise', 'Sélectionnez une note entre 1 et 5.'); return; }
+    if (!score) {
+      Alert.alert(t('errors.score_required_title'), t('errors.score_required_body'));
+      return;
+    }
     setStep('nps');
     fadeAnim.setValue(0);
     fadeIn();
   };
 
   const handleNpsNext = () => {
-    if (nps === null) { Alert.alert('NPS requis', 'Sélectionnez votre probabilité de recommandation.'); return; }
+    if (nps === null) {
+      Alert.alert(t('errors.nps_required_title'), t('errors.nps_required_body'));
+      return;
+    }
     setStep('comment');
     fadeAnim.setValue(0);
     fadeIn();
@@ -101,37 +105,45 @@ export default function RateAgentScreen({ navigation, route }: Props) {
       });
       setDone(true);
     } catch (err: any) {
-      Alert.alert('Erreur', err?.response?.data?.message ?? "Impossible d'envoyer la note.");
+      Alert.alert(tc('error'), err?.response?.data?.message ?? t('errors.generic'));
     } finally {
       setBusy(false);
     }
   };
 
-  // ── Success ──────────────────────────────────────────────────────────────
+  // ── Success ───────────────────────────────────────────────────────────────
   if (done) {
     const npsCategory = nps !== null ? getNpsCategory(nps) : null;
     return (
       <View style={styles.container}>
-        <ScreenHeader title="Évaluation envoyée" />
+        <ScreenHeader title={t('screen_title')} />
         <View style={styles.center}>
           <View style={styles.successIconWrap}>
             <CheckCircle2 size={48} color={colors.success} strokeWidth={1.5} />
           </View>
           <View style={styles.starsRowDone}>
             {STARS.map(v => (
-              <Star key={v} size={28} color={v <= score ? palette.gold : colors.border} fill={v <= score ? palette.gold : 'transparent'} strokeWidth={1.5} />
+              <Star key={v} size={28}
+                color={v <= score ? palette.gold : colors.border}
+                fill={v <= score ? palette.gold : 'transparent'}
+                strokeWidth={1.5}
+              />
             ))}
           </View>
           {npsCategory && (
             <View style={[styles.npsDoneBadge, { backgroundColor: npsCategory.color + '22', borderColor: npsCategory.color + '80' }]}>
-              <Text style={[styles.npsDoneText, { color: npsCategory.color }]}>{npsCategory.label} — NPS {nps}/10</Text>
+              <Text style={[styles.npsDoneText, { color: npsCategory.color }]}>
+                {npsCategory.label} — NPS {nps}/10
+              </Text>
             </View>
           )}
-          <Text style={styles.doneTitle}>Merci pour votre évaluation !</Text>
-          <Text style={styles.doneSub}>
-            Votre retour contribue à maintenir un haut niveau de qualité sur SecurBook.
-          </Text>
-          <Button label="Retour à mes missions" onPress={() => navigation.popToTop()} fullWidth size="lg" style={styles.doneBtn} />
+          <Text style={styles.doneTitle}>{t('done.title')}</Text>
+          <Button
+            label={t('done.back_btn')}
+            onPress={() => navigation.popToTop()}
+            fullWidth size="lg"
+            style={styles.doneBtn}
+          />
         </View>
       </View>
     );
@@ -140,20 +152,30 @@ export default function RateAgentScreen({ navigation, route }: Props) {
   return (
     <View style={styles.container}>
       <ScreenHeader
-        title="Évaluer l'agent"
+        title={t('screen_title')}
         subtitle={missionTitle}
         onBack={() => navigation.goBack()}
       />
 
-      {/* Step indicator */}
+      {/* Step dots */}
       <View style={styles.stepBar}>
         {(['rating', 'nps', 'comment'] as const).map((s, i) => (
-          <View key={s} style={[styles.stepDot, step === s && styles.stepDotActive, i < ['rating','nps','comment'].indexOf(step) && styles.stepDotDone]} />
+          <View
+            key={s}
+            style={[
+              styles.stepDot,
+              step === s && styles.stepDotActive,
+              i < (['rating', 'nps', 'comment'] as const).indexOf(step) && styles.stepDotDone,
+            ]}
+          />
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Agent card */}
         <View style={styles.agentCard}>
           <View style={styles.agentAvatar}>
@@ -167,18 +189,18 @@ export default function RateAgentScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* ── STEP 1: Star rating ── */}
+        {/* ── STEP 1: Stars ── */}
         {step === 'rating' && (
           <View style={styles.stepContent}>
-            <Text style={styles.stepTitle}>Comment s'est passée la mission ?</Text>
-            <Text style={styles.stepSub}>Évaluez la qualité globale de la prestation</Text>
+            <Text style={styles.stepTitle}>{t('step_rating.title')}</Text>
+            <Text style={styles.stepSub}>{t('step_rating.subtitle')}</Text>
 
             <View style={styles.starsRow}>
               {STARS.map(val => (
-                <TouchableOpacity key={val} onPress={() => handleStarPress(val)} activeOpacity={0.7} hitSlop={{ top:12,bottom:12,left:8,right:8 }}>
+                <TouchableOpacity key={val} onPress={() => handleStarPress(val)} activeOpacity={0.7}
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
                   <Animated.View style={{ transform: [{ scale: starAnims[val - 1] }] }}>
-                    <Star
-                      size={48}
+                    <Star size={48}
                       color={val <= score ? palette.gold : colors.border}
                       fill={val <= score ? palette.gold : 'transparent'}
                       strokeWidth={1.5}
@@ -188,12 +210,10 @@ export default function RateAgentScreen({ navigation, route }: Props) {
               ))}
             </View>
 
-            {score > 0 && (
-              <Text style={styles.scoreLabel}>{STAR_LABELS[score]}</Text>
-            )}
+            {score > 0 && <Text style={styles.scoreLabel}>{starLabels[score]}</Text>}
 
             <Button
-              label="Continuer"
+              label={t('nav.continue')}
               onPress={handleStarNext}
               disabled={!score}
               fullWidth size="lg"
@@ -202,29 +222,24 @@ export default function RateAgentScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {/* ── STEP 2: NPS (0–10) ── */}
+        {/* ── STEP 2: NPS ── */}
         {step === 'nps' && (
           <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
-            <Text style={styles.stepTitle}>Recommanderiez-vous SecurBook ?</Text>
-            <Text style={styles.stepSub}>De 0 (pas du tout) à 10 (certainement)</Text>
+            <Text style={styles.stepTitle}>{t('step_nps.title')}</Text>
+            <Text style={styles.stepSub}>{t('step_nps.subtitle')}</Text>
 
             <View style={styles.npsGrid}>
               {Array.from({ length: 11 }, (_, i) => i).map(n => {
-                const cat      = getNpsCategory(n);
+                const color    = getNpsColors(n);
                 const isActive = nps === n;
                 return (
                   <TouchableOpacity
                     key={n}
-                    style={[
-                      styles.npsCell,
-                      isActive && { backgroundColor: cat.color, borderColor: cat.color },
-                    ]}
+                    style={[styles.npsCell, isActive && { backgroundColor: color, borderColor: color }]}
                     onPress={() => setNps(n)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.npsCellText, isActive && styles.npsCellTextActive]}>
-                      {n}
-                    </Text>
+                    <Text style={[styles.npsCellText, isActive && styles.npsCellTextActive]}>{n}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -232,42 +247,45 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
             <View style={styles.npsLegend}>
               <View style={styles.npsLegendRow}>
-                <ThumbsDown size={13} color={colors.danger} strokeWidth={2} />
-                <Text style={[styles.npsLegendText, { color: colors.danger }]}>Détracteurs 0–6</Text>
+                <ThumbsDown size={13} color={colors.danger}  strokeWidth={2} />
+                <Text style={[styles.npsLegendText, { color: colors.danger  }]}>{t('step_nps.detractors')}</Text>
               </View>
               <View style={styles.npsLegendRow}>
-                <Minus size={13} color={colors.warning} strokeWidth={2} />
-                <Text style={[styles.npsLegendText, { color: colors.warning }]}>Passifs 7–8</Text>
+                <Minus      size={13} color={colors.warning} strokeWidth={2} />
+                <Text style={[styles.npsLegendText, { color: colors.warning }]}>{t('step_nps.passives')}</Text>
               </View>
               <View style={styles.npsLegendRow}>
-                <ThumbsUp size={13} color={colors.success} strokeWidth={2} />
-                <Text style={[styles.npsLegendText, { color: colors.success }]}>Promoteurs 9–10</Text>
+                <ThumbsUp   size={13} color={colors.success} strokeWidth={2} />
+                <Text style={[styles.npsLegendText, { color: colors.success }]}>{t('step_nps.promoters')}</Text>
               </View>
             </View>
 
-            {nps !== null && (
-              <View style={[styles.npsCategoryBadge, { backgroundColor: getNpsCategory(nps).color + '20', borderColor: getNpsCategory(nps).color + '60' }]}>
-                <Text style={[styles.npsCategoryText, { color: getNpsCategory(nps).color }]}>
-                  {getNpsCategory(nps).label} — {NPS_LABEL[nps] || `Score ${nps}`}
-                </Text>
-              </View>
-            )}
+            {nps !== null && (() => {
+              const cat = getNpsCategory(nps);
+              return (
+                <View style={[styles.npsCategoryBadge, { backgroundColor: cat.color + '20', borderColor: cat.color + '60' }]}>
+                  <Text style={[styles.npsCategoryText, { color: cat.color }]}>
+                    {cat.label} — {npsScale[nps] || `Score ${nps}`}
+                  </Text>
+                </View>
+              );
+            })()}
 
             <View style={styles.navRow}>
-              <Button label="Retour"     onPress={() => setStep('rating')} variant="ghost" size="md" style={{ flex: 1 }} />
-              <Button label="Continuer"  onPress={handleNpsNext} disabled={nps === null} size="md" style={{ flex: 2 }} />
+              <Button label={t('nav.back')}     onPress={() => setStep('rating')} variant="ghost" size="md" style={{ flex: 1 }} />
+              <Button label={t('nav.continue')} onPress={handleNpsNext} disabled={nps === null} size="md" style={{ flex: 2 }} />
             </View>
           </Animated.View>
         )}
 
-        {/* ── STEP 3: Commentaire ── */}
+        {/* ── STEP 3: Comment ── */}
         {step === 'comment' && (
           <Animated.View style={[styles.stepContent, { opacity: fadeAnim }]}>
-            <Text style={styles.stepTitle}>Un commentaire ?</Text>
-            <Text style={styles.stepSub}>Facultatif — aide les prochains clients</Text>
+            <Text style={styles.stepTitle}>{t('step_comment.title')}</Text>
+            <Text style={styles.stepSub}>{t('step_comment.subtitle')}</Text>
 
             <View style={styles.chips}>
-              {QUICK_COMMENTS.map(q => {
+              {quickTags.map(q => {
                 const active = comment === q;
                 return (
                   <TouchableOpacity
@@ -284,7 +302,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
             <TextInput
               style={styles.textarea}
-              placeholder="Partagez votre expériences avec cet agent…"
+              placeholder={t('step_comment.placeholder')}
               placeholderTextColor={colors.textMuted}
               value={comment}
               onChangeText={setComment}
@@ -296,9 +314,9 @@ export default function RateAgentScreen({ navigation, route }: Props) {
             <Text style={styles.charCount}>{comment.length} / 300</Text>
 
             <View style={styles.navRow}>
-              <Button label="Retour"    onPress={() => setStep('nps')} variant="ghost" size="md" style={{ flex: 1 }} />
+              <Button label={t('nav.back')}  onPress={() => setStep('nps')} variant="ghost" size="md" style={{ flex: 1 }} />
               <Button
-                label={busy ? 'Envoi…' : "Envoyer l' évaluation"}
+                label={busy ? t('nav.sending') : t('nav.submit')}
                 onPress={handleSubmit}
                 loading={busy}
                 size="md"
@@ -306,8 +324,8 @@ export default function RateAgentScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <TouchableOpacity onPress={() => handleSubmit()} style={styles.skipBtn} disabled={busy}>
-              <Text style={styles.skipTxt}>Envoyer sans commentaire</Text>
+            <TouchableOpacity onPress={handleSubmit} style={styles.skipBtn} disabled={busy}>
+              <Text style={styles.skipTxt}>{t('step_comment.skip')}</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
@@ -333,14 +351,13 @@ const styles = StyleSheet.create({
   npsDoneBadge:    { borderRadius: radius.full, paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderWidth: 1 },
   npsDoneText:     { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm },
   doneTitle:       { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4, textAlign: 'center' },
-  doneSub:         { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSize.sm * 1.6 },
   doneBtn:         { marginTop: spacing[4] },
 
-  agentCard:    { flexDirection: 'row', alignItems: 'center', gap: spacing[4], backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.border, marginBottom: spacing[5] },
-  agentAvatar:  { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  agentInitials:{ fontSize: 18, fontWeight: '700', color: '#FFF' },
-  agentName:    { fontFamily: fontFamily.display, fontSize: fontSize.md, color: colors.textPrimary, letterSpacing: -0.3 },
-  missionLabel: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
+  agentCard:     { flexDirection: 'row', alignItems: 'center', gap: spacing[4], backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.border, marginBottom: spacing[5] },
+  agentAvatar:   { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  agentInitials: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+  agentName:     { fontFamily: fontFamily.display, fontSize: fontSize.md, color: colors.textPrimary, letterSpacing: -0.3 },
+  missionLabel:  { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 
   stepContent: { gap: spacing[4] },
   stepTitle:   { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4, textAlign: 'center' },
@@ -355,12 +372,11 @@ const styles = StyleSheet.create({
   npsCellText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.base, color: colors.textSecondary },
   npsCellTextActive: { color: colors.textInverse },
 
-  npsLegend:     { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing[2] },
-  npsLegendRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
-  npsLegendText: { fontFamily: fontFamily.body, fontSize: fontSize.xs },
-
-  npsCategoryBadge:{ alignSelf: 'center', borderRadius: radius.full, paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderWidth: 1 },
-  npsCategoryText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm },
+  npsLegend:        { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing[2] },
+  npsLegendRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
+  npsLegendText:    { fontFamily: fontFamily.body, fontSize: fontSize.xs },
+  npsCategoryBadge: { alignSelf: 'center', borderRadius: radius.full, paddingHorizontal: spacing[4], paddingVertical: spacing[2], borderWidth: 1 },
+  npsCategoryText:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm },
 
   chips:          { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] },
   chip:           { paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.full, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
@@ -375,4 +391,3 @@ const styles = StyleSheet.create({
   skipBtn: { alignItems: 'center', paddingVertical: spacing[3] },
   skipTxt: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
 });
-
