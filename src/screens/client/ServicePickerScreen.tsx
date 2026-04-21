@@ -1,11 +1,11 @@
 /**
- * ServicePickerScreen — Multi-service selection with per-agent uniform picker.
+ * ServicePickerScreen ï¿½ Multi-service selection with per-agent uniform picker.
  *
  * UX:
- *  • Tap a card to select/deselect a service
- *  • +/- stepper adds/removes agent slots (each agent = one uniform chip)
- *  • Each agent has its own tenue (STANDARD, CIVIL, EVENEMENTIEL, SSIAP, CYNOPHILE)
- *  • Sticky bottom bar shows live summary + "Continuer" CTA
+ *  ï¿½ Tap a card to select/deselect a service
+ *  ï¿½ +/- stepper adds/removes agent slots (each agent = one uniform chip)
+ *  ï¿½ Each agent has its own tenue (STANDARD, CIVIL, EVENEMENTIEL, SSIAP, CYNOPHILE)
+ *  ï¿½ Sticky bottom bar shows live summary + "Continuer" CTA
  */
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
@@ -36,11 +36,11 @@ type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: numbe
 
 // -- Uniform config ------------------------------------------------------------
 export const UNIFORM_OPTIONS = [
-  { value: 'STANDARD',     label: 'Standard',  desc: 'Uniforme noir réglementaire', emoji: '??' },
-  { value: 'CIVIL',        label: 'Civil',      desc: 'Tenue discrète, en civil',    emoji: '??' },
-  { value: 'EVENEMENTIEL', label: 'Soirée',     desc: 'Costume / tenue de gala',     emoji: '??' },
-  { value: 'SSIAP',        label: 'SSIAP',      desc: 'Tenue incendie réglementaire',emoji: '??' },
-  { value: 'CYNOPHILE',    label: 'Cynophile',  desc: 'Tenue maître-chien',          emoji: '??' },
+  { value: 'STANDARD',     label: 'Standard',   desc: 'Uniforme noir rÃ©glementaire',  emoji: 'ðŸ¦º' },
+  { value: 'CIVIL',        label: 'Civil',       desc: 'Tenue discrÃ¨te, en civil',     emoji: 'ðŸ‘”' },
+  { value: 'EVENEMENTIEL', label: 'SoirÃ©e', desc: 'Costume / tenue de gala',           emoji: 'ðŸ¤µ' },
+  { value: 'SSIAP',        label: 'SSIAP',       desc: 'Tenue incendie rÃ©glementaire', emoji: 'ðŸ”¥' },
+  { value: 'CYNOPHILE',    label: 'Cynophile',   desc: 'Tenue maÃ®tre-chien',           emoji: 'ðŸ•' },
 ] as const;
 
 export type UniformValue = (typeof UNIFORM_OPTIONS)[number]['value'];
@@ -64,7 +64,7 @@ const SERVICE_ICON_MAP: Array<{ keywords: string[]; Icon: LucideIconComp; accent
   { keywords: ['incendie', 'ssiap', 'feu'],                   Icon: Flame,     accent: '#EF4444' },
   { keywords: ['rondier', 'mobile', 'voiture'],               Icon: Car,       accent: '#3B82F6' },
   { keywords: ['corps', 'apr', 'garde'],                      Icon: UserCheck, accent: '#8B5CF6' },
-  { keywords: ['accueil', 'hôtesse', 'hotesse', 'réception'], Icon: Users,     accent: '#bc933b' },
+  { keywords: ['accueil', 'hÃ´tesse', 'hÃ´tesse', 'rÃ©ception'], Icon: Users,     accent: '#bc933b' },
   { keywords: ['equipe', 'chef', 'coord'],                    Icon: Building2, accent: '#06B6D4' },
 ];
 function getServiceMeta(name: string): { Icon: LucideIconComp; accent: string } {
@@ -84,7 +84,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
 
   useEffect(() => { execute(); }, [execute]);
 
-  // FIX Mobile B1 — when returning from MissionCreate with existingLines,
+  // FIX Mobile B1 ï¿½ when returning from MissionCreate with existingLines,
   // re-hydrate the selection map so the user does not lose their picks.
   useFocusEffect(
     useCallback(() => {
@@ -227,7 +227,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
       {totalLines > 0 && (
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
-            {totalLines} prestation{totalLines > 1 ? 's' : ''} · {totalAgents} agent{totalAgents > 1 ? 's' : ''}
+            {totalLines} prestation{totalLines > 1 ? 's' : ''} ï¿½ {totalAgents} agent{totalAgents > 1 ? 's' : ''}
           </Text>
           <TouchableOpacity onPress={() => setSelected(new Map())} style={styles.clearBtn}>
             <Text style={styles.clearBtnText}>Tout effacer</Text>
@@ -279,16 +279,16 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.ctaInner}>
           <View style={styles.ctaInfo}>
             <Text style={styles.ctaTitle}>
-              {totalLines} prestation{totalLines > 1 ? 's' : ''} · {totalAgents} agent{totalAgents > 1 ? 's' : ''}
+              {totalLines} prestation{totalLines > 1 ? 's' : ''} ï¿½ {totalAgents} agent{totalAgents > 1 ? 's' : ''}
             </Text>
             <Text style={styles.ctaSub} numberOfLines={1}>
               {Array.from(selected.values()).map(l =>
-                `${l.agents.length}× ${l.name.split(' ')[0]}`
-              ).join(' · ')}
+                `${l.agents.length}ï¿½ ${l.name.split(' ')[0]}`
+              ).join(' ï¿½ ')}
             </Text>
           </View>
           <TouchableOpacity style={styles.ctaBtn} onPress={handleConfirm} activeOpacity={0.85}>
-            {t('continue_btn')}
+            <Text style={styles.ctaBtnText}>{t('continue_btn')}</Text>
             <ArrowRight size={18} color={colors.textInverse} strokeWidth={2.2} />
           </TouchableOpacity>
         </View>
@@ -319,7 +319,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
 }) => (
   <View style={[styles.card, isSelected && { borderColor: accent, borderWidth: 1.5 }]}>
 
-    {/* -- Header row — always visible -------------------------------- */}
+    {/* -- Header row ï¿½ always visible -------------------------------- */}
     <TouchableOpacity
       style={styles.cardHeader}
       onPress={onToggle}
@@ -343,7 +343,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{item.name}</Text>
         <Text style={styles.cardDesc} numberOfLines={1}>{item.description}</Text>
-        <Text style={[styles.cardRate, { color: accent }]}>{formatEuros(item.baseRatePerHour)}/h · agent</Text>
+        <Text style={[styles.cardRate, { color: accent }]}>{formatEuros(item.baseRatePerHour)}/h ï¿½ agent</Text>
       </View>
 
       {/* Right: add button or agent count badge */}
@@ -360,7 +360,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
       )}
     </TouchableOpacity>
 
-    {/* -- Per-agent detail — visible when selected ------------------- */}
+    {/* -- Per-agent detail ï¿½ visible when selected ------------------- */}
     {isSelected && line && (
       <View style={[styles.agentsPanel, { borderTopColor: accent + '30' }]}>
 
@@ -391,7 +391,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
         {/* Quick "same tenue for all" shortcut */}
         {line.agents.length > 1 && (
           <View style={styles.allSameRow}>
-            <Text style={styles.allSameLabel}>Même tenue pour tous :</Text>
+            <Text style={styles.allSameLabel}>MÃªme tenue pour tous :</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allSameChips}>
               {UNIFORM_OPTIONS.map(opt => {
                 const allSame = line.agents.every(a => a.uniform === opt.value);
@@ -418,7 +418,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
           activeOpacity={0.7}
         >
           <Text style={[styles.expandToggleText, { color: accent }]}>
-            {line.expanded ? 'Masquer le détail' : 'Configurer chaque agent'}
+            {line.expanded ? 'Masquer le dÃ©tail' : 'Configurer chaque agent'}
           </Text>
           {line.expanded
             ? <ChevronUp size={14} color={accent} strokeWidth={2} />
@@ -454,7 +454,7 @@ const AgentRow: React.FC<{
       <Text style={[agentRowStyles.badgeNum, { color: accent }]}>{index + 1}</Text>
     </View>
 
-    {/* Uniform chips — first chip = "None / not specified", rest = UNIFORM_OPTIONS */}
+    {/* Uniform chips ï¿½ first chip = "None / not specified", rest = UNIFORM_OPTIONS */}
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -466,9 +466,9 @@ const AgentRow: React.FC<{
         onPress={() => onChangeUniform(null)}
         hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       >
-        <Text style={agentRowStyles.chipEmoji}>—</Text>
+        <Text style={agentRowStyles.chipEmoji}>ï¿½</Text>
         <Text style={[agentRowStyles.chipLabel, agent.uniform === null && agentRowStyles.chipLabelNone]}>
-          Non précisée
+          Non prÃ©cisÃ©e
         </Text>
       </TouchableOpacity>
 

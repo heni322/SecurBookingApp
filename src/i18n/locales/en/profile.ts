@@ -19,6 +19,9 @@ const profile: ProfileNS = {
     two_fa_disabled: 'Disabled',
     quick_login:     'Quick login',
     notifications:   'Notifications',
+    language:        'Language',
+    language_fr:     '🇫🇷  Français',
+    language_en:     '🇬🇧  English',
     email:           'Email',
     phone:           'Phone',
     member_since:    'Member since',
@@ -30,6 +33,10 @@ const profile: ProfileNS = {
     verified:      'VERIFIED CLIENT',
     since:         'Since {{date}}',
     phone_not_set: 'Not provided',
+  },
+  language_picker: {
+    title:    'Choose language',
+    subtitle: 'Select your preferred language',
   },
   logout: {
     button:  'Sign out',

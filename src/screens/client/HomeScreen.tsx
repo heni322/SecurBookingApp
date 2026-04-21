@@ -61,7 +61,10 @@ export const HomeScreen: React.FC = () => {
   const totalMissions   = allMissions.length;
   const completedCount  = allMissions.filter(m => m.status === MissionStatus.COMPLETED).length;
   const inProgressCount = allMissions.filter(m =>
-    m.status === MissionStatus.IN_PROGRESS || m.status === MissionStatus.PUBLISHED,
+    m.status === MissionStatus.PUBLISHED  ||
+    m.status === MissionStatus.STAFFING   ||
+    m.status === MissionStatus.STAFFED    ||
+    m.status === MissionStatus.IN_PROGRESS,
   ).length;
 
   const firstName = user?.fullName?.split(' ')[0] ?? 'Client';

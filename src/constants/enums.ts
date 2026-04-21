@@ -9,7 +9,6 @@ export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 export const UserStatus = {
   PENDING:   'PENDING',
   ACTIVE:    'ACTIVE',
-  INACTIVE:  'INACTIVE',
   SUSPENDED: 'SUSPENDED',
   BANNED:    'BANNED',
 } as const;
@@ -17,9 +16,10 @@ export type UserStatus = (typeof UserStatus)[keyof typeof UserStatus];
 
 // ─── Missions ─────────────────────────────────────────────────────────────────
 export const MissionStatus = {
-  DRAFT:       'DRAFT',
-  CONFIRMED:   'CONFIRMED',
+  CREATED:     'CREATED',
   PUBLISHED:   'PUBLISHED',
+  STAFFING:    'STAFFING',
+  STAFFED:     'STAFFED',
   IN_PROGRESS: 'IN_PROGRESS',
   COMPLETED:   'COMPLETED',
   CANCELLED:   'CANCELLED',

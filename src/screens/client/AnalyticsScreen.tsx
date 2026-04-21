@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AnalyticsScreen — spending & mission charts dashboard.
  * Bar chart for monthly spending + pie-like breakdown of mission statuses.
  * Pure RN (no charting lib dependency) — uses animated bars.
@@ -91,8 +91,8 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
     const all = Array.isArray(missions) ? missions : [];
     return [
       { label: t('history.status.paid'),  count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,  color: colors.success, Icon: CheckCircle },
-      { label: 'En cours',   count: all.filter((m: Mission) => [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.CONFIRMED].includes(m.status as any)).length, color: colors.primary, Icon: Shield },
-      { label: 'Brouillons', count: all.filter((m: Mission) => m.status === MissionStatus.DRAFT).length,      color: colors.textMuted, Icon: Clock },
+      { label: 'En cours',   count: all.filter((m: Mission) => [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.STAFFED].includes(m.status as any)).length, color: colors.primary, Icon: Shield },
+      { label: 'Brouillons', count: all.filter((m: Mission) => m.status === MissionStatus.CREATED).length,      color: colors.textMuted, Icon: Clock },
       { label: 'Cancelled',   count: all.filter((m: Mission) => m.status === MissionStatus.CANCELLED).length,  color: colors.danger, Icon: XCircle },
     ];
   }, [missions]);

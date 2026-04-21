@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PaymentHistoryScreen — full payment list with invoice download.
  * Premium UI: grouped by month, status badges, PDF tap-to-open.
  */
@@ -41,10 +41,11 @@ function groupByMonth(payments: Payment[]) {
 }
 
 const STATUS_META: Record<string, { label: string; color: string; Icon: any }> = {
-  [PaymentStatus.PAID]:     { label: 'Paid',    color: colors.success, Icon: CheckCircle },
-  [PaymentStatus.PENDING]:  { label: 'Pending', color: colors.warning, Icon: Clock },
-  [PaymentStatus.FAILED]:   { label: 'Failed',  color: colors.danger,  Icon: XCircle },
-  [PaymentStatus.REFUNDED]: { label: 'Refunded', color: colors.info,  Icon: Receipt },
+  [PaymentStatus.PAID]:     { label: 'Payé',    color: colors.success, Icon: CheckCircle },
+  [PaymentStatus.PENDING]:    { label: 'En attente',    color: colors.warning, Icon: Clock },
+  [PaymentStatus.PROCESSING]: { label: 'En traitement', color: colors.info,    Icon: Clock },
+  [PaymentStatus.FAILED]:   { label: 'Échoué',  color: colors.danger,  Icon: XCircle },
+  [PaymentStatus.REFUNDED]: { label: 'Remboursé', color: colors.info,  Icon: Receipt },
 };
 
 export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {

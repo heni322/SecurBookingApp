@@ -47,6 +47,30 @@ function resolveNavAction(notif: AppNotification) {
         : null;
     case 'DOCUMENT_APPROVED': case 'DOCUMENT_REJECTED':
       return CommonActions.navigate('Profile', { screen: 'ProfileMain' });
+    // Backend: agent checked in / checked out
+    case 'AGENT_CHECKED_IN': case 'AGENT_CHECKED_OUT':
+      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
+      if (meta.missionId) return CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } });
+      return CommonActions.navigate('Missions', { screen: 'MissionList' });
+    // Backend: PDF report ready
+    case 'MISSION_REPORT_READY':
+      return meta.missionId
+        ? CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } })
+        : CommonActions.navigate('Missions', { screen: 'MissionList' });
+    // Backend: account status
+    case 'ACCOUNT_SUSPENDED': case 'ACCOUNT_ACTIVATED':
+      return CommonActions.navigate('Profile', { screen: 'ProfileMain' });
+    // Backend: booking cancelled / forced checkout by admin
+    case 'BOOKING_CANCELLED': case 'BOOKING_FORCE_CHECKOUT':
+      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
+      return CommonActions.navigate('Missions', { screen: 'MissionList' });
+    // Backend: rating requested post-mission
+    case 'RATING_REQUESTED':
+      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
+      return CommonActions.navigate('Missions', { screen: 'MissionList' });
+    // Backend: payment status change
+    case 'PAYMENT_CONFIRMED': case 'PAYMENT_PENDING': case 'PAYMENT_PROCESSING':
+      return CommonActions.navigate('Profile', { screen: 'PaymentHistory' });
     default: return null;
   }
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MissionSuccessScreen - Payment confirmation + mission timeline.
  *
  * FIX #3: Poll GET /missions/:id after payment so we only show the success
@@ -27,9 +27,12 @@ import { useTranslation } from '@i18n';
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionSuccess'>;
 type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
 
+// After payment is confirmed, backend sets mission to STAFFED then admin publishes
+// Poll until we see any of these statuses to confirm payment was received
 const CONFIRMED_STATUSES = new Set([
-  MissionStatus.CONFIRMED,
+  MissionStatus.STAFFED,
   MissionStatus.PUBLISHED,
+  MissionStatus.STAFFING,
   MissionStatus.IN_PROGRESS,
   MissionStatus.COMPLETED,
 ]);
@@ -69,6 +72,7 @@ export const MissionSuccessScreen: React.FC<Props> = ({ route, navigation }) => 
     return () => { if (timer.current) clearInterval(timer.current); };
   }, [checkStatus]);
 
+  // Timeline steps matching real flow: STAFFED (payment) → PUBLISHED → STAFFING → IN_PROGRESS
   const STEPS: Array<{ Icon: LucideIconComp; label: string; done: boolean; color: string }> = [
     { Icon: ShieldCheck, label: t('success.step_confirmed'),   done: verifyState !== 'pending', color: colors.success },
     { Icon: Megaphone,   label: t('success.step_published'),   done: false, color: colors.primary },

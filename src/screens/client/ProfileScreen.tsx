@@ -4,14 +4,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Switch, RefreshControl,
+  StyleSheet, Alert, Switch, RefreshControl, Modal, Pressable,
 } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   User, Mail, Phone, CalendarDays, ShieldCheck,
   FileText, Info, LogOut, ChevronRight, CreditCard,
-  Bell, Lock, Wallet, Fingerprint, Trash2, Edit3, BarChart2,
+  Bell, Lock, Wallet, Fingerprint, Trash2, Edit3, BarChart2, Globe,
 } from 'lucide-react-native';
 import { Avatar }           from '@components/ui/Avatar';
 import { Card }             from '@components/ui/Card';
@@ -26,6 +26,7 @@ import { fontSize, fontFamily }    from '@theme/typography';
 import { formatDate }       from '@utils/formatters';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation }   from '@i18n';
+import i18n, { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@i18n';
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList>;
 type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -38,6 +39,10 @@ export const ProfileScreen: React.FC = () => {
   const [bioAvail,   setBioAvail]   = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
   const [bioLabel,   setBioLabel]   = useState<string>(t('menu.quick_login'));
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  const [currentLang, setCurrentLang] = useState<SupportedLanguage>(
+    (i18n.language as SupportedLanguage) ?? 'fr',
+  );
 
   useEffect(() => {
     (async () => {
@@ -76,6 +81,14 @@ export const ProfileScreen: React.FC = () => {
     );
   };
 
+  const handleSelectLanguage = useCallback((lang: SupportedLanguage) => {
+    i18n.changeLanguage(lang);
+    setCurrentLang(lang);
+    setLangModalVisible(false);
+  }, []);
+
+  const currentLangLabel = currentLang === 'fr' ? t('menu.language_fr') : t('menu.language_en');
+
   if (!user) return <ProfileSkeleton />;
 
   return (
@@ -100,7 +113,7 @@ export const ProfileScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.navigate('ProfileEdit')} activeOpacity={0.85}>
               <View style={styles.avatarRingOuter}>
                 <View style={styles.avatarRingInner}>
-                  <Avatar name={user.fullName} size={72} />
+                  <Avatar name={user.fullName} avatarUrl={user.avatarUrl} size={72} />
                 </View>
               </View>
             </TouchableOpacity>
@@ -173,7 +186,22 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.sectionGroup}>
           <Text style={styles.sectionTitle}>{t('sections.preferences')}</Text>
           <Card elevated style={styles.menuCard}>
-            <MenuRow Icon={Bell} iconColor={colors.warning} label={t('menu.notifications')} tappable onPress={() => navigation.dispatch(CommonActions.navigate('Notifications'))} />
+            <MenuRow
+              Icon={Bell}
+              iconColor={colors.warning}
+              label={t('menu.notifications')}
+              tappable
+              onPress={() => navigation.dispatch(CommonActions.navigate('Notifications'))}
+            />
+            <Divider />
+            <MenuRow
+              Icon={Globe}
+              iconColor={colors.info}
+              label={t('menu.language')}
+              value={currentLangLabel}
+              tappable
+              onPress={() => setLangModalVisible(true)}
+            />
           </Card>
         </View>
 
@@ -215,6 +243,47 @@ export const ProfileScreen: React.FC = () => {
 
         <Text style={styles.uid}>{user.id}</Text>
       </ScrollView>
+
+      {/* ── Language Picker Modal ── */}
+      <Modal
+        visible={langModalVisible}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setLangModalVisible(false)}
+      >
+        <Pressable style={modalStyles.backdrop} onPress={() => setLangModalVisible(false)}>
+          <Pressable style={modalStyles.sheet} onPress={() => {}}>
+            {/* Handle bar */}
+            <View style={modalStyles.handle} />
+
+            <Text style={modalStyles.title}>{t('language_picker.title')}</Text>
+            <Text style={modalStyles.subtitle}>{t('language_picker.subtitle')}</Text>
+
+            <View style={modalStyles.options}>
+              {SUPPORTED_LANGUAGES.map((lang) => {
+                const isActive = currentLang === lang;
+                const label = lang === 'fr' ? t('menu.language_fr') : t('menu.language_en');
+                return (
+                  <TouchableOpacity
+                    key={lang}
+                    style={[modalStyles.option, isActive && modalStyles.optionActive]}
+                    onPress={() => handleSelectLanguage(lang)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[modalStyles.optionText, isActive && modalStyles.optionTextActive]}>
+                      {label}
+                    </Text>
+                    {isActive && (
+                      <View style={modalStyles.checkDot} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -247,6 +316,76 @@ const rowStyles = StyleSheet.create({
   content: { flex: 1 },
   label:   { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.base, color: colors.textPrimary },
   value:   { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted, marginTop: 2 },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius['2xl'],
+    borderTopRightRadius: radius['2xl'],
+    paddingHorizontal: spacing[5],
+    paddingBottom: spacing[10],
+    paddingTop: spacing[3],
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing[5],
+  },
+  title: {
+    fontFamily: fontFamily.display,
+    fontSize: fontSize.xl,
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
+    marginBottom: spacing[1],
+  },
+  subtitle: {
+    fontFamily: fontFamily.body,
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    marginBottom: spacing[5],
+  },
+  options: {
+    gap: spacing[3],
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[4],
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  optionActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primarySurface,
+  },
+  optionText: {
+    fontFamily: fontFamily.bodyMedium,
+    fontSize: fontSize.base,
+    color: colors.textPrimary,
+  },
+  optionTextActive: {
+    color: colors.primary,
+    fontFamily: fontFamily.bodySemiBold,
+  },
+  checkDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
 });
 
 const styles = StyleSheet.create({

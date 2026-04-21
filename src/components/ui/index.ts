@@ -13,6 +13,7 @@ export { StarRating }         from './StarRating';
 export { Separator }          from './Separator';
 export { AddressSearch }      from './AddressSearch';
 export { MapLocationPicker }  from './MapLocationPicker';
+export { MissionMapView }     from './MissionMapView';
 export { DateTimePicker }     from './DateTimePicker';
 export { SearchBar }          from './SearchBar';
 export { OfflineBanner }      from './OfflineBanner';

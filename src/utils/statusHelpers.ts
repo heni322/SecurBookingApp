@@ -1,38 +1,27 @@
 /**
- * statusHelpers.ts — labels et couleurs par statut métier
+ * statusHelpers.ts — color maps by business status.
+ *
+ * Labels are intentionally NOT here — they live in the i18n namespaces
+ * (missions.statuses, booking.*, payment.history.status) so they react
+ * to locale changes automatically.
+ *
+ * Use the useMissionStatus() hook (or equivalent) to get both label + color.
  */
 import { colors } from '@theme/colors';
 import { MissionStatus, BookingStatus, DocumentStatus, PaymentStatus } from '@constants/enums';
 
 // ── Mission ───────────────────────────────────────────────────────────────────
-export const MISSION_STATUS_LABEL: Record<string, string> = {
-  [MissionStatus.DRAFT]:       'Brouillon',
-  [MissionStatus.CONFIRMED]:   'Confirmée',
-  [MissionStatus.PUBLISHED]:   'Publiée',
-  [MissionStatus.IN_PROGRESS]: 'En cours',
-  [MissionStatus.COMPLETED]:   'Terminée',
-  [MissionStatus.CANCELLED]:   'Annulée',
-};
-
 export const MISSION_STATUS_COLOR: Record<string, string> = {
-  [MissionStatus.DRAFT]:       colors.textMuted,
-  [MissionStatus.CONFIRMED]:   colors.info,
+  [MissionStatus.CREATED]:     colors.textMuted,
   [MissionStatus.PUBLISHED]:   colors.primary,
+  [MissionStatus.STAFFING]:    colors.info,
+  [MissionStatus.STAFFED]:     colors.info,
   [MissionStatus.IN_PROGRESS]: colors.warning,
   [MissionStatus.COMPLETED]:   colors.success,
   [MissionStatus.CANCELLED]:   colors.danger,
 };
 
 // ── Booking ───────────────────────────────────────────────────────────────────
-export const BOOKING_STATUS_LABEL: Record<string, string> = {
-  [BookingStatus.OPEN]:        'Ouvert',
-  [BookingStatus.ASSIGNED]:    'Assigné',
-  [BookingStatus.IN_PROGRESS]: 'En mission',
-  [BookingStatus.COMPLETED]:   'Terminé',
-  [BookingStatus.CANCELLED]:   'Annulé',
-  [BookingStatus.ABANDONED]:   'Abandonné',
-};
-
 export const BOOKING_STATUS_COLOR: Record<string, string> = {
   [BookingStatus.OPEN]:        colors.primary,
   [BookingStatus.ASSIGNED]:    colors.info,
@@ -43,13 +32,6 @@ export const BOOKING_STATUS_COLOR: Record<string, string> = {
 };
 
 // ── Document ──────────────────────────────────────────────────────────────────
-export const DOCUMENT_STATUS_LABEL: Record<string, string> = {
-  [DocumentStatus.PENDING]:  'En attente',
-  [DocumentStatus.APPROVED]: 'Approuvé',
-  [DocumentStatus.REJECTED]: 'Rejeté',
-  [DocumentStatus.EXPIRED]:  'Expiré',
-};
-
 export const DOCUMENT_STATUS_COLOR: Record<string, string> = {
   [DocumentStatus.PENDING]:  colors.warning,
   [DocumentStatus.APPROVED]: colors.success,
@@ -58,16 +40,10 @@ export const DOCUMENT_STATUS_COLOR: Record<string, string> = {
 };
 
 // ── Payment ───────────────────────────────────────────────────────────────────
-export const PAYMENT_STATUS_LABEL: Record<string, string> = {
-  [PaymentStatus.PENDING]:  'En attente',
-  [PaymentStatus.PAID]:     'Payé',
-  [PaymentStatus.FAILED]:   'Échoué',
-  [PaymentStatus.REFUNDED]: 'Remboursé',
-};
-
 export const PAYMENT_STATUS_COLOR: Record<string, string> = {
-  [PaymentStatus.PENDING]:  colors.warning,
-  [PaymentStatus.PAID]:     colors.success,
-  [PaymentStatus.FAILED]:   colors.danger,
-  [PaymentStatus.REFUNDED]: colors.info,
+  [PaymentStatus.PENDING]:    colors.warning,
+  [PaymentStatus.PROCESSING]: colors.info,
+  [PaymentStatus.PAID]:       colors.success,
+  [PaymentStatus.FAILED]:     colors.danger,
+  [PaymentStatus.REFUNDED]:   colors.info,
 };

@@ -1,6 +1,6 @@
 /**
- * locales/types.ts — Complete namespace shape definitions.
- * Both EN and FR implement these interfaces — no literal-type cross-lock.
+ * locales/types.ts â€” Complete namespace shape definitions.
+ * Both EN and FR implement these interfaces â€” no literal-type cross-lock.
  */
 
 export interface CommonNS {
@@ -76,11 +76,18 @@ export interface HomeNS {
 
 export interface MissionsNS {
   title: string; subtitle_one: string; subtitle_other: string;
-  new: string; search_placeholder: string;
-  filters: { all: string; active: string; drafts: string; completed: string; cancelled: string; };
+  new: string; search_placeholder: string; card_fallback_title: string; card_urgent: string;
+  filters: { all: string; active: string; created: string; completed: string; cancelled: string; };
   empty: {
     no_results: string; no_missions: string; filter_label: string;
     search_sub: string; all_sub: string; category_sub: string; action: string;
+  };
+  error: {
+    title: string; subtitle: string; retry: string;
+  };
+  a11y: {
+    loading: string; refreshing: string; retry: string; new_mission: string; search: string;
+    filter_bar: string; filter_chip: string; filter_chip_with_count: string;
   };
   detail: {
     status: string; location: string; date: string; agent: string;
@@ -91,10 +98,7 @@ export interface MissionsNS {
     cta_get_quote: string; cta_see_quote: string; cta_pay: string;
     cta_select: string; cta_waiting: string; cta_messaging: string;
   };
-  statuses: {
-    draft: string; published: string; confirmed: string; in_progress: string;
-    completed: string; cancelled: string; disputed: string;
-  };
+  statuses: { created: string; published: string; staffing: string; staffed: string; in_progress: string; completed: string; cancelled: string; };
   success: {
     title: string; subtitle: string; timeline_title: string;
     step_confirmed: string; step_published: string; step_selection: string; step_operational: string;
@@ -130,10 +134,13 @@ export interface ProfileNS {
   menu: {
     edit_profile: string; analytics: string; payment_history: string; payment_methods: string;
     two_fa: string; two_fa_enabled: string; two_fa_disabled: string;
-    quick_login: string; notifications: string; email: string; phone: string;
+    quick_login: string; notifications: string; language: string;
+    language_fr: string; language_en: string;
+    email: string; phone: string;
     member_since: string; version: string; privacy_policy: string; terms: string;
   };
   hero: { verified: string; since: string; phone_not_set: string; };
+  language_picker: { title: string; subtitle: string; };
   logout: { button: string; title: string; message: string; confirm: string; cancel: string; };
   delete_account: string;
 }
@@ -266,7 +273,7 @@ export interface BookingNS {
 export interface RatingNS {
   screen_title: string;
   steps: { rating: string; nps: string; comment: string; };
-  star_labels: string[]; // 6 entries — index 0 unused, 1-5 = star labels
+  star_labels: string[]; // 6 entries â€” index 0 unused, 1-5 = star labels
   step_rating: { title: string; subtitle: string; };
   step_nps: { title: string; subtitle: string; detractors: string; passives: string; promoters: string; };
   step_comment: { title: string; subtitle: string; placeholder: string; char_count: string; skip: string; tags: string[]; };
@@ -317,7 +324,7 @@ export interface ServicesNS {
     CYNOPHILE:    { label: string; desc: string; emoji: string; };
   };
 }
-/** Union of all namespaces — drives i18next CustomTypeOptions. */
+/** Union of all namespaces â€” drives i18next CustomTypeOptions. */
 export interface LocaleResources {
   common:        CommonNS;
   auth:          AuthNS;

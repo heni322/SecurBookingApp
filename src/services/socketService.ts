@@ -149,6 +149,7 @@ class SocketService {
 
   leaveMission(missionId: string) {
     this.joinedRooms.delete(missionId);
+    this.socket?.emit('leave_mission', { missionId });
   }
 
   // ── Subscriptions ─────────────────────────────────────────────────────────

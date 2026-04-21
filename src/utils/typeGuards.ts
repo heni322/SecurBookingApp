@@ -16,13 +16,16 @@ export const isMissionStatus = (
 export const isActiveMission = (m: Mission): boolean =>
   isMissionStatus(
     m.status,
-    MissionStatus.CONFIRMED,
-    MissionStatus.PUBLISHED,
-    MissionStatus.IN_PROGRESS,
+    MissionStatus.CREATED,
+  MissionStatus.PUBLISHED,
+  MissionStatus.STAFFING,
+  MissionStatus.STAFFED,
+  MissionStatus.IN_PROGRESS,
   );
 
+// Client can cancel at CREATED or PUBLISHED (not yet staffed)
 export const isCancellableMission = (m: Mission): boolean =>
-  isMissionStatus(m.status, MissionStatus.DRAFT, MissionStatus.CONFIRMED);
+  isMissionStatus(m.status, MissionStatus.CREATED, MissionStatus.PUBLISHED, MissionStatus.STAFFING);
 
 // ── Booking ───────────────────────────────────────────────────────────────────
 type BookingStatusValue = (typeof BookingStatus)[keyof typeof BookingStatus];

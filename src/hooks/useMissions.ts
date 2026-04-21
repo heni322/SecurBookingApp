@@ -18,7 +18,7 @@ export function useMissions() {
   const missions       = data ?? [];
   const active         = missions.filter(isActiveMission);
   const completed      = missions.filter((m) => m.status === MissionStatus.COMPLETED);
-  const drafts         = missions.filter((m) => m.status === MissionStatus.DRAFT);
+  const drafts         = missions.filter((m) => m.status === MissionStatus.CREATED);
 
   return {
     missions,

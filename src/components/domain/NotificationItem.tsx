@@ -1,13 +1,14 @@
-﻿/**
- * NotificationItem — ligne de notification avec statut lu/non-lu.
- * Icônes : lucide-react-native (fallback emoji pour les types non couverts)
+/**
+ * NotificationItem — notification row with read/unread state.
+ * Icons cover all backend notification types.
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
-  Megaphone, CheckCircle2, MapPin, LogOut,
+  Megaphone, CheckCircle2, MapPin, LogOut, LogIn,
   CreditCard, AlertTriangle, Star, FileCheck,
-  XCircle, Bell,
+  XCircle, Bell, FileText, ShieldCheck, ShieldOff,
+  Flag, Clock, UserCheck,
 } from 'lucide-react-native';
 import { colors }  from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
@@ -24,15 +25,54 @@ interface NotifMeta {
 }
 
 const TYPE_META: Record<string, NotifMeta> = {
-  MISSION_PUBLISHED: { Icon: Megaphone,    color: colors.primary,  bgColor: colors.primarySurface },
-  BOOKING_ASSIGNED:  { Icon: CheckCircle2, color: colors.success,  bgColor: colors.successSurface },
-  BOOKING_CHECKIN:   { Icon: MapPin,       color: colors.info,     bgColor: colors.infoSurface    },
-  BOOKING_CHECKOUT:  { Icon: LogOut,       color: colors.primary,  bgColor: colors.primarySurface },
-  PAYMENT_CONFIRMED: { Icon: CreditCard,   color: colors.success,  bgColor: colors.successSurface },
-  INCIDENT_REPORTED: { Icon: AlertTriangle,color: colors.warning,  bgColor: colors.warningSurface },
-  RATING_RECEIVED:   { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface            },
-  DOCUMENT_APPROVED: { Icon: FileCheck,    color: colors.success,  bgColor: colors.successSurface },
-  DOCUMENT_REJECTED: { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface  },
+  // Mission lifecycle
+  MISSION_PUBLISHED:        { Icon: Megaphone,    color: colors.primary,  bgColor: colors.primarySurface  },
+  MISSION_AVAILABLE:        { Icon: Megaphone,    color: colors.primary,  bgColor: colors.primarySurface  },
+  MISSION_CANCELLED:        { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface   },
+  MISSION_REPORT_READY:     { Icon: FileText,     color: colors.info,     bgColor: colors.infoSurface     },
+
+  // Booking lifecycle
+  BOOKING_ASSIGNED:         { Icon: CheckCircle2, color: colors.success,  bgColor: colors.successSurface  },
+  BOOKING_CANCELLED:        { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface   },
+  BOOKING_FORCE_CHECKOUT:   { Icon: LogOut,       color: colors.warning,  bgColor: colors.warningSurface  },
+
+  // Agent presence
+  AGENT_CHECKED_IN:         { Icon: LogIn,        color: colors.success,  bgColor: colors.successSurface  },
+  AGENT_CHECKED_OUT:        { Icon: LogOut,       color: colors.primary,  bgColor: colors.primarySurface  },
+  AGENT_LOCATION_UPDATE:    { Icon: MapPin,       color: colors.info,     bgColor: colors.infoSurface     },
+
+  // Legacy check-in/out names
+  BOOKING_CHECKIN:          { Icon: LogIn,        color: colors.success,  bgColor: colors.successSurface  },
+  BOOKING_CHECKOUT:         { Icon: LogOut,       color: colors.primary,  bgColor: colors.primarySurface  },
+
+  // Payment
+  PAYMENT_CONFIRMED:        { Icon: CreditCard,   color: colors.success,  bgColor: colors.successSurface  },
+  PAYMENT_FAILED:           { Icon: CreditCard,   color: colors.danger,   bgColor: colors.dangerSurface   },
+  PAYMENT_PENDING:          { Icon: Clock,        color: colors.warning,  bgColor: colors.warningSurface  },
+  PAYMENT_PROCESSING:       { Icon: Clock,        color: colors.info,     bgColor: colors.infoSurface     },
+
+  // Incidents & disputes
+  INCIDENT_REPORTED:        { Icon: AlertTriangle,color: colors.warning,  bgColor: colors.warningSurface  },
+
+  // Ratings
+  RATING_RECEIVED:          { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface  },
+  RATING_REQUESTED:         { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface  },
+
+  // Documents
+  DOCUMENT_APPROVED:        { Icon: FileCheck,    color: colors.success,  bgColor: colors.successSurface  },
+  DOCUMENT_REJECTED:        { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface   },
+  DOCUMENT_SUBMITTED:       { Icon: FileText,     color: colors.info,     bgColor: colors.infoSurface     },
+  DOCUMENT_EXPIRING:        { Icon: Clock,        color: colors.warning,  bgColor: colors.warningSurface  },
+  DOCUMENT_EXPIRING_URGENT: { Icon: Clock,        color: colors.danger,   bgColor: colors.dangerSurface   },
+  DOCUMENT_EXPIRED:         { Icon: XCircle,      color: colors.danger,   bgColor: colors.dangerSurface   },
+
+  // Account
+  ACCOUNT_SUSPENDED:        { Icon: ShieldOff,    color: colors.danger,   bgColor: colors.dangerSurface   },
+  ACCOUNT_ACTIVATED:        { Icon: ShieldCheck,  color: colors.success,  bgColor: colors.successSurface  },
+  PROFILE_ACTIVATED:        { Icon: UserCheck,    color: colors.success,  bgColor: colors.successSurface  },
+
+  // SOS
+  SOS_ALERT:                { Icon: Flag,         color: colors.danger,   bgColor: colors.dangerSurface   },
 };
 
 const DEFAULT_META: NotifMeta = {
@@ -122,4 +162,3 @@ const styles = StyleSheet.create({
     color:      colors.textMuted,
   },
 });
-
