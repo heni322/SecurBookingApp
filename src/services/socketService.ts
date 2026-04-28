@@ -1,4 +1,4 @@
-/**
+﻿/**
  * socketService.ts — Bulletproof WebSocket client (CLIENT app).
  *
  * Changes vs previous version:
@@ -96,7 +96,7 @@ class SocketService {
       this.socket = null;
     }
     this.setState('disconnected');
-    console.log('[WS-Client] Reconnecting with fresh token...');
+    if (__DEV__) console.log('[WS-Client] Reconnecting with fresh token...');
     this._createSocket(accessToken);
   }
 
@@ -113,22 +113,22 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('[WS-Client] Connected');
+      if (__DEV__) console.log('[WS-Client] Connected');
       this.setState('connected');
       // Rejoin all tracked mission rooms after connect / reconnect
       this.joinedRooms.forEach(mid => {
         this.socket?.emit('join_mission', { missionId: mid });
-        console.log(`[WS-Client] Rejoined mission:${mid}`);
+        if (__DEV__) console.log(`[WS-Client] Rejoined mission:${mid}`);
       });
     });
 
     this.socket.on('connect_error', (e: Error) => {
-      console.warn('[WS-Client] connect_error:', e.message);
+      if (__DEV__) console.warn('[WS-Client] connect_error:', e.message);
       this.setState('disconnected');
     });
 
     this.socket.on('disconnect', (reason: string) => {
-      console.warn('[WS-Client] Disconnected:', reason);
+      if (__DEV__) console.warn('[WS-Client] Disconnected:', reason);
       this.setState('disconnected');
     });
   }

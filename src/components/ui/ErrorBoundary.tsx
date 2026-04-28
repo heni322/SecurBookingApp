@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     paddingVertical:   spacing[3],
     borderRadius:      radius.full,
     marginTop:         spacing[2],
-    shadowColor:       '#bc933b',
+    shadowColor:       colors.primary,
     shadowOffset:      { width: 0, height: 4 },
     shadowOpacity:     0.35,
     shadowRadius:      10,
@@ -101,3 +101,4 @@ const styles = StyleSheet.create({
     color:      colors.textInverse,
   },
 });
+

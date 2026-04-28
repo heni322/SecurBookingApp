@@ -1,5 +1,5 @@
-/**
- * PaymentHistoryScreen — full payment list with invoice download.
+﻿/**
+ * PaymentHistoryScreen â€” full payment list with invoice download.
  * Premium UI: grouped by month, status badges, PDF tap-to-open.
  */
 import React, { useEffect, useCallback, useMemo } from 'react';
@@ -26,7 +26,7 @@ import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PaymentHistory'>;
 
-// ─── Group payments by month ──────────────────────────────────────────────────
+// â”€â”€â”€ Group payments by month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function groupByMonth(payments: Payment[]) {
   const map = new Map<string, Payment[]>();
   const list = Array.isArray(payments) ? payments : [];
@@ -40,17 +40,17 @@ function groupByMonth(payments: Payment[]) {
   return Array.from(map.entries()).map(([title, data]) => ({ title, data }));
 }
 
-const STATUS_META: Record<string, { label: string; color: string; Icon: any }> = {
-  [PaymentStatus.PAID]:     { label: 'Payé',    color: colors.success, Icon: CheckCircle },
-  [PaymentStatus.PENDING]:    { label: 'En attente',    color: colors.warning, Icon: Clock },
-  [PaymentStatus.PROCESSING]: { label: 'En traitement', color: colors.info,    Icon: Clock },
-  [PaymentStatus.FAILED]:   { label: 'Échoué',  color: colors.danger,  Icon: XCircle },
-  [PaymentStatus.REFUNDED]: { label: 'Remboursé', color: colors.info,  Icon: Receipt },
-};
 
 export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const { data: payments, loading, execute } = useApi(paymentsApi.getMyPayments);
-    const { t } = useTranslation('payment');
+    const { t } = useTranslation(['payment', 'common']);
+  const STATUS_META: Record<string, { color: string; Icon: React.FC<any>; label: string }> = {
+    [PaymentStatus.PAID]:       { color: colors.success, Icon: CheckCircle, label: t('history.status.paid')        },
+    [PaymentStatus.FAILED]:     { color: colors.danger,  Icon: XCircle,     label: t('history.status.failed')      },
+    [PaymentStatus.REFUNDED]:   { color: colors.primary, Icon: CreditCard,  label: t('history.status.refunded')    },
+    [PaymentStatus.PENDING]:    { color: colors.warning, Icon: Clock,       label: t('history.status.pending')     },
+    [PaymentStatus.PROCESSING]: { color: colors.info,    Icon: Clock,       label: t('history.status.processing')  },
+  };
   
   useEffect(() => { execute(); }, [execute]);
 
@@ -77,7 +77,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
       if (url) await Linking.openURL(url);
       else Alert.alert('Invoice', 'Invoice not available for this payment.');
     } catch {
-      Alert.alert('Erreur', 'Impossible d\'ouvrir la facture.');
+      Alert.alert(t('common:error'), t('invoice_open_error'));
     }
   }, []);
 
@@ -95,7 +95,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
         {/* Info */}
         <View style={rowStyles.info}>
           <Text style={rowStyles.invoice} numberOfLines={1}>
-            {item.invoiceNumber || `Paiement #${item.id.slice(0, 8)}`}
+            {item.invoiceNumber || t('invoice_ref', { ref: item.id.slice(0, 8) })}
           </Text>
           <Text style={rowStyles.date}>
             {item.mission?.city
@@ -136,7 +136,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
       {(payments?.length ?? 0) > 0 && (
         <View style={styles.totalCard}>
           <View>
-            <Text style={styles.totalLabel}>TOTAL DÉPENSÉ</Text>
+            <Text style={styles.totalLabel}>{t('common:total_spent')}</Text>
             <Text style={styles.totalAmount}>{formatEuros(totalSpent)}</Text>
           </View>
           <Text style={styles.totalCount}>
@@ -180,7 +180,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// ─── Row styles ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Row styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const rowStyles = StyleSheet.create({
   row: {
     flexDirection:     'row',

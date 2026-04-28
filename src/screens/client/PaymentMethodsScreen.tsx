@@ -38,7 +38,6 @@ const BRAND_LABEL: Record<string, string> = {
   visa:             'Visa',
   mastercard:       'Mastercard',
   amex:             'American Express',
-  discover:         'Discover',
   jcb:              'JCB',
   unionpay:         'UnionPay',
   diners:           'Diners Club',

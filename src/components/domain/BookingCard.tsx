@@ -1,6 +1,13 @@
 /**
  * BookingCard — carte résumé d'un booking (poste de mission).
  * Utilise AgentSummary (pas AgentProfile) côté client.
+ *
+ * Fix: BOOKING_STATUS_LABEL was imported from statusHelpers but does not
+ * exist there (same pattern as MISSION_STATUS_LABEL — labels live in i18n).
+ * Metro resolved the named import to `undefined` → crash at line 28:
+ *   TypeError: Cannot convert undefined value to object
+ * Fix: removed the dead import, added BOOKING_STATUS_I18N_KEY static map,
+ * use t('statuses.*') from the booking namespace.
  */
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
@@ -11,8 +18,11 @@ import { colors }   from '@theme/colors';
 import { spacing }  from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { formatMissionRange, formatDuration } from '@utils/formatters';
-import { BOOKING_STATUS_LABEL, BOOKING_STATUS_COLOR } from '@utils/statusHelpers';
-import type { Booking } from '@models/index';
+import { BOOKING_STATUS_COLOR } from '@utils/statusHelpers'; // BOOKING_STATUS_LABEL removed — does not exist
+import { BookingStatus }        from '@constants/enums';
+import type { BookingNS }       from '@i18n/locales/types';
+import { useTranslation }       from '@i18n';
+import type { Booking }         from '@models/index';
 
 interface Props {
   booking:      Booking;
@@ -20,14 +30,32 @@ interface Props {
   perspective?: 'agent' | 'client';
 }
 
+/**
+ * Static map: BookingStatus value → keyof BookingNS['statuses']
+ *
+ * WHY: t(`statuses.${status.toLowerCase()}`) widens to `statuses.${string}` — TS2345.
+ * This map narrows it to the exact 6-member union defined in BookingNS['statuses'].
+ * Also safely handles IN_PROGRESS → 'in_progress' without relying on toLowerCase.
+ */
+const BOOKING_STATUS_I18N_KEY: Record<BookingStatus, keyof BookingNS['statuses']> = {
+  [BookingStatus.OPEN]:        'open',
+  [BookingStatus.ASSIGNED]:    'assigned',
+  [BookingStatus.IN_PROGRESS]: 'in_progress',
+  [BookingStatus.COMPLETED]:   'completed',
+  [BookingStatus.CANCELLED]:   'cancelled',
+  [BookingStatus.ABANDONED]:   'abandoned',
+};
+
 export const BookingCard: React.FC<Props> = ({
   booking,
   onPress,
   perspective = 'client',
 }) => {
-  const statusLabel = BOOKING_STATUS_LABEL[booking.status] ?? booking.status;
+  const { t } = useTranslation('booking');
+
+  const statusLabel = t(`statuses.${BOOKING_STATUS_I18N_KEY[booking.status as BookingStatus]}`);
   const statusColor = BOOKING_STATUS_COLOR[booking.status] ?? colors.textMuted;
-  const agent       = booking.agent;   // AgentSummary — fullName, avatarUrl, avgRating, completedCount
+  const agent       = booking.agent;
   const mission     = booking.mission;
 
   return (

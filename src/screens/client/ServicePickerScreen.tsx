@@ -1,11 +1,11 @@
-/**
- * ServicePickerScreen � Multi-service selection with per-agent uniform picker.
+﻿/**
+ * ServicePickerScreen — Multi-service selection with per-agent uniform picker.
  *
  * UX:
- *  � Tap a card to select/deselect a service
- *  � +/- stepper adds/removes agent slots (each agent = one uniform chip)
- *  � Each agent has its own tenue (STANDARD, CIVIL, EVENEMENTIEL, SSIAP, CYNOPHILE)
- *  � Sticky bottom bar shows live summary + "Continuer" CTA
+ *  — Tap a card to select/deselect a service
+ *  — +/- stepper adds/removes agent slots (each agent = one uniform chip)
+ *  — Each agent has its own tenue (STANDARD, CIVIL, EVENEMENTIEL, SSIAP, CYNOPHILE)
+ *  — Sticky bottom bar shows live summary + "Continuer" CTA
  */
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
@@ -28,7 +28,7 @@ import { colors, palette }     from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatEuros }         from '@utils/formatters';
-import { useTranslation }        from 'react-i18next';
+import { useTranslation } from '@i18n';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'ServicePicker'>;
@@ -59,18 +59,18 @@ interface SelectedLine {
 
 // -- Icon map ------------------------------------------------------------------
 const SERVICE_ICON_MAP: Array<{ keywords: string[]; Icon: LucideIconComp; accent: string }> = [
-  { keywords: ['luxe', 'hotel', 'vip'],                       Icon: Star,      accent: '#bc933b' },
-  { keywords: ['cynophile', 'chien', 'dog'],                  Icon: Dog,       accent: '#10B981' },
-  { keywords: ['incendie', 'ssiap', 'feu'],                   Icon: Flame,     accent: '#EF4444' },
-  { keywords: ['rondier', 'mobile', 'voiture'],               Icon: Car,       accent: '#3B82F6' },
-  { keywords: ['corps', 'apr', 'garde'],                      Icon: UserCheck, accent: '#8B5CF6' },
-  { keywords: ['accueil', 'hôtesse', 'hôtesse', 'réception'], Icon: Users,     accent: '#bc933b' },
-  { keywords: ['equipe', 'chef', 'coord'],                    Icon: Building2, accent: '#06B6D4' },
+  { keywords: ['luxe', 'hotel', 'vip'],                       Icon: Star,      accent: palette.goldTxt },
+  { keywords: ['cynophile', 'chien', 'dog'],                  Icon: Dog,       accent: palette.txtGreen },
+  { keywords: ['incendie', 'ssiap', 'feu'],                   Icon: Flame,     accent: palette.txtRed },
+  { keywords: ['rondier', 'mobile', 'voiture'],               Icon: Car,       accent: palette.txtBlue },
+  { keywords: ['corps', 'apr', 'garde'],                      Icon: UserCheck, accent: palette.txtPurple },
+  { keywords: ['accueil', 'hôtesse', 'hôtesse', 'réception'], Icon: Users,     accent: palette.gold },
+  { keywords: ['equipe', 'chef', 'coord'],                    Icon: Building2, accent: palette.txtBlue },
 ];
 function getServiceMeta(name: string): { Icon: LucideIconComp; accent: string } {
   const n = name.toLowerCase();
   return SERVICE_ICON_MAP.find(({ keywords }) => keywords.some(k => n.includes(k)))
-    ?? { Icon: Shield, accent: colors.primary };
+    ?? { Icon: Shield, accent: palette.txtBlue };
 }
 
 const defaultSlot = (): AgentSlot => ({ uniform: null });
@@ -84,7 +84,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
 
   useEffect(() => { execute(); }, [execute]);
 
-  // FIX Mobile B1 � when returning from MissionCreate with existingLines,
+  // FIX Mobile B1 — when returning from MissionCreate with existingLines,
   // re-hydrate the selection map so the user does not lose their picks.
   useFocusEffect(
     useCallback(() => {
@@ -227,10 +227,10 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
       {totalLines > 0 && (
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
-            {totalLines} prestation{totalLines > 1 ? 's' : ''} � {totalAgents} agent{totalAgents > 1 ? 's' : ''}
+            {t('summary', { lines: totalLines, agents: totalAgents })}
           </Text>
           <TouchableOpacity onPress={() => setSelected(new Map())} style={styles.clearBtn}>
-            <Text style={styles.clearBtnText}>Tout effacer</Text>
+            <Text style={styles.clearBtnText}>{t('clear_all')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -244,7 +244,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
           contentContainerStyle={[styles.list, totalLines > 0 && styles.listWithCta]}
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={execute} tintColor={colors.primary} />}
-          ListHeaderComponent={<Text style={styles.listHeader}>PRESTATIONS DISPONIBLES</Text>}
+          ListHeaderComponent={<Text style={styles.listHeader}>{t('available_title')}</Text>}
           ListEmptyComponent={
             <EmptyState Icon={Shield} title={t('empty.title')} subtitle={t('empty.subtitle')} />
           }
@@ -279,12 +279,12 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.ctaInner}>
           <View style={styles.ctaInfo}>
             <Text style={styles.ctaTitle}>
-              {totalLines} prestation{totalLines > 1 ? 's' : ''} � {totalAgents} agent{totalAgents > 1 ? 's' : ''}
+              {t('summary', { lines: totalLines, agents: totalAgents })}
             </Text>
             <Text style={styles.ctaSub} numberOfLines={1}>
               {Array.from(selected.values()).map(l =>
-                `${l.agents.length}� ${l.name.split(' ')[0]}`
-              ).join(' � ')}
+                `${l.agents.length}× ${l.name.split(' ')[0]}`
+              ).join(' · ')}
             </Text>
           </View>
           <TouchableOpacity style={styles.ctaBtn} onPress={handleConfirm} activeOpacity={0.85}>
@@ -312,14 +312,12 @@ interface CardProps {
   onToggleExpand:     () => void;
 }
 
-const ServiceCard: React.FC<CardProps> = React.memo(({
-  item, Icon, accent, isSelected, line,
-  onToggle, onAddAgent, onRemoveAgent,
-  onSetAgentUniform, onSetAllUniforms, onToggleExpand,
-}) => (
+const ServiceCard: React.FC<CardProps> = React.memo(({ item, Icon, accent, isSelected, line, onToggle, onAddAgent, onRemoveAgent, onSetAgentUniform, onSetAllUniforms, onToggleExpand }) => {
+  const { t } = useTranslation('services');
+  return (
   <View style={[styles.card, isSelected && { borderColor: accent, borderWidth: 1.5 }]}>
 
-    {/* -- Header row � always visible -------------------------------- */}
+    {/* -- Header row — always visible -------------------------------- */}
     <TouchableOpacity
       style={styles.cardHeader}
       onPress={onToggle}
@@ -327,7 +325,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
     >
       {/* Check badge */}
       {isSelected && (
-        <View style={[styles.checkBadge, { backgroundColor: accent }]}>
+        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
           <Check size={10} color="#fff" strokeWidth={3} />
         </View>
       )}
@@ -343,7 +341,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
       <View style={styles.cardInfo}>
         <Text style={styles.cardName}>{item.name}</Text>
         <Text style={styles.cardDesc} numberOfLines={1}>{item.description}</Text>
-        <Text style={[styles.cardRate, { color: accent }]}>{formatEuros(item.baseRatePerHour)}/h � agent</Text>
+        <Text style={[styles.cardRate, { color: accent }]}>{formatEuros(item.baseRatePerHour)}/h · agent</Text>
       </View>
 
       {/* Right: add button or agent count badge */}
@@ -355,18 +353,18 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
       ) : (
         <View style={[styles.addPill, { backgroundColor: accent + '15', borderColor: accent + '40' }]}>
           <Plus size={11} color={accent} strokeWidth={2.5} />
-          <Text style={[styles.addPillText, { color: accent }]}>Ajouter</Text>
+          <Text style={[styles.addPillText, { color: accent }]}>{t('add_btn')}</Text>
         </View>
       )}
     </TouchableOpacity>
 
-    {/* -- Per-agent detail � visible when selected ------------------- */}
+    {/* -- Per-agent detail — visible when selected ------------------- */}
     {isSelected && line && (
       <View style={[styles.agentsPanel, { borderTopColor: accent + '30' }]}>
 
         {/* Agent count controls */}
         <View style={styles.agentCountRow}>
-          <Text style={styles.agentCountTitle}>Agents & tenues</Text>
+          <Text style={styles.agentCountTitle}>{t('agents_and_uniforms')}</Text>
           <View style={styles.agentStepper}>
             <TouchableOpacity
               style={[styles.stepBtn, line.agents.length <= 1 && styles.stepBtnDisabled]}
@@ -391,7 +389,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
         {/* Quick "same tenue for all" shortcut */}
         {line.agents.length > 1 && (
           <View style={styles.allSameRow}>
-            <Text style={styles.allSameLabel}>Même tenue pour tous :</Text>
+            <Text style={styles.allSameLabel}>{t('same_uniform_label')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allSameChips}>
               {UNIFORM_OPTIONS.map(opt => {
                 const allSame = line.agents.every(a => a.uniform === opt.value);
@@ -403,7 +401,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
                     <Text style={styles.uniformEmoji}>{opt.emoji}</Text>
-                    <Text style={[styles.uniformChipText, allSame && { color: accent }]}>{opt.label}</Text>
+                    <Text style={[styles.uniformChipText, allSame && { color: accent }]}>{t(`uniforms.${opt.value}.label`)}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -418,7 +416,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
           activeOpacity={0.7}
         >
           <Text style={[styles.expandToggleText, { color: accent }]}>
-            {line.expanded ? 'Masquer le détail' : 'Configurer chaque agent'}
+            {line.expanded ? t('agent_config.hide_detail') : t('agent_config.configure_agents')}
           </Text>
           {line.expanded
             ? <ChevronUp size={14} color={accent} strokeWidth={2} />
@@ -439,22 +437,20 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
       </View>
     )}
   </View>
-));
+);
+});
 
 // -- AgentRow ------------------------------------------------------------------
-const AgentRow: React.FC<{
-  index:           number;
-  agent:           AgentSlot;
-  accent:          string;
-  onChangeUniform: (u: UniformValue | null) => void;
-}> = ({ index, agent, accent, onChangeUniform }) => (
+const AgentRow: React.FC<{ index: number; agent: AgentSlot; accent: string; onChangeUniform: (u: UniformValue | null) => void; }> = ({ index, agent, accent, onChangeUniform }) => {
+  const { t } = useTranslation('services');
+  return (
   <View style={agentRowStyles.wrap}>
     {/* Agent number */}
     <View style={[agentRowStyles.badge, { backgroundColor: accent + '20', borderColor: accent + '50' }]}>
       <Text style={[agentRowStyles.badgeNum, { color: accent }]}>{index + 1}</Text>
     </View>
 
-    {/* Uniform chips � first chip = "None / not specified", rest = UNIFORM_OPTIONS */}
+    {/* Uniform chips — first chip = "None / not specified", rest = UNIFORM_OPTIONS */}
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
@@ -466,7 +462,7 @@ const AgentRow: React.FC<{
         onPress={() => onChangeUniform(null)}
         hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
       >
-        <Text style={agentRowStyles.chipEmoji}>�</Text>
+        <Text style={agentRowStyles.chipEmoji}>❓</Text>
         <Text style={[agentRowStyles.chipLabel, agent.uniform === null && agentRowStyles.chipLabelNone]}>
           Non précisée
         </Text>
@@ -486,10 +482,10 @@ const AgentRow: React.FC<{
           >
             <Text style={agentRowStyles.chipEmoji}>{opt.emoji}</Text>
             <View>
-              <Text style={[agentRowStyles.chipLabel, active && { color: accent }]}>{opt.label}</Text>
+              <Text style={[agentRowStyles.chipLabel, active && { color: accent }]}>{t(`uniforms.${opt.value}.label`)}</Text>
               {active && (
                 <Text style={[agentRowStyles.chipDesc, { color: accent }]} numberOfLines={1}>
-                  {opt.desc}
+                  {t(`uniforms.${opt.value}.desc`)}
                 </Text>
               )}
             </View>
@@ -504,6 +500,7 @@ const AgentRow: React.FC<{
     </ScrollView>
   </View>
 );
+};
 
 const agentRowStyles = StyleSheet.create({
   wrap: {
@@ -614,8 +611,8 @@ const styles = StyleSheet.create({
   },
   checkBadge: {
     position:        'absolute',
-    top:             -6,
-    left:            -6,
+    top:             12,
+    left:            12,
     zIndex:          10,
     width:           20,
     height:          20,
@@ -778,7 +775,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[5],
     paddingVertical:   spacing[3] + 2,
     borderRadius:      radius.full,
-    shadowColor:       '#bc933b',
+    shadowColor:       colors.primary,
     shadowOffset:      { width: 0, height: 4 },
     shadowOpacity:     0.4,
     shadowRadius:      10,

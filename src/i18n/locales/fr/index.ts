@@ -1,4 +1,4 @@
-import common        from './common';
+﻿import common        from './common';
 import auth          from './auth';
 import home          from './home';
 import missions      from './missions';
@@ -14,10 +14,14 @@ import dispute       from './dispute';
 import tracking      from './tracking';
 import conversation  from './conversation';
 import services      from './services';
+import map_picker    from './map_picker';
+import analytics     from './analytics';
+import offline_banner from './offline_banner';
 
 const fr = {
   common, auth, home, missions, profile, navigation, notifications,
   quote, payment, account,
   booking, rating, dispute, tracking, conversation, services,
+  map_picker, analytics, offline_banner,
 } as const;
 export default fr;

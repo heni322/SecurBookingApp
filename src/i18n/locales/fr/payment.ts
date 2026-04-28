@@ -29,6 +29,11 @@ const payment: PaymentNS = {
   sepa_legal:
     "En confirmant, vous autorisez le débit SEPA du montant indiqué. CGV applicables.",
 
+  amount_sub: 'TVA 20% incluse · Virement agent à J+15',
+  invoice_ref:        'Paiement #{{ref}}',
+  invoice_count:      '{{count}} facture',
+  invoice_open_error: "Impossible d'ouvrir la facture.",
+
   errors: {
     card_declined:
       'Votre carte a été refusée. Veuillez utiliser une autre carte.',

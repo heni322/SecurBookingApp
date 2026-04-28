@@ -35,7 +35,7 @@ const SkeletonBox: React.FC<SkeletonBoxProps> = ({ width = '100%', height, style
           width,
           height,
           borderRadius: round ? height / 2 : radius.lg,
-          backgroundColor: palette.navy50,
+          backgroundColor: 'rgba(30,45,69,0.8)',
           opacity,
         },
         style,
@@ -186,3 +186,4 @@ const sk = StyleSheet.create({
 });
 
 export { SkeletonBox };
+

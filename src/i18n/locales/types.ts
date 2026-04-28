@@ -1,4 +1,4 @@
-/**
+﻿/**
  * locales/types.ts — Complete namespace shape definitions.
  * Both EN and FR implement these interfaces — no literal-type cross-lock.
  */
@@ -16,8 +16,7 @@ export interface CommonNS {
   error:         string;
   success:       string;
   unknown_error: string;
-  tls_badge:     string;
-}
+  tls_badge: string; map_loading: string; total_spent: string; }
 
 export interface AuthNS {
   login: {
@@ -95,8 +94,8 @@ export interface MissionsNS {
     screen_title: string; loading: string; error_load: string; retry: string;
     cancel_title: string; cancel_body: string; cancel_back: string; cancel_confirm: string;
     cancel_error: string; duration: string; created_on: string;
-    cta_get_quote: string; cta_see_quote: string; cta_pay: string;
-    cta_select: string; cta_waiting: string; cta_messaging: string;
+    cta_get_quote: string; cta_see_quote: string; cta_pay: string; radius: string;
+    cta_select: string; cta_waiting: string; cta_assigning: string; cta_messaging: string;
   };
   statuses: { created: string; published: string; staffing: string; staffed: string; in_progress: string; completed: string; cancelled: string; };
   success: {
@@ -125,6 +124,18 @@ export interface MissionsNS {
     schedule_title: string; start_label: string; start_hint: string;
     end_hint: string; summary_start: string; summary_duration: string;
     next_btn: string; create_btn: string;
+    address_required: string; city_required: string; end_required: string;
+    uniform_per_agent: string; total_agents: string; add_service: string;
+    summary_title: string; recap_section: string; urgency_note: string;
+    title_label: string; notes_label: string;
+    radius_label: string; radius_hint: string;
+    address_placeholder: string;
+    city_label: string; city_placeholder: string;
+    zip_label: string; zip_placeholder: string;
+    end_label: string;
+    summary_location: string; summary_end: string; total_agents_label: string;
+    duration_hours: string; step_two_title: string; agent_label: string;
+    amplitude_max: string; weekly_cap: string; rest_between: string; rest_after_cap: string;
   };
 }
 
@@ -175,8 +186,7 @@ export interface QuoteNS {
   accepted_banner: string;
   secure_note: string;
   sepa_note: string;
-  offline_note: string;
-}
+  offline_note: string; breakdown_title: string; agent_payout: string; accepted_badge: string; row_base_ht: string; row_night: string; row_weekend: string; row_urgency: string; row_subtotal: string; row_vat: string; row_total_ttc: string; row_commission: string; valid_until: string; accept_label: string; }
 
 export interface PaymentNS {
   title_card: string; title_sepa: string; secured_by: string;
@@ -184,7 +194,7 @@ export interface PaymentNS {
   sepa_success: string; card_success: string;
   sepa_success_body: string; card_success_body: string;
   home: string;
-  stripe_info_sepa: string; stripe_info_card: string; sepa_legal: string;
+  stripe_info_sepa: string; stripe_info_card: string; sepa_legal: string; amount_sub: string; invoice_ref: string; invoice_count: string; invoice_open_error: string;
   errors: {
     card_declined: string; expired_card: string; incorrect_number: string;
     invalid_expiry_year: string; processing_error: string; do_not_honor: string;
@@ -267,13 +277,15 @@ export interface BookingNS {
   incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; };
   actions: { rate_agent: string; already_rated: string; open_dispute: string; };
   uniforms: { STANDARD: string; CIVIL: string; EVENEMENTIEL: string; SSIAP: string; CYNOPHILE: string; };
+  /** Status labels for BookingCard badge - mirrors BookingStatus enum values. */
+  statuses: { open: string; assigned: string; in_progress: string; completed: string; cancelled: string; abandoned: string; };
   errors: { load: string; generic: string; };
 }
 
 export interface RatingNS {
   screen_title: string;
   steps: { rating: string; nps: string; comment: string; };
-  star_labels: string[]; // 6 entries — index 0 unused, 1-5 = star labels
+  star_labels: string[]; // 6 entries - index 0 unused, 1-5 = star labels
   step_rating: { title: string; subtitle: string; };
   step_nps: { title: string; subtitle: string; detractors: string; passives: string; promoters: string; };
   step_comment: { title: string; subtitle: string; placeholder: string; char_count: string; skip: string; tags: string[]; };
@@ -301,6 +313,10 @@ export interface DisputeNS {
 
 export interface TrackingNS {
   screen_title: string; status_offline: string; status_live: string; status_waiting: string;
+  /** Shown when socket is connected but GPS signal hasn't updated in 30 s. */
+  status_signal_lost: string;
+  /** Shown in the map WebView loading overlay. */
+  map_loading: string;
   in_zone: string; out_of_zone: string;
   follow_agent_btn: string; view_site_btn: string; sync_btn: string;
   last_seen: string; attribution: string;
@@ -315,7 +331,7 @@ export interface ServicesNS {
   screen_title: string; subtitle: string; continue_btn: string;
   summary_agents: string; summary_agents_plural: string;
   empty: { title: string; subtitle: string; };
-  agent_config: { hide_detail: string; configure_agents: string; };
+  agent_config: { hide_detail: string; configure_agents: string; }; available_title: string; same_uniform_label: string; add_btn: string; clear_all: string; uniforms_none: string; agents_and_uniforms: string; summary: string;
   uniforms: {
     STANDARD:     { label: string; desc: string; emoji: string; };
     CIVIL:        { label: string; desc: string; emoji: string; };
@@ -324,7 +340,19 @@ export interface ServicesNS {
     CYNOPHILE:    { label: string; desc: string; emoji: string; };
   };
 }
-/** Union of all namespaces — drives i18next CustomTypeOptions. */
+export interface MapPickerNS {
+  label: string; hint: string; loading: string;
+  validate_btn: string; validated: string; unlock_hint: string;
+}
+
+export interface AnalyticsNS {
+  missions_per_month: string;
+}
+
+export interface OfflineBannerNS {
+  no_connection: string;
+}
+/** Union of all namespaces â€” drives i18next CustomTypeOptions. */
 export interface LocaleResources {
   common:        CommonNS;
   auth:          AuthNS;
@@ -340,6 +368,5 @@ export interface LocaleResources {
   rating:        RatingNS;
   dispute:       DisputeNS;
   tracking:      TrackingNS;
-  conversation:  ConversationNS;
-  services:      ServicesNS;
-}
+  conversation: ConversationNS; services: ServicesNS; map_picker: MapPickerNS; analytics: AnalyticsNS; offline_banner: OfflineBannerNS; }
+

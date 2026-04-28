@@ -85,7 +85,7 @@ function buildApproachHTML(siteLat: number, siteLng: number): string {
     // Dashed route line agent → site
     var pts = [[lat,lng],[SITE_LAT,SITE_LNG]];
     if (!routeLine) {
-      routeLine = L.polyline(pts,{color:'#3b82f6',weight:2,dashArray:'6,5',opacity:.75}).addTo(map);
+      routeLine = L.polyline(pts,{color:'#60a5fa',weight:2,dashArray:'6,5',opacity:.75}).addTo(map);
     } else {
       routeLine.setLatLngs(pts);
     }
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   routeDot: {
     width: 8, height: 8, borderRadius: 4,
-    backgroundColor: colors.info,
+    backgroundColor: colors.infoSurface,
   },
   routeText: {
     fontFamily: fontFamily.bodyMedium,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-    backgroundColor: '#071e38',
+    backgroundColor: palette.panelSolid,
   },
 
   // Agent row
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
     gap:               spacing[1],
-    backgroundColor:   colors.info,
+    backgroundColor:   colors.infoSurface,
     borderRadius:      radius.lg,
     paddingHorizontal: spacing[3],
     paddingVertical:   spacing[2],
@@ -373,6 +373,10 @@ const styles = StyleSheet.create({
   trackBtnText: {
     fontFamily: fontFamily.bodySemiBold,
     fontSize:   fontSize.xs,
-    color:      '#fff',
+    color:      palette.white,
   },
 });
+
+
+
+

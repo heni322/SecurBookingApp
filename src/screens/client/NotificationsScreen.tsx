@@ -1,5 +1,5 @@
-/**
- * NotificationsScreen — notification feed with unread management + deep navigation.
+﻿/**
+ * NotificationsScreen â€” notification feed with unread management + deep navigation.
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
@@ -14,7 +14,7 @@ import { useNotificationsStore } from '@store/notificationsStore';
 import { NotificationItem }      from '@components/domain/NotificationItem';
 import { LoadingState }          from '@components/ui/LoadingState';
 import { EmptyState }            from '@components/ui/EmptyState';
-import { colors }                from '@theme/colors';
+import { colors, palette } from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }  from '@theme/typography';
 import type { AppNotification, MainTabParamList } from '@models/index';
@@ -119,7 +119,7 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.bellWrap}>
@@ -148,7 +148,7 @@ export const NotificationsScreen: React.FC = () => {
         )}
       </View>
 
-      {/* ── Unread strip ── */}
+      {/* â”€â”€ Unread strip â”€â”€ */}
       {unread > 0 && (
         <View style={styles.unreadStrip}>
           <View style={styles.unreadDot} />
@@ -158,7 +158,7 @@ export const NotificationsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* ── List ── */}
+      {/* â”€â”€ List â”€â”€ */}
       {loading && !notifications ? (
         <LoadingState message={t('loading')} />
       ) : (
@@ -189,8 +189,8 @@ const styles = StyleSheet.create({
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[10], paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border },
   headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   bellWrap:        { width: 44, height: 44, borderRadius: radius.xl, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  bellBadge:       { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background },
-  bellBadgeText:   { fontFamily: fontFamily.bodySemiBold, fontSize: 9, color: '#fff', lineHeight: 12 },
+  bellBadge:       { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.dangerSurface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background },
+  bellBadgeText:   { fontFamily: fontFamily.bodySemiBold, fontSize: 9, color: palette.white, lineHeight: 12 },
   title:           { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4 },
   subtitle:        { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
   readAllBtn:      { flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2, paddingHorizontal: spacing[3], paddingVertical: spacing[2], backgroundColor: colors.primarySurface, borderRadius: radius.full, borderWidth: 1, borderColor: colors.borderPrimary },

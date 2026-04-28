@@ -1,4 +1,4 @@
-﻿
+
 /**
  * AddPaymentMethodScreen - save a card or SEPA mandate without a mission.
  */
@@ -13,6 +13,7 @@ import { Card } from '@components/ui/Card';
 import { ScreenHeader } from '@components/ui/ScreenHeader';
 import { Separator } from '@components/ui/Separator';
 import { colors } from '@theme/colors';
+import { palette } from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { paymentsApi } from '@api/endpoints/payments';
@@ -29,7 +30,7 @@ const isValidIban = (v: string): boolean => {
 const formatIban = (raw: string): string =>
   raw.replace(/\s/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim();
 
-const CARD_STYLE = { backgroundColor: '#071e38', textColor: '#FFFFFF', placeholderColor: '#66809F', cursorColor: '#bc933b', fontSize: 15 };
+const CARD_STYLE = { backgroundColor: palette.panelSolid, textColor: palette.white, placeholderColor: palette.muted, cursorColor: palette.gold, fontSize: 15 };
 export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   const { confirmSetupIntent } = useStripe();
   const user = useAuthStore(s => s.user);
@@ -240,8 +241,8 @@ const s = StyleSheet.create({
   formTitle:   { fontFamily: fontFamily.display, fontSize: fontSize.md, color: colors.textPrimary, letterSpacing: -0.2 },
   sslBadge:    { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.successSurface, paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.success },
   sslText:     { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.success },
-  cardWrap:       { borderRadius: 12, borderWidth: 1, borderColor: '#1a3d5e', overflow: 'hidden', backgroundColor: '#071e38' },
-  cardWrapActive: { borderColor: '#bc933b', borderWidth: 1.5 },
+  cardWrap:       { borderRadius: 12, borderWidth: 1, borderColor: palette.panelBorder, overflow: 'hidden', backgroundColor: palette.panelSolid },
+  cardWrapActive: { borderColor: colors.primary, borderWidth: 1.5 },
   cardField:      { width: '100%', height: 52 },
   brands: { flexDirection: 'row', gap: spacing[2], marginTop: spacing[1] },
   brand:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, backgroundColor: colors.backgroundElevated, paddingHorizontal: spacing[2], paddingVertical: 3, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border },
@@ -266,3 +267,7 @@ const s = StyleSheet.create({
   successSub:   { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSize.base * 1.6 },
   successBtn:   { marginTop: spacing[2], width: '100%' },
 });
+
+
+
+

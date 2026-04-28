@@ -128,9 +128,9 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.expiredBanner}>
               <AlertTriangle size={18} color={colors.danger} strokeWidth={2} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.expiredTitle}>Devis expiré</Text>
+                <Text style={styles.expiredTitle}>{t('expired_title')}</Text>
                 <Text style={styles.expiredText}>
-                  Ce devis a expiré. Veuillez en générer un nouveau pour continuer.
+                  {t('expired_body')}
                 </Text>
               </View>
               <TouchableOpacity
@@ -150,8 +150,8 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <Clock size={18} color={showUrgent ? colors.danger : colors.warning} strokeWidth={1.8} />
               <Text style={[styles.bannerText, { color: showUrgent ? colors.danger : colors.warning }]}> 
                 {showUrgent
-                  ? `⚠ Ce devis expire dans ${fmtCountdown(secondsLeft ?? 0)} — acceptez-le maintenant`
-                  : `Ce devis est valable encore ${fmtCountdown(secondsLeft ?? 0)}`
+                  ? t('countdown_urgent', { time: fmtCountdown(secondsLeft ?? 0) })
+                  : t('countdown_warning', { time: fmtCountdown(secondsLeft ?? 0) })
                 }
               </Text>
             </View>

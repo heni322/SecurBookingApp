@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   section:       { gap: spacing[3] },
   sectionTitle:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2 },
   deleteItem:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  deleteDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.danger, flexShrink: 0 },
+  deleteDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dangerSurface, flexShrink: 0 },
   deleteItemText:{ fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
   fields:        { gap: spacing[4] },
   fieldGroup:    { gap: spacing[2] },
@@ -148,3 +148,4 @@ const styles = StyleSheet.create({
   phraseError:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger },
   deleteBtn:     { marginTop: spacing[2] },
 });
+

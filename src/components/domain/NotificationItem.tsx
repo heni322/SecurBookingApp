@@ -55,8 +55,8 @@ const TYPE_META: Record<string, NotifMeta> = {
   INCIDENT_REPORTED:        { Icon: AlertTriangle,color: colors.warning,  bgColor: colors.warningSurface  },
 
   // Ratings
-  RATING_RECEIVED:          { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface  },
-  RATING_REQUESTED:         { Icon: Star,         color: '#bc933b',       bgColor: colors.primarySurface  },
+  RATING_RECEIVED:          { Icon: Star,         color: colors.primary,  bgColor: colors.primarySurface  },
+  RATING_REQUESTED:         { Icon: Star,         color: colors.primary,  bgColor: colors.primarySurface  },
 
   // Documents
   DOCUMENT_APPROVED:        { Icon: FileCheck,    color: colors.success,  bgColor: colors.successSurface  },

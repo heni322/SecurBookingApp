@@ -1,4 +1,4 @@
-import type { MissionsNS } from '../types';
+﻿import type { MissionsNS } from '../types';
 
 const missions: MissionsNS = {
   title: 'Missions',
@@ -68,11 +68,12 @@ const missions: MissionsNS = {
     duration:   'Durée',
     created_on: 'Créée le',
 
-    cta_get_quote: 'Obtenir un devis',
+    cta_get_quote: 'Obtenir un devis', radius: 'Rayon de recherche',
     cta_see_quote: 'Voir le devis',
     cta_pay:       'Voir le devis et payer',
     cta_select:    'Sélectionner les agents',
     cta_waiting:   'En attente de candidatures...',
+    cta_assigning: 'Agent en cours d\u2019assignation automatique...',
     cta_messaging: 'Messagerie de la mission',
   },
 
@@ -124,11 +125,11 @@ const missions: MissionsNS = {
     success_title: 'Agent sélectionné',
     success_body:  '{{name}} a été assigné à ce poste.',
 
-    error:      'Impossible de sélectionner cet agent',
-    select_btn: 'Sélectionner cet agent',
-    selecting:  'Attribution...',
-    experienced:'Expérimenté',
-    loading:    'Chargement des candidatures...',
+    error:       'Impossible de sélectionner cet agent',
+    select_btn:  'Sélectionner cet agent',
+    selecting:   'Attribution...',
+    experienced: 'Expérimenté',
+    loading:     'Chargement des candidatures...',
   },
 
   create: {
@@ -145,8 +146,8 @@ const missions: MissionsNS = {
     duration_min: 'Durée minimum : 6 heures (obligation légale)',
     duration_max: 'Durée maximum : 10 jours',
 
-    end_before_start:  'La fin doit être après le début',
-    start_min_future:  'La mission doit débuter dans au moins 1 heure',
+    end_before_start: 'La fin doit être après le début',
+    start_min_future: 'La mission doit débuter dans au moins 1 heure',
 
     radius_min: 'Rayon minimum : 5 km',
     radius_max: 'Rayon maximum : 500 km',
@@ -165,6 +166,36 @@ const missions: MissionsNS = {
     summary_duration: 'Durée',
     next_btn:         'Étape suivante',
     create_btn:       'Créer et obtenir un devis',
+
+    address_required:    'Adresse requise',
+    city_required:       'Ville requise',
+    end_required:        'Date de fin requise',
+    uniform_per_agent:   'TENUE PAR AGENT',
+    total_agents:        '{{count}} agent · {{lines}} prestation',
+    add_service:         'Ajouter une prestation',
+    summary_title:       'RÉCAPITULATIF',
+    recap_section:       'PRESTATIONS & TENUES',
+    urgency_note:        'Majoration urgence applicable',
+    title_label:         'Titre (optionnel)',
+    notes_label:         'Notes / instructions (optionnel)',
+    radius_label:        'Rayon de recherche (km)',
+    radius_hint:         'Entre 5 et 500 km',
+    address_placeholder: 'Rechercher une adresse…',
+    city_label:          'Ville *',
+    city_placeholder:    'Paris',
+    zip_label:           'Code postal',
+    zip_placeholder:     '75001',
+    end_label:           'Fin de mission *',
+    summary_location:    'Lieu',
+    summary_end:         'Fin',
+    total_agents_label:  'Total agents',
+    duration_hours:      'Mission de {{hours}} heures',
+    step_two_title:      'Lieu de la mission',
+    agent_label:         'Agent {{n}}',
+    amplitude_max:       'Mission trop longue\u00a0: {{h}}h (max 12h par mission).',
+    weekly_cap:          'Plafond hebdomadaire atteint\u00a0: {{h}}h trav. (max 48h du lun. au dim.).',
+    rest_between:        'Repos insuffisant\u00a0: {{h}}h entre deux missions (min 11h requis).',
+    rest_after_cap:      'Repos de 24h obligatoire apr\u00e8s avoir atteint le plafond de 48h.',
   },
 };
 

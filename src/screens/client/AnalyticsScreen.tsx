@@ -1,9 +1,4 @@
-/**
- * AnalyticsScreen — spending & mission charts dashboard.
- * Bar chart for monthly spending + pie-like breakdown of mission statuses.
- * Pure RN (no charting lib dependency) — uses animated bars.
- */
-import React, { useEffect, useMemo, useRef } from 'react';
+﻿import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   RefreshControl, Animated,
@@ -25,7 +20,7 @@ import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Analytics'>;
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function getLast6Months(): { key: string; label: string }[] {
   const result = [];
   const now = new Date();
@@ -38,7 +33,7 @@ function getLast6Months(): { key: string; label: string }[] {
   return result;
 }
 
-// ─── Bar ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const AnimatedBar: React.FC<{ ratio: number; color: string; height: number }> = ({
   ratio, color, height,
 }) => {
@@ -60,7 +55,7 @@ const AnimatedBar: React.FC<{ ratio: number; color: string; height: number }> = 
 };
 
 export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
-  const { t } = useTranslation('payment');
+  const { t } = useTranslation('analytics');
   const { data: missions, loading: mLoading, execute: loadM } = useApi(missionsApi.getMyMissions);
   const { data: payments, loading: pLoading, execute: loadP } = useApi(paymentsApi.getMyPayments);
 
@@ -90,7 +85,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
   const statusData = useMemo(() => {
     const all = Array.isArray(missions) ? missions : [];
     return [
-      { label: t('history.status.paid'),  count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,  color: colors.success, Icon: CheckCircle },
+      { label: 'Terminées',  count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,  color: colors.success, Icon: CheckCircle },
       { label: 'En cours',   count: all.filter((m: Mission) => [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.STAFFED].includes(m.status as any)).length, color: colors.primary, Icon: Shield },
       { label: 'Brouillons', count: all.filter((m: Mission) => m.status === MissionStatus.CREATED).length,      color: colors.textMuted, Icon: Clock },
       { label: 'Cancelled',   count: all.filter((m: Mission) => m.status === MissionStatus.CANCELLED).length,  color: colors.danger, Icon: XCircle },
@@ -128,23 +123,23 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
         }
       >
 
-        {/* ── Summary KPIs ─────────────────────────────────────────────── */}
+        {/* â”€â”€ Summary KPIs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <View style={styles.kpiRow}>
           <KpiCard label="Total spent"  value={formatEuros(totalSpend)}      accent />
           <KpiCard label="Total missions" value={String(totalMissions)} />
         </View>
 
-        {/* ── Monthly Spending Bar Chart ───────────────────────────────── */}
+        {/* â”€â”€ Monthly Spending Bar Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={16} color={colors.primary} strokeWidth={1.8} />
-            <Text style={styles.chartTitle}>Dépenses mensuelles</Text>
+            <Text style={styles.chartTitle}>DÃ©penses mensuelles</Text>
           </View>
           <View style={styles.barsRow}>
             {monthlySpend.map(m => (
               <View key={m.key} style={styles.barCol}>
                 <Text style={styles.barValue}>
-                  {m.value > 0 ? `${Math.round(m.value)}€` : ''}
+                  {m.value > 0 ? `${Math.round(m.value)}â‚¬` : ''}
                 </Text>
                 <View style={[styles.barTrack, { height: BAR_H }]}>
                   <AnimatedBar
@@ -159,11 +154,11 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Card>
 
-        {/* ── Monthly Missions Bar Chart ───────────────────────────────── */}
+        {/* â”€â”€ Monthly Missions Bar Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.info} strokeWidth={1.8} />
-            <Text style={styles.chartTitle}>Missions par mois</Text>
+            <Text style={styles.chartTitle}>{t('missions_per_month')}</Text>
           </View>
           <View style={styles.barsRow}>
             {monthlyMissions.map(m => (
@@ -184,11 +179,11 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Card>
 
-        {/* ── Status Breakdown ─────────────────────────────────────────── */}
+        {/* â”€â”€ Status Breakdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.textSecondary} strokeWidth={1.8} />
-            <Text style={styles.chartTitle}>Répartition des missions</Text>
+            <Text style={styles.chartTitle}>RÃ©partition des missions</Text>
           </View>
           <View style={styles.statusList}>
             {statusData.map(({ label, count, color, Icon }) => {
@@ -213,7 +208,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// ─── KPI Card ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ KPI Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const KpiCard: React.FC<{ label: string; value: string; accent?: boolean }> = ({
   label, value, accent,
 }) => (

@@ -99,8 +99,8 @@ export const MissionSuccessScreen: React.FC<Props> = ({ route, navigation }) => 
       <View style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.hero}>
-            <View style={[styles.glowOuter, { borderColor: 'rgba(59,130,246,0.25)' }]}>
-              <View style={[styles.glowMid, { borderColor: 'rgba(59,130,246,0.35)' }]}>
+            <View style={[styles.glowOuter, { borderColor: colors.primaryGlow }]}>
+              <View style={[styles.glowMid, { borderColor: 'rgba(96,165,250,0.35)' }]}>
                 <View style={[styles.checkCircle, { borderColor: colors.info }]}>
                   <Clock size={44} color={colors.info} strokeWidth={1.6} />
                 </View>
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   pendingTitle:    { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, textAlign: 'center', letterSpacing: -0.4 },
   pendingSubtitle: { fontFamily: fontFamily.body, fontSize: fontSize.base, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
   hero:            { alignItems: 'center', gap: spacing[4] },
-  glowOuter:       { width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(188,147,59,0.06)', borderWidth: 1, borderColor: 'rgba(188,147,59,0.12)', alignItems: 'center', justifyContent: 'center' },
+  glowOuter:       { width: 120, height: 120, borderRadius: 60, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.primarySurface, alignItems: 'center', justifyContent: 'center' },
   glowMid:         { width: 96, height: 96, borderRadius: 48, backgroundColor: 'rgba(188,147,59,0.10)', borderWidth: 1, borderColor: 'rgba(188,147,59,0.20)', alignItems: 'center', justifyContent: 'center' },
   checkCircle:     { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.primarySurface, borderWidth: 1.5, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center' },
   title:           { fontFamily: fontFamily.display, fontSize: fontSize['2xl'], color: colors.textPrimary, letterSpacing: -0.6, textAlign: 'center' },
@@ -224,3 +224,4 @@ const styles = StyleSheet.create({
   infoBox:         { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], backgroundColor: colors.infoSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.info + '40' },
   infoText:        { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
 });
+

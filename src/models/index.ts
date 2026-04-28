@@ -1,4 +1,4 @@
-import {
+﻿import {
   UserRole, UserStatus, MissionStatus, BookingStatus,
   DocumentStatus, PaymentStatus, ClientType,
 } from '@constants/enums';
@@ -110,6 +110,7 @@ export interface Quote {
 export interface BookingLine {
   serviceTypeId: string;
   agentCount:    number;
+  agentUniforms?: string[];   // one entry per agent — nulls stripped before sending
 }
 
 export interface CreateQuotePayload {

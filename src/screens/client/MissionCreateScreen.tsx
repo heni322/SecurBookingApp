@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionCreateScreen — multi-step mission creation.
  *
  * Step 1 : Prestations & tenues par agent + titre / notes / rayon
@@ -102,6 +102,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const [lines,   setLines]   = useState<BookingLineLocal[]>(initialLines);
   const [errors,  setErrors]  = useState<Partial<Record<keyof FormData, string>>>({});
   const [loading, setLoading] = useState(false);
+  const [mapScrollLocked, setMapScrollLocked] = useState(false);
 
   const setField = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) =>
     setForm(p => ({ ...p, [k]: v })), []);
@@ -155,7 +156,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     setErrors(e => ({ ...e, latitude: undefined }));
   }, []);
 
-  // ── Validation ────────────────────────────────────────────────────────────
+  // ── Validation ────────────────────────────────────────────────────────────────
   const validate = (): boolean => {
     const e: Partial<Record<keyof FormData, string>> = {};
 
@@ -169,13 +170,13 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       else if (km > 500)        e.radiusKm = t('create.radius_max');
     }
     if (step === 2) {
-      if (!form.address.trim())  e.address  = 'Adresse requise';
-      if (!form.city.trim())     e.city     = 'Ville requise';
+      if (!form.address.trim())  e.address = t('create.address_required');
+      if (!form.city.trim())     e.city    = t('create.city_required');
       if (form.latitude == null) e.latitude = t('create.map_position_required');
     }
     if (step === 3) {
       if (!form.startAt) e.startAt = t('create.start_required');
-      if (!form.endAt)   e.endAt   = 'Date de fin requise';
+      if (!form.endAt)   e.endAt = t('create.end_required');
       if (form.startAt) {
         const start    = new Date(form.startAt);
         const minStart = new Date(Date.now() + 3_600_000);
@@ -282,6 +283,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
+        scrollEnabled={!mapScrollLocked}
+        nestedScrollEnabled={true}
       >
 
         {/* ── STEP 1 — Prestations & tenues ────────────────────────── */}
@@ -331,7 +334,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
                 {/* Per-agent uniform rows */}
                 <View style={styles.agentsBlock}>
-                  <Text style={[styles.agentsBlockTitle, { color: line.accent }]}>TENUE PAR AGENT</Text>
+                  <Text style={[styles.agentsBlockTitle, { color: line.accent }]}>{t('create.uniform_per_agent')}</Text>
                   {line.agentUniforms.map((uniform, agentIdx) => (
                     <View key={agentIdx} style={styles.agentRow}>
                       <View style={[styles.agentBadge, { backgroundColor: line.accent + '20', borderColor: line.accent + '50' }]}>
@@ -397,19 +400,19 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.totalRow}>
               <Users size={14} color={colors.textMuted} strokeWidth={1.8} />
               <Text style={styles.totalText}>
-                {totalAgents} agent{totalAgents > 1 ? 's' : ''} au total · {lines.length} prestation{lines.length > 1 ? 's' : ''}
+                {t('create.total_agents', { count: totalAgents, lines: lines.length })}
               </Text>
             </View>
 
             {/* Add more */}
             <TouchableOpacity style={styles.addMoreBtn} onPress={handleAddMore} activeOpacity={0.75}>
               <Plus size={14} color={colors.primary} strokeWidth={2.5} />
-              <Text style={styles.addMoreText}>Ajouter une prestation</Text>
+              <Text style={styles.addMoreText}>{t('create.add_service')}</Text>
             </TouchableOpacity>
 
             {/* Optional fields */}
             <Input
-              label="Titre (optionnel)"
+            label={t('create.title_label')}
               value={form.title}
               onChangeText={v => setField('title', v)}
               placeholder={t('create.title_placeholder')}
@@ -417,7 +420,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               maxLength={100}
             />
             <Input
-              label="Notes / consignes (optionnel)"
+              label={t('create.notes_label')}
               value={form.notes}
               onChangeText={v => setField('notes', v)}
               placeholder={t('create.instructions_placeholder')}
@@ -427,11 +430,11 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               leftIcon={<FileText size={16} color={colors.textMuted} strokeWidth={1.8} />}
             />
             <Input
-              label="Rayon de recherche (km)"
+              label={t('create.radius_label')}
               value={form.radiusKm}
               onChangeText={v => setField('radiusKm', v.replace(/[^0-9]/g, ''))}
               keyboardType="number-pad"
-              hint="Entre 5 et 500 km"
+              hint={t('create.radius_hint')}
               error={errors.radiusKm}
               leftIcon={<Radius size={16} color={colors.textMuted} strokeWidth={1.8} />}
             />
@@ -441,32 +444,32 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* ── STEP 2 — Location ────────────────────────────────────── */}
         {step === 2 && (
           <View style={styles.stepContent}>
-            <StepHero Icon={MapPin} title="Lieu de la mission" color={colors.info} />
+            <StepHero Icon={MapPin} title={t('create.step_two_title')} color={colors.infoSurface} />
             <AddressSearch
               value={form.address}
               error={errors.address}
               onSelect={handleAddressSelect}
-              placeholder="Rechercher une adresse (France)…"
+              placeholder={t('create.address_placeholder')}
               countrycodes="fr"
             />
             <View style={styles.row}>
               <View style={styles.half}>
                 <Input
-                  label="Ville *"
+                  label={t('create.city_label')}
                   value={form.city}
                   onChangeText={v => setField('city', v)}
-                  placeholder="Paris"
+                  placeholder={t('create.city_placeholder')}
                   error={errors.city}
                   leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />}
                 />
               </View>
               <View style={styles.half}>
                 <Input
-                  label="Code postal"
+                  label={t('create.zip_label')}
                   value={form.zipCode}
                   onChangeText={v => setField('zipCode', v)}
                   keyboardType="number-pad"
-                  placeholder="75001"
+                  placeholder={t('create.zip_placeholder')}
                   leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />}
                 />
               </View>
@@ -475,6 +478,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               latitude={form.latitude  ?? undefined}
               longitude={form.longitude ?? undefined}
               onSelect={handleMapSelect}
+              onInteractionChange={setMapScrollLocked}
             />
             {errors.latitude && (
               <View style={styles.errorBanner}>
@@ -487,7 +491,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* ── STEP 3 — Schedule ────────────────────────────────────── */}
         {step === 3 && (
           <View style={styles.stepContent}>
-            <StepHero Icon={CalendarClock} title={t('create.schedule_title')} color={colors.warning} />
+            <StepHero Icon={CalendarClock} title={t('create.schedule_title')} color={colors.primary} />
             <DateTimePicker
               label={t('create.start_label')}
               value={form.startAt}
@@ -497,7 +501,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               hint={t('create.start_hint')}
             />
             <DateTimePicker
-              label="Fin de mission *"
+              label={t('create.end_label')}
               value={form.endAt}
               onChange={v => setField('endAt', v)}
               minDate={form.startAt
@@ -510,11 +514,11 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.durationBadge}>
                 <Clock size={16} color={colors.primary} strokeWidth={2} />
                 <View style={styles.durationInfo}>
-                  <Text style={styles.durationText}>{durH.toFixed(1)} heures de mission</Text>
+                  <Text style={styles.durationText}>{t('create.duration_hours', { hours: durH.toFixed(1) })}</Text>
                   {isToday(form.startAt) && (
                     <View style={styles.urgencyRow}>
-                      <Zap size={12} color={colors.warning} strokeWidth={2} />
-                      <Text style={styles.urgencyNote}>Majoration urgence applicable</Text>
+                      <Zap size={12} color={colors.primaryLight} strokeWidth={2} />
+                      <Text style={styles.urgencyNote}>{t('create.urgency_note')}</Text>
                     </View>
                   )}
                 </View>
@@ -524,8 +528,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             {/* Full recap */}
             {form.startAt && form.endAt && durH >= 6 && (
               <View style={styles.summaryCard}>
-                <Text style={styles.summaryTitle}>RÉCAPITULATIF</Text>
-                <SummaryRow label="Lieu"    value={`${form.address}, ${form.city}`} />
+                <Text style={styles.summaryTitle}>{t('create.summary_title')}</Text>
+                <SummaryRow label={t('create.summary_location')}    value={`${form.address}, ${form.city}`} />
                 <SummaryRow
                   label={t('create.summary_start')}
                   value={new Date(form.startAt).toLocaleString('fr-FR', {
@@ -533,7 +537,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                   })}
                 />
                 <SummaryRow
-                  label="Fin"
+                  label={t('create.summary_end')}
                   value={new Date(form.endAt).toLocaleString('fr-FR', {
                     day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
                   })}
@@ -545,7 +549,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
 
                 <View style={styles.recapLinesWrap}>
-                  <Text style={styles.recapLinesTitle}>PRESTATIONS & TENUES</Text>
+                  <Text style={styles.recapLinesTitle}>{t('create.recap_section')}</Text>
                   {lines.map(l => (
                     <View key={l.serviceTypeId} style={styles.recapLine}>
                       <View style={[styles.recapDot, { backgroundColor: l.accent }]} />
@@ -553,7 +557,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                         <Text style={styles.recapLineName}>{l.name}</Text>
                         <Text style={styles.recapLineDetail}>
                           {l.agentUniforms.map((u, i) =>
-                            `${u ? UNIFORM_EMOJI[u] : '—'} Agent ${i + 1}`
+                            `${u ? UNIFORM_EMOJI[u] : "—"} ${t("create.agent_label", { n: i + 1 })}`
                           ).join('  ')}
                         </Text>
                       </View>
@@ -561,7 +565,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
                     </View>
                   ))}
                   <View style={styles.recapTotal}>
-                    <Text style={styles.recapTotalLabel}>Total agents</Text>
+                    <Text style={styles.recapTotalLabel}>{t('create.total_agents_label')}</Text>
                     <Text style={styles.recapTotalValue}>{totalAgents}</Text>
                   </View>
                 </View>
@@ -708,7 +712,7 @@ const styles = StyleSheet.create({
   addMoreText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.primary },
 
   // Error
-  errorBanner:     { backgroundColor: colors.dangerSurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.danger },
+  errorBanner:     { backgroundColor: 'rgba(225,29,72,0.12)', borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.danger },
   errorBannerText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.danger },
 
   // Duration badge
@@ -720,7 +724,7 @@ const styles = StyleSheet.create({
   durationInfo:  { flex: 1, gap: spacing[1] },
   durationText:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.base, color: colors.primary },
   urgencyRow:    { flexDirection: 'row', alignItems: 'center', gap: spacing[1] },
-  urgencyNote:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.warning },
+  urgencyNote:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primaryLight },
 
   // Summary card
   summaryCard: {
@@ -744,3 +748,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border,
   },
 });
+

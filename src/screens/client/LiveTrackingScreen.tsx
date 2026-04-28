@@ -1,16 +1,59 @@
-/**
- * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
+﻿/**
+ * LiveTrackingScreen â€” Real-time agent tracking (CLIENT app).
  *
  * Map engine: WebView + Leaflet (zero Google dependency, zero API key)
- * Real-time updates: injectJavaScript() → Leaflet JS API
+ * Real-time updates: injectJavaScript() â†’ Leaflet JS API
  *
  * FIX HISTORY:
- *  v2 — html memoized with useMemo (was rebuilt every render → WebView remounted
- *        every second → tracking reset on every GPS update) [CRITICAL]
- *     — Removed dead react-native-svg imports (Svg/G/SvgCircle/Path)
- *     — WebView readiness confirmed via postMessage ('ready') not just onLoad
- *     — inject() guard: skip if webRef null or not ready
- *     — leaveMission now emits socket event to stop server-side forwarding
+ *  v2 â€” html memoized with useMemo (was rebuilt every render â†’ WebView remounted
+ *        every second â†’ tracking reset on every GPS update) [CRITICAL]
+ *     â€” Removed dead react-native-svg imports
+ *     â€” WebView readiness confirmed via postMessage ('ready') not just onLoad
+ *     â€” inject() guard: skip if webRef null or not ready
+ *     â€” leaveMission now emits socket event to stop server-side forwarding
+ *  v3 â€” [BUG FIX] alertBanner elevation raised from 14 â†’ 30.
+ *        On Android, elevation determines z-order inside a stacking context.
+ *        The bottom card had elevation:24, which placed it ABOVE the alertBanner
+ *        (elevation:14), hiding the out-of-zone error popup completely on Android.
+ *     â€” [BUG FIX] Hardcoded French strings replaced with t() calls.
+ *     â€” [BUG FIX] useSocketTracking now returns lastSeenAt (ISO string).
+ *     â€” useTranslation import fixed: '@i18n' instead of 'react-i18next'.
+ *  v4 â€” [BUG FIX] Alert banner âœ• close button completely unresponsive.
+ *
+ *       ROOT CAUSES (all fixed):
+ *
+ *       1. pointerEvents race â€” Animated.View had pointerEvents={pendingAlert ?
+ *          'auto' : 'none'}. The moment dismissAlert() was called, React set
+ *          pendingAlert=null in the SAME synchronous frame, flipping pointerEvents
+ *          to 'none' before the 220 ms slide-out animation had even started.
+ *          Any tap on âœ• during that animation was silently swallowed.
+ *          Fix: pointerEvents is now driven by a separate isVisible ref that
+ *          is set to false only after the animation callback fires, not on
+ *          state change.
+ *
+ *       2. Animation ownership conflict â€” useEffect watched pendingAlert to
+ *          trigger both slide-in AND slide-out. When the socket fired a new
+ *          alert during the slide-out, pendingAlert became non-null again,
+ *          immediately calling spring() and fighting the running timing()
+ *          animation. Leaflet's requestAnimationFrame loop on the WebView
+ *          made this worse on lower-end Android devices.
+ *          Fix: All animation calls are now owned exclusively by
+ *          slideIn() / slideOut() helpers. The useEffect only calls slideIn.
+ *          dismissAlert() calls slideOut directly.
+ *
+ *       3. Alert queue clobbering â€” rapid successive geofence alerts from the
+ *          socket called setPendingAlert(newAlert) and overwrote the null that
+ *          dismiss had just written, re-showing the banner mid-animation.
+ *          Fix: useSocketTracking v4 now maintains an internal queue; the
+ *          screen always sees at most one alert at a time and the next queued
+ *          alert surfaces only after dismissAlert() is acknowledged.
+ *
+ *       4. Inline initials computation â€” duplicated 3Ã— in the component.
+ *          Replaced with getInitials() from formatters.ts.
+ *
+ *       5. handleDismissAlert was defined after the useEffect that referenced
+ *          it via eslint-disable suppression, masking a stale-closure risk.
+ *          All callbacks are now defined before the effects that use them.
  */
 
 import React, {
@@ -28,22 +71,25 @@ import {
   AlertTriangle, CheckCircle2, Target, RefreshCw,
   WifiOff as SignalIcon,
 } from 'lucide-react-native';
-import { useTranslation }       from 'react-i18next';
+import { useTranslation }       from '@i18n';
 import { ScreenHeader }         from '@components/ui';
 import { colors, palette }      from '@theme/colors';
 import { spacing, radius }      from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { formatTime, getInitials } from '@utils/formatters';
 import { socketService }        from '@services/socketService';
 import { useSocketTracking }    from '@hooks/useSocketTracking';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'LiveTracking'>;
 
-const GEOFENCE_RADIUS_M = 30;
+const GEOFENCE_RADIUS_M  = 30;
+/** Must be longer than the slide-out timing duration (220 ms) to prevent
+ *  pointerEvents from flipping before the animation finishes. */
+const ALERT_SLIDE_OUT_MS = 220;
+const ALERT_SLIDE_IN_CONFIG = { friction: 8, tension: 80, useNativeDriver: true } as const;
 
-// ── Leaflet HTML ──────────────────────────────────────────────────────────────
-// Built ONCE per screen mount (memoized). Rebuilding causes WebView remount
-// which resets all Leaflet state — losing the agent marker on every GPS update.
+// â”€â”€ Leaflet HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildTrackingHTML(siteLat: number, siteLng: number): string {
   return `<!DOCTYPE html>
 <html>
@@ -55,8 +101,8 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
   html, body, #map { width:100%; height:100%; background:#0a0c0f; }
   .leaflet-control-attribution { display:none !important; }
   .leaflet-control-zoom a {
-    background:#0d1f33 !important; color:#bc933b !important;
-    border-color:#1a3d5e !important;
+    background:#0c1220 !important; color:#bc933b !important;
+    border-color:#1e2d45 !important;
   }
   .agent-bubble {
     position:absolute; top:50%; left:50%;
@@ -95,19 +141,17 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
     maxZoom: 19, attribution: ''
   }).addTo(map);
 
-  // ── Geofence ────────────────────────────────────────────────────────────
   var geoFill = L.circle([SITE_LAT, SITE_LNG], {
     radius: GEO_R, weight: 2, opacity: 0.85,
-    color: '#10b981', fillColor: '#10b981', fillOpacity: 0.13,
+    color: '#4ade80', fillColor: '#4ade80', fillOpacity: 0.13,
     className: 'pulse-ring',
   }).addTo(map);
 
   var geoOuter = L.circle([SITE_LAT, SITE_LNG], {
     radius: GEO_R * 2, weight: 1, opacity: 0.25,
-    color: '#10b981', fillColor: 'transparent', fillOpacity: 0,
+    color: '#4ade80', fillColor: 'transparent', fillOpacity: 0,
   }).addTo(map);
 
-  // ── Site marker ─────────────────────────────────────────────────────────
   var siteIcon = L.divIcon({
     className: '',
     html: '<div style="width:42px;height:42px;border-radius:50%;background:#bc933b;border:3px solid #fff;'
@@ -120,18 +164,16 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
   });
   L.marker([SITE_LAT, SITE_LNG], { icon: siteIcon }).addTo(map);
 
-  // ── Agent state ─────────────────────────────────────────────────────────
   var agentMarker    = null;
   var accuracyCircle = null;
   var arrowMarker    = null;
 
   window.updateAgent = function(lat, lng, heading, inZone, initials, accuracy, signalLost) {
     var bubbleColor = signalLost ? '#666' : (inZone ? '#3b82f6' : '#ef4444');
-    var dotColor    = inZone ? '#10b981' : '#f59e0b';
+    var dotColor    = inZone ? '#4ade80' : '#f1c47d';
     var opacity     = signalLost ? 0.5 : 1;
     var showArrow   = heading !== null && heading >= 0 && !signalLost;
 
-    // Arrow marker (separate layer so it rotates without affecting anchor)
     if (showArrow) {
       var arrowHtml = '<div style="width:56px;height:56px;opacity:' + opacity + ';pointer-events:none">'
         + '<svg viewBox=\\'0 0 56 56\\' xmlns=\\'http://www.w3.org/2000/svg\\' style=\\'transform:rotate('+heading+'deg);width:56px;height:56px;\\'>'
@@ -149,7 +191,6 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
       arrowMarker = null;
     }
 
-    // Main bubble marker
     var bubbleHtml = '<div style="position:relative;width:56px;height:56px;opacity:' + opacity + '">'
       + '<div class=\\'agent-bubble\\' style=\\'background:' + bubbleColor + '\\'>'
       + '<span>' + initials + '</span></div>'
@@ -165,7 +206,6 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
       agentMarker.setIcon(bubbleIcon);
     }
 
-    // Accuracy circle
     var acc = Math.min(accuracy || 0, 150);
     if (acc > 0) {
       if (!accuracyCircle) {
@@ -189,20 +229,17 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
   };
 
   window.updateGeofence = function(inZone) {
-    var color = inZone ? '#10b981' : '#ef4444';
+    var color = inZone ? '#4ade80' : '#ef4444';
     geoFill.setStyle({ color: color, fillColor: color });
     geoOuter.setStyle({ color: color });
   };
 
-  // Notify RN when user pans (to stop camera follow)
   map.on('dragstart', function() {
     if (window.ReactNativeWebView) {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'pan' }));
     }
   });
 
-  // Signal readiness AFTER all globals are defined
-  // This fires after the IIFE completes — guarantees window.updateAgent exists
   if (window.ReactNativeWebView) {
     window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
   }
@@ -212,7 +249,7 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
 </html>`;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const {
     missionId, bookingId, agentName,
@@ -223,85 +260,133 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
   const webRef       = useRef<WebViewType>(null);
   const followingRef = useRef(true);
-  const jsReadyRef   = useRef(false); // true once Leaflet JS signals 'ready'
+  const jsReadyRef   = useRef(false);
 
   const [showFollowBtn, setShowFollowBtn] = useState(false);
   const [mapLoading,    setMapLoading]    = useState(true);
 
   const {
-    agentPosition, lastSeenLabel, connected, signalLost,
+    agentPosition, lastSeenAt, connected, signalLost,
     distanceM, inZone, pendingAlert, dismissAlert,
   } = useSocketTracking({ missionId, bookingId, onMissionEnd: () => navigation.goBack() });
 
-  // ── Animations ─────────────────────────────────────────────────────────────
-  const alertSlide = useRef(new Animated.Value(-160)).current;
+  // â”€â”€ Alert banner animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const alertSlide     = useRef(new Animated.Value(-160)).current;
+  /**
+   * isAlertVisible â€” ref (not state) so it can be read synchronously inside
+   * animation callbacks and set without triggering re-renders.
+   * true  = banner is on screen (either sliding in, fully visible, or sliding out)
+   * false = banner is completely off screen
+   *
+   * pointerEvents on the Animated.View is derived from this ref via the
+   * [alertPointerEvents, setAlertPointerEvents] state pair below so React
+   * can still update the prop â€” but we only flip it to 'none' inside the
+   * slide-out completion callback, NOT on pendingAlert state change.
+   */
+  const isAlertVisible = useRef(false);
+  const [alertPointerEvents, setAlertPointerEvents] = useState<'auto' | 'none'>('none');
 
+  /**
+   * slideIn â€” starts the spring animation and enables touches immediately.
+   * Safe to call when already visible (spring will settle from current position).
+   */
+  const slideIn = useCallback(() => {
+    setAlertPointerEvents('auto');
+    isAlertVisible.current = true;
+    Animated.spring(alertSlide, {
+      toValue: 0,
+      ...ALERT_SLIDE_IN_CONFIG,
+    }).start();
+  }, [alertSlide]);
+
+  /**
+   * slideOut â€” starts the timing animation. Only disables touches and calls
+   * dismissAlert() AFTER the animation completes. This is the critical fix:
+   * pointerEvents stays 'auto' for the full 220 ms of the animation so the
+   * user can always tap âœ•.
+   */
+  const slideOut = useCallback(() => {
+    Animated.timing(alertSlide, {
+      toValue: -160,
+      duration: ALERT_SLIDE_OUT_MS,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      // Guard against unmounted component or interrupted animation
+      if (!finished) return;
+      isAlertVisible.current = false;
+      setAlertPointerEvents('none');
+      // Notify the hook AFTER animation so the next queued alert can surface.
+      // If we called dismissAlert() before this, pendingAlert would change
+      // mid-animation and potentially trigger slideIn() while slideOut() runs.
+      dismissAlert();
+    });
+  }, [alertSlide, dismissAlert]);
+
+  /**
+   * handleDismissAlert â€” public handler wired to the âœ• button and the
+   * auto-dismiss effect. Guards against double-tap: if the banner is already
+   * sliding out (isAlertVisible = false) subsequent calls are ignored.
+   */
+  const handleDismissAlert = useCallback(() => {
+    if (!isAlertVisible.current) return;
+    Vibration.cancel();
+    slideOut();
+  }, [slideOut]);
+
+  // Slide IN when a new alert arrives. The hook queues alerts so this fires
+  // once per alert, never while a slide-out is in progress.
   useEffect(() => {
     if (pendingAlert) {
       Vibration.vibrate([0, 250, 100, 250]);
-      Animated.spring(alertSlide, { toValue: 0, friction: 8, tension: 80, useNativeDriver: true }).start();
-    } else {
-      Animated.timing(alertSlide, { toValue: -160, duration: 220, useNativeDriver: true }).start();
+      slideIn();
     }
-  }, [pendingAlert, alertSlide]);
+  }, [pendingAlert, slideIn]);
 
+  // Auto-dismiss when agent returns to the geofence zone
   useEffect(() => {
-    if (inZone && pendingAlert) dismissAlert();
-  }, [inZone, pendingAlert, dismissAlert]);
+    if (inZone && isAlertVisible.current) {
+      handleDismissAlert();
+    }
+  }, [inZone, handleDismissAlert]);
 
-  // ── CRITICAL FIX: memoize html so WebView never remounts on state changes ──
-  // Without useMemo, buildTrackingHTML() runs every render (every GPS update)
-  // → html prop changes → WebView unmounts+remounts → Leaflet state wiped
+  // â”€â”€ Map HTML (memoized â€” must never change identity or WebView remounts) â”€â”€
   const html = useMemo(
     () => buildTrackingHTML(siteLat, siteLng),
     [siteLat, siteLng],
   );
 
-  // ── Safe inject helper ─────────────────────────────────────────────────────
-  // Guards: webRef must exist AND Leaflet JS must have signaled 'ready'
+  // â”€â”€ WebView JS bridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const inject = useCallback((js: string) => {
     if (!webRef.current || !jsReadyRef.current) return;
     webRef.current.injectJavaScript(`(function(){${js}})(); true;`);
   }, []);
 
-  // ── Push agent updates into Leaflet ───────────────────────────────────────
+  // Push position updates into the map
   useEffect(() => {
     if (!agentPosition) return;
-
-    const initials = agentName
-      .split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
-
+    const initials = getInitials(agentName);
     inject(
       `window.updateAgent(
-        ${agentPosition.latitude},
-        ${agentPosition.longitude},
-        ${agentPosition.heading ?? 'null'},
-        ${inZone},
-        '${initials}',
-        ${agentPosition.accuracy ?? 0},
-        ${signalLost}
+        ${agentPosition.latitude},${agentPosition.longitude},
+        ${agentPosition.heading ?? 'null'},${inZone},
+        '${initials}',${agentPosition.accuracy ?? 0},${signalLost}
       );`
     );
-
     inject(`window.updateGeofence(${inZone});`);
-
     if (followingRef.current) {
       inject(`window.flyToAgent(${agentPosition.latitude}, ${agentPosition.longitude});`);
     }
   }, [agentPosition, inZone, signalLost, inject, agentName]);
 
-  // ── WebView → RN messages ──────────────────────────────────────────────────
   const handleMessage = useCallback((event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'ready') {
-        // Leaflet JS fully initialized — safe to inject now
         jsReadyRef.current = true;
         setMapLoading(false);
-        // If we already have a position, push it immediately
+        // Replay current state into freshly-initialised Leaflet instance
         if (agentPosition) {
-          const initials = agentName
-            .split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+          const initials = getInitials(agentName);
           webRef.current?.injectJavaScript(
             `(function(){
               window.updateAgent(${agentPosition.latitude},${agentPosition.longitude},
@@ -316,10 +401,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         setShowFollowBtn(true);
       }
     } catch { /* ignore parse errors */ }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentPosition, agentName, inZone, signalLost]);
 
-  // ── Controls ───────────────────────────────────────────────────────────────
   const handleFollowAgent = useCallback(() => {
     followingRef.current = true;
     setShowFollowBtn(false);
@@ -334,30 +417,32 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     inject('window.flyToSite();');
   }, [inject]);
 
-  // ── Derived ────────────────────────────────────────────────────────────────
-  const agentInitials = agentName
-    .split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase();
+  // â”€â”€ Derived display values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  const agentInitials = useMemo(() => getInitials(agentName), [agentName]);
 
-  const distanceLabel = distanceM !== null
-    ? distanceM < 1000 ? `${distanceM} m` : `${(distanceM / 1000).toFixed(1)} km`
-    : null;
+  const distanceLabel = useMemo(() => {
+    if (distanceM === null) return null;
+    return distanceM < 1000 ? `${distanceM} m` : `${(distanceM / 1000).toFixed(1)} km`;
+  }, [distanceM]);
 
-  const statusText = !connected
-    ? t('status_offline')
-    : signalLost ? '⚠ Signal GPS perdu'
-    : agentPosition ? (lastSeenLabel ?? t('status_live'))
-    : t('status_waiting');
+  const statusText = useMemo(() => {
+    if (!connected)                    return t('status_offline');
+    if (signalLost)                    return t('status_signal_lost');
+    if (agentPosition && lastSeenAt)   return t('last_seen', { time: formatTime(lastSeenAt) });
+    return t('status_waiting');
+  }, [connected, signalLost, agentPosition, lastSeenAt, t]);
 
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <View style={styles.container}>
       <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
 
-      {/* ── Map (full screen behind all overlays) ── */}
+      {/* â”€â”€ Map â”€â”€ */}
       <View style={StyleSheet.absoluteFill}>
         {mapLoading && (
           <View style={styles.mapLoadingOverlay}>
             <ActivityIndicator color={colors.primary} size="large" />
-            <Text style={styles.mapLoadingText}>Chargement de la carte…</Text>
+            <Text style={styles.mapLoadingText}>{t('map_loading')}</Text>
           </View>
         )}
         <WebView
@@ -378,12 +463,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {/* ── OSM Attribution ── */}
+      {/* â”€â”€ OSM Attribution â”€â”€ */}
       <View style={styles.attribution} pointerEvents="none">
-        <Text style={styles.attributionTxt}>© OpenStreetMap contributors</Text>
+        <Text style={styles.attributionTxt}>{t('attribution')}</Text>
       </View>
 
-      {/* ── Status bar ── */}
+      {/* â”€â”€ Status bar â”€â”€ */}
       <View style={styles.statusBar}>
         {connected
           ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
@@ -400,34 +485,42 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* ── Geofence alert banner ── */}
+      {/* â”€â”€ Geofence alert banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+       *  pointerEvents is driven by alertPointerEvents state, which is only
+       *  set to 'none' inside the slide-out animation callback â€” NOT on
+       *  pendingAlert state change. This prevents the race where a tap on âœ•
+       *  was swallowed because React had already flipped pointerEvents to
+       *  'none' in the same render that started the animation.
+       * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <Animated.View
         style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
-        pointerEvents={pendingAlert ? 'auto' : 'none'}
+        pointerEvents={alertPointerEvents}
       >
         <AlertTriangle size={20} color="#fff" strokeWidth={2.5} />
-        <View style={{ flex: 1 }}>
+        <View style={styles.alertTextBlock}>
           <Text style={styles.alertTitle}>{t('out_of_zone')}</Text>
           <Text style={styles.alertBody} numberOfLines={1}>
-            {pendingAlert ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}` : ''}
+            {pendingAlert ? `${pendingAlert.agentName} â€” ${pendingAlert.distanceStr}` : ''}
           </Text>
         </View>
         <TouchableOpacity
-          onPress={dismissAlert}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          onPress={handleDismissAlert}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+          activeOpacity={0.6}
+          style={styles.alertCloseBtn}
         >
-          <Text style={styles.alertClose}>✕</Text>
+          <Text style={styles.alertClose}>âœ•</Text>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* ── Re-center FAB ── */}
+      {/* â”€â”€ Re-center FAB â”€â”€ */}
       {showFollowBtn && (
         <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8}>
           <Target size={20} color={colors.primary} strokeWidth={2} />
         </TouchableOpacity>
       )}
 
-      {/* ── Bottom card ── */}
+      {/* â”€â”€ Bottom card â”€â”€ */}
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.avatarBubble}>
@@ -453,8 +546,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         <View style={[styles.zoneStrip, !inZone && styles.zoneStripAlert]}>
           <Text style={[styles.zoneTxt, !inZone && styles.zoneTxtAlert]}>
             {inZone
-              ? `✓ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
-              : `⚠ ${t('out_of_zone')}`}
+              ? `âœ“ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
+              : `âš  ${t('out_of_zone')}`}
           </Text>
         </View>
 
@@ -488,28 +581,33 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   );
 }
 
+// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.navy },
-  webview:   { flex: 1, backgroundColor: '#0a0c0f' },
+  webview:   { flex: 1, backgroundColor: palette.bg },
 
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center', justifyContent: 'center',
-    gap: spacing[3], backgroundColor: '#0a0c0f', zIndex: 10,
+    gap: spacing[3], backgroundColor: palette.bg, zIndex: 10,
   },
-  mapLoadingText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
+  mapLoadingText: {
+    fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted,
+  },
 
   attribution: {
     position: 'absolute', bottom: 290, right: 10,
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
   },
-  attributionTxt: { fontSize: 9, color: 'rgba(255,255,255,0.65)', fontFamily: fontFamily.body },
+  attributionTxt: {
+    fontSize: 9, color: colors.textMuted, fontFamily: fontFamily.body,
+  },
 
   statusBar: {
     position: 'absolute', top: 68, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: 'rgba(10,12,15,0.88)',
+    backgroundColor: colors.overlay,
     borderRadius: radius.full,
     paddingVertical: spacing[2], paddingHorizontal: spacing[3],
     borderWidth: 1, borderColor: palette.white10,
@@ -518,23 +616,45 @@ const styles = StyleSheet.create({
   statusTxtOff: { color: colors.danger },
 
   alertBanner: {
-    position: 'absolute', top: 120, left: 16, right: 16,
+    position: 'absolute', top: 180, left: 16, right: 16,
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.danger, borderRadius: radius.xl,
-    padding: spacing[4], zIndex: 50,
+    backgroundColor: colors.dangerSurface, borderRadius: radius.xl,
+    padding: spacing[4],
+    zIndex: 50,
     ...Platform.select({
-      ios:     { shadowColor: colors.danger, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.55, shadowRadius: 14 },
-      android: { elevation: 14 },
+      ios: {
+        shadowColor: colors.danger, shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.55, shadowRadius: 14,
+      },
+      android: {
+        // Must be higher than card (elevation: 24) to render on top.
+        elevation: 30,
+      },
     }),
   },
-  alertTitle: { fontFamily: fontFamily.display, fontSize: fontSize.base, color: '#fff', letterSpacing: -0.2 },
-  alertBody:  { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: 'rgba(255,255,255,0.82)', marginTop: 2 },
-  alertClose: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: 'rgba(255,255,255,0.75)' },
+  alertTextBlock: { flex: 1 },
+  alertTitle: {
+    fontFamily: fontFamily.display, fontSize: fontSize.base,
+    color: colors.white, letterSpacing: -0.2,
+  },
+  alertBody: {
+    fontFamily: fontFamily.body, fontSize: fontSize.sm,
+    color: colors.textSecondary, marginTop: 2,
+  },
+  // Explicit container for the close button so the hitSlop has a defined
+  // boundary to expand from and doesn't bleed outside the banner on Android.
+  alertCloseBtn: {
+    padding: spacing[1],
+  },
+  alertClose: {
+    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base,
+    color: colors.textSecondary,
+  },
 
   reCenterFab: {
     position: 'absolute', right: 16, bottom: 300,
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: palette.navy80,
+    backgroundColor: palette.panelSolid,
     borderWidth: 1, borderColor: palette.white10,
     alignItems: 'center', justifyContent: 'center',
     ...Platform.select({
@@ -545,7 +665,7 @@ const styles = StyleSheet.create({
 
   card: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(10,12,15,0.97)',
+    backgroundColor: 'rgba(12,18,32,0.97)',
     borderTopLeftRadius: radius['2xl'], borderTopRightRadius: radius['2xl'],
     padding: spacing[5], gap: spacing[3],
     borderTopWidth: 1, borderTopColor: palette.white10,
@@ -558,30 +678,30 @@ const styles = StyleSheet.create({
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   avatarBubble: {
     width: 46, height: 46, borderRadius: 23,
-    backgroundColor: palette.azureDim,
+    backgroundColor: 'rgba(96,165,250,0.15)',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  avatarTxt:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: '#fff' },
+  avatarTxt:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: palette.white },
   cardMeta:    { flex: 1 },
   cardName:    { fontFamily: fontFamily.display, fontSize: fontSize.base, color: palette.white, letterSpacing: -0.2 },
   cardAddress: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: palette.white30, marginTop: 2 },
 
   distBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: palette.emeraldDim, borderRadius: radius.full,
+    backgroundColor: palette.uiGreen, borderRadius: radius.full,
     paddingHorizontal: spacing[3], paddingVertical: spacing[1],
-    borderWidth: 1, borderColor: `${palette.emerald}55`,
+    borderWidth: 1, borderColor: `${palette.txtGreen}55`,
   },
-  distBadgeAlert: { backgroundColor: palette.crimsonDim, borderColor: `${palette.crimson}55` },
+  distBadgeAlert: { backgroundColor: palette.uiRed, borderColor: `${palette.txtRed}55` },
   distTxt:        { fontFamily: fontFamily.monoMedium, fontSize: fontSize.xs, color: colors.success },
   distTxtAlert:   { color: colors.danger },
 
   zoneStrip: {
-    backgroundColor: palette.emeraldDim, borderRadius: radius.lg,
+    backgroundColor: palette.uiGreen, borderRadius: radius.lg,
     paddingVertical: spacing[2], paddingHorizontal: spacing[3],
-    borderWidth: 1, borderColor: `${palette.emerald}44`, alignItems: 'center',
+    borderWidth: 1, borderColor: `${palette.txtGreen}44`, alignItems: 'center',
   },
-  zoneStripAlert:  { backgroundColor: palette.crimsonDim, borderColor: `${palette.crimson}44` },
+  zoneStripAlert:  { backgroundColor: palette.uiRed, borderColor: `${palette.txtRed}44` },
   zoneTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
   zoneTxtAlert:    { color: colors.danger },
 
@@ -591,8 +711,8 @@ const styles = StyleSheet.create({
     gap: spacing[1], paddingVertical: spacing[3], borderRadius: radius.lg,
     backgroundColor: palette.white05, borderWidth: 1, borderColor: palette.white10,
   },
-  ctrlBtnPrimary:  { backgroundColor: palette.azure, borderColor: palette.azure, flex: 2 },
+  ctrlBtnPrimary:  { backgroundColor: palette.uiBlue, borderColor: palette.uiBlue, flex: 2 },
   ctrlBtnDisabled: { opacity: 0.35 },
   ctrlTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white60 },
-  ctrlTxtPrimary:  { color: '#fff' },
+  ctrlTxtPrimary:  { color: colors.white },
 });

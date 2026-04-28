@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   stepBar:       { flexDirection: 'row', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[3], borderBottomWidth: 1, borderBottomColor: colors.border },
   stepDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   stepDotActive: { backgroundColor: colors.primary, width: 24, borderRadius: 4 },
-  stepDotDone:   { backgroundColor: colors.success },
+  stepDotDone:   { backgroundColor: colors.successSurface },
 
   center:          { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: layout.screenPaddingH, gap: spacing[3] },
   successIconWrap: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.successSurface, borderWidth: 2, borderColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: spacing[2] },
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
 
   agentCard:     { flexDirection: 'row', alignItems: 'center', gap: spacing[4], backgroundColor: colors.surface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.border, marginBottom: spacing[5] },
   agentAvatar:   { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  agentInitials: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+  agentInitials: { fontSize: 18, fontWeight: '700', color: palette.white },
   agentName:     { fontFamily: fontFamily.display, fontSize: fontSize.md, color: colors.textPrimary, letterSpacing: -0.3 },
   missionLabel:  { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, marginTop: 2 },
 
@@ -391,3 +391,5 @@ const styles = StyleSheet.create({
   skipBtn: { alignItems: 'center', paddingVertical: spacing[3] },
   skipTxt: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
 });
+
+

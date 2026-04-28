@@ -1,10 +1,11 @@
-/**
+﻿/**
  * OfflineBanner — slide-in strip when device loses connectivity.
  * Uses @react-native-community/netinfo.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Animated, StyleSheet } from 'react-native';
 import { WifiOff } from 'lucide-react-native';
+import { useTranslation } from '@i18n';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
@@ -15,6 +16,7 @@ try { NetInfo = require('@react-native-community/netinfo').default; } catch { /*
 
 export const OfflineBanner: React.FC = () => {
   const [offline, setOffline] = useState(false);
+  const { t } = useTranslation('offline_banner');
   const slideY = useRef(new Animated.Value(-60)).current;
 
   useEffect(() => {
@@ -40,7 +42,7 @@ export const OfflineBanner: React.FC = () => {
   return (
     <Animated.View style={[styles.banner, { transform: [{ translateY: slideY }] }]}>
       <WifiOff size={14} color={colors.white} strokeWidth={2} />
-      <Text style={styles.text}>Pas de connexion — affichage en cache</Text>
+      <Text style={styles.text}>{t('no_connection')}</Text>
     </Animated.View>
   );
 };
@@ -56,7 +58,7 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'center',
     gap:               spacing[2],
-    backgroundColor:   colors.danger,
+    backgroundColor:   colors.dangerSurface,
     paddingVertical:   spacing[3],
     paddingHorizontal: spacing[4],
   },
@@ -66,3 +68,4 @@ const styles = StyleSheet.create({
     color:      colors.white,
   },
 });
+

@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
     padding: spacing[4],
   },
   glowShadow: {
-    shadowColor:   '#bc933b',
+    shadowColor:   colors.primary,
     shadowOffset:  { width: 0, height: 2 },
     shadowOpacity: 0.18,
     shadowRadius:  10,
@@ -83,3 +83,4 @@ const styles = StyleSheet.create({
     elevation:     6,
   },
 });
+

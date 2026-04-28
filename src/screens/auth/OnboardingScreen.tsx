@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   dotsRow:      { flexDirection: 'row', gap: spacing[2], marginTop: spacing[8], marginBottom: spacing[6] },
   dot:          { width: 8,  height: 8,  borderRadius: 4, backgroundColor: colors.surfaceBorder },
   dotActive:    { width: 24, backgroundColor: colors.primary },
-  cta:          { width: W - layout.screenPaddingH * 2, height: 52, borderRadius: radius.full, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: '#bc933b', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
+  cta:          { width: W - layout.screenPaddingH * 2, height: 52, borderRadius: radius.full, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.4, shadowRadius: 16, elevation: 8 },
   ctaText:      { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.lg, color: colors.textInverse },
   bottomSpacer: { height: Platform.OS === 'ios' ? 40 : 24 },
 });
@@ -154,3 +154,4 @@ export const checkOnboardingDone = async (): Promise<boolean> => {
   const v = await AsyncStorage.getItem(ONBOARDING_KEY).catch(() => null);
   return v === '1';
 };
+

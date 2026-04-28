@@ -2,19 +2,16 @@
  * MissionsScreen — Enterprise-grade mission list with status filtering, search,
  * skeleton loading, error recovery, and full accessibility support.
  *
- * Fixes applied vs original:
- *  - FilterKey narrowed to the 5 UI-only values — Record<FilterKey,…> no longer
- *    demands the 4 non-filterable MissionStatus variants (PUBLISHED, STAFFING, etc.)
- *  - FILTER_I18N_KEY static map — fully type-safe t() key, no dynamic template literal
- *  - execute stabilised via ref guard — no infinite fetch loop
- *  - Error state surfaced with retry action (colors.danger — no 'error' in theme)
- *  - SearchBar called with only its declared props (no accessibilityLabel, etc.)
- *  - Skeleton shown only on true first load; RefreshControl handles subsequent refreshes
- *  - counts keys normalised — no silent zero-badge bug
- *  - total derived from counts.ALL (no redundant recomputation)
- *  - activeFilterLabel fallback uses in-memory label — no invented i18n key
- *  - Accessibility labels on every interactive element
- *  - renderItem stable — only recreated when handleMissionPress changes
+ * Bugs fixed in this revision:
+ *  [1] useMemo([t]) stale labels — i18next v26 + react-i18next v17 with async
+ *      languageDetector (AsyncStorage): `t` reference is STABLE, so useMemo
+ *      computed once at mount while i18next wasn't ready (returned '' or key
+ *      strings), never recomputed. Fix: add i18n.language to the dep array —
+ *      it changes from undefined → 'fr'/'en' when async detection completes,
+ *      guaranteeing recomputation with real translations.
+ *  [2] isFirstLoad always false — useApi initialises data as null, not
+ *      undefined. `missions === undefined` was always false → skeleton never
+ *      showed. Fix: `missions === null`.
  */
 
 import React, {
@@ -58,12 +55,9 @@ type Props = NativeStackScreenProps<MissionStackParamList, 'MissionList'>;
 
 /**
  * FilterKey is intentionally narrower than MissionStatus.
- *
- * Only 5 values are exposed as UI filters. Using `SyntheticFilter | MissionStatus`
- * would widen the union to 9 members, forcing FILTER_I18N_KEY to declare entries
- * for PUBLISHED, STAFFING, STAFFED and IN_PROGRESS which are never shown as chips.
- *
- * By listing only the 5 used values, Record<FilterKey, …> stays exact and TS2739 goes away.
+ * Only 5 values are exposed as UI filter chips. Widening to the full
+ * MissionStatus union (7 values) forces FILTER_I18N_KEY to declare
+ * PUBLISHED/STAFFING/STAFFED/IN_PROGRESS which are never shown as chips.
  */
 type FilterKey =
   | 'ALL'
@@ -77,18 +71,12 @@ interface FilterDef {
   label: string;
 }
 
-/** Normalised counts record — string keys for safe bracket-access. */
 type FilterCounts = Record<string, number>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants (module-level — stable refs, zero GC pressure)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Full set of statuses that count as "active" in the UI.
- * Includes PUBLISHED/STAFFING/STAFFED/IN_PROGRESS which are NOT exposed as
- * individual filter chips — they only contribute to the ACTIVE aggregate count.
- */
 const ACTIVE_STATUSES = new Set<MissionStatus>([
   MissionStatus.PUBLISHED,
   MissionStatus.STAFFING,
@@ -96,7 +84,6 @@ const ACTIVE_STATUSES = new Set<MissionStatus>([
   MissionStatus.IN_PROGRESS,
 ]);
 
-/** Ordered list of filter keys shown as chips. */
 const FILTER_KEYS: FilterKey[] = [
   'ALL',
   'ACTIVE',
@@ -108,13 +95,8 @@ const FILTER_KEYS: FilterKey[] = [
 /**
  * Static map: FilterKey → keyof MissionsNS['filters']
  *
- * WHY: t(`filters.${key.toLowerCase()}`) widens to `filters.${string}` which
- * TypeScript cannot verify against the known union — TS2345.
- * With this map, t(`filters.${FILTER_I18N_KEY[key]}`) resolves to the exact
- * union "filters.all" | "filters.active" | "filters.created" | …
- *
- * WHY Record<FilterKey, …> now compiles: FilterKey has exactly 5 members,
- * and we provide exactly 5 entries — no missing keys.
+ * WHY: t(`filters.${key.toLowerCase()}`) widens to `filters.${string}` — TS2345.
+ * This map narrows the lookup to the exact 5-member union that MissionsNS defines.
  */
 const FILTER_I18N_KEY: Record<FilterKey, keyof MissionsNS['filters']> = {
   ALL:                       'all',
@@ -165,7 +147,10 @@ function buildCounts(missions: Mission[]): FilterCounts {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
-  const { t } = useTranslation('missions');
+  // Destructure i18n alongside t.
+  // i18n.language is the dependency that changes when the async languageDetector
+  // (AsyncStorage) resolves — this is what triggers filters to recompute.
+  const { t, i18n } = useTranslation('missions');
 
   // ── State ──────────────────────────────────────────────────────────────────
 
@@ -175,8 +160,6 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: missions, loading, error, execute } = useApi(missionsApi.getMyMissions);
 
   // ── Initial fetch ──────────────────────────────────────────────────────────
-  // Ref-guarded so an unstable `execute` reference never causes an infinite loop.
-  // After mount, refreshes are only triggered by user actions (pull / retry).
   const hasFetched = useRef(false);
   useEffect(() => {
     if (!hasFetched.current) {
@@ -187,12 +170,25 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
+  /**
+   * FIX [1] — add i18n.language to the dependency array.
+   *
+   * In i18next v26 + react-i18next v17, `t` is a stable reference: it does not
+   * change object identity when i18next finishes async initialization. A memo
+   * keyed only on [t] would compute once at mount (while i18next is unready,
+   * returning '' or the raw key) and never recompute — so labels stayed empty
+   * even after translations were loaded, while API data caused counts/badges
+   * to update correctly.
+   *
+   * i18n.language goes from undefined → 'fr' (or 'en') the moment the async
+   * languageDetector callback fires, reliably invalidating this memo.
+   */
   const filters = useMemo<FilterDef[]>(
     () => FILTER_KEYS.map((key) => ({
       key,
       label: t(`filters.${FILTER_I18N_KEY[key]}`),
     })),
-    [t],
+    [t, i18n.language], // ← i18n.language is the missing trigger
   );
 
   const missionList = useMemo(() => missions ?? [], [missions]);
@@ -251,7 +247,12 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
 
   const keyExtractor = useCallback((item: Mission) => item.id, []);
 
-  const isFirstLoad = loading && missions === undefined;
+  /**
+   * FIX [2] — useApi initialises data as null (not undefined).
+   * `missions === undefined` was always false → skeleton never showed.
+   * Correct check: missions === null (the initial state from useApi).
+   */
+  const isFirstLoad = loading && missions === null;
 
   const renderContent = () => {
     if (isFirstLoad) {
@@ -269,7 +270,7 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
     if (error && !missions) {
       return (
         <View style={styles.errorWrap} accessibilityRole="alert">
-          {/* colors.danger = crimson (#EF4444) — theme has no 'error' key */}
+          {/* colors.danger = crimson — theme has no 'error' key */}
           <AlertCircle size={40} color={colors.danger} />
           <Text style={styles.errorTitle}>{t('error.title')}</Text>
           <Text style={styles.errorSubtitle}>{t('error.subtitle')}</Text>
@@ -399,7 +400,6 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
         })}
       </ScrollView>
 
-      {/* Content */}
       {renderContent()}
     </View>
   );
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.primary, paddingHorizontal: spacing[4],
     paddingVertical: spacing[2] + 2, borderRadius: radius.full,
-    shadowColor: '#bc933b', shadowOffset: { width: 0, height: 3 },
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35, shadowRadius: 8, elevation: 5,
   },
   newBtnText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textInverse },
@@ -476,8 +476,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
     backgroundColor: colors.primary, paddingHorizontal: spacing[5],
     paddingVertical: spacing[3], borderRadius: radius.full, marginTop: spacing[2],
-    shadowColor: '#bc933b', shadowOffset: { width: 0, height: 3 },
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3, shadowRadius: 6, elevation: 4,
   },
   retryBtnText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textInverse },
 });
+

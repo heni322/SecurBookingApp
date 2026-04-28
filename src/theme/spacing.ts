@@ -1,3 +1,5 @@
+import { palette } from './colors';
+
 /**
  * SecurBook Design System — Spacing & Layout
  */
@@ -60,7 +62,7 @@ export const shadow = {
   },
   // Gold glow — used for primary buttons, focused inputs, cards
   gold: {
-    shadowColor:   '#bc933b',
+    shadowColor:   palette.gold,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.40,
     shadowRadius:  14,
@@ -68,7 +70,7 @@ export const shadow = {
   },
   // Legacy alias — keeps backward-compat with old `shadow.amber` references
   amber: {
-    shadowColor:   '#bc933b',
+    shadowColor:   palette.gold,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.40,
     shadowRadius:  14,
@@ -85,3 +87,4 @@ export const layout = {
   inputHeight:    52,
   buttonHeight:   52,
 } as const;
+

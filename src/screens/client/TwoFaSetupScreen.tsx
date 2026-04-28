@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
   screen:         { flex: 1, backgroundColor: colors.background },
   content:        { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[6], paddingBottom: spacing[12], gap: spacing[5] },
   statusBanner:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[4], borderRadius: radius.xl, padding: spacing[5], borderWidth: 1 },
-  bannerEnabled:  { backgroundColor: colors.successSurface, borderColor: colors.success + '40' },
+  bannerEnabled:  { backgroundColor: 'rgba(134,239,172,0.12)', borderColor: colors.success + '40' },
   bannerDisabled: { backgroundColor: colors.surface, borderColor: colors.border },
   bannerText:     { flex: 1, gap: spacing[1] },
   bannerTitle:    { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.3 },
@@ -223,3 +223,4 @@ const styles = StyleSheet.create({
   iconWrap:       { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center' },
   perkText:       { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, textAlign: 'center' },
 });
+

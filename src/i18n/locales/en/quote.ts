@@ -18,6 +18,19 @@ const quote: QuoteNS = {
   secure_note: "Secure payment via Stripe — your bank details never pass through our servers.",
   sepa_note: "SEPA transfer processed in 1-2 business days. Your IBAN will be collected on the next page via Stripe.",
   offline_note: "Bank wire or cheque. Your mission will be confirmed after validation by our team (1-3 business days).",
+  breakdown_title: 'Price breakdown',
+  agent_payout: 'Agent payout',
+  accepted_badge: 'Accepted',
+  row_base_ht: 'Base rate (excl. VAT)',
+  row_night: 'Night supplement',
+  row_weekend: 'Weekend supplement',
+  row_urgency: 'Urgency surcharge',
+  row_subtotal: 'Subtotal (excl. VAT)',
+  row_vat: 'VAT ({{rate}}%)',
+  row_total_ttc: 'Total (incl. VAT)',
+  row_commission: 'Platform fee',
+  valid_until: 'Valid until {{date}}',
+  accept_label: 'Accept this quote',
 };
 
 export default quote;

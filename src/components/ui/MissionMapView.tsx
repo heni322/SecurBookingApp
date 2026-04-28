@@ -49,12 +49,12 @@ function buildHTML(
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html, body, #map { width:100%; height:100%; background:#0d1f33; }
+  html, body, #map { width:100%; height:100%; background:#0c1220; }
   .leaflet-control-attribution { display:none !important; }
   .leaflet-control-zoom { display:${interactive ? 'block' : 'none'} !important; }
   .leaflet-control-zoom a {
-    background:#0d1f33 !important; color:#bc933b !important;
-    border-color:#1a3d5e !important;
+    background:#0c1220 !important; color:#bc933b !important;
+    border-color:#1e2d45 !important;
   }
 </style>
 </head>
@@ -268,3 +268,4 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
 });
+

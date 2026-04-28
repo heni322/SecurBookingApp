@@ -52,6 +52,19 @@ const quote: QuoteNS = {
 
   offline_note:
     "Virement bancaire ou chèque. Votre mission sera confirmée après validation par notre équipe (1 à 3 jours ouvrés).",
+  breakdown_title: 'Détail du devis',
+  agent_payout:    '↳ Rémunération agent (virement J+15)',
+  accepted_badge:  '✓ Devis accepté',
+  row_base_ht:   'Base HT',
+  row_night:     'Majoration nuit',
+  row_weekend:   'Majoration week-end',
+  row_urgency:   'Majoration urgence',
+  row_subtotal:  'Sous-total HT',
+  row_vat:       'TVA 20%',
+  row_total_ttc: 'TOTAL TTC',
+  row_commission:'↳ Commission SecurBook',
+  valid_until:   "Valable jusqu'au {{date}}",
+  accept_label:  'Accepter ce devis',
 };
 
 export default quote;

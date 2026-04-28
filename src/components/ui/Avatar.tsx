@@ -114,13 +114,14 @@ const styles = StyleSheet.create({
   },
   onlineDot: {
     position:        'absolute',
-    backgroundColor: colors.success,
+    backgroundColor: colors.successSurface,
     borderWidth:     2.5,
     borderColor:     colors.background,
-    shadowColor:     colors.success,
+    shadowColor:     colors.successSurface,
     shadowOffset:    { width: 0, height: 0 },
     shadowOpacity:   0.6,
     shadowRadius:    4,
     elevation:       2,
   },
 });
+

@@ -12,6 +12,10 @@ const payment: PaymentNS = {
   stripe_info_sepa: "Your bank details are transmitted directly to Stripe and never pass through SecurBook servers. Compliant with SEPA regulation EU 260/2012.",
   stripe_info_card: "Your card details are encrypted by Stripe and never pass through SecurBook servers. 3DS payment compliant with PSD2.",
   sepa_legal: "By confirming, you authorize the SEPA debit of the indicated amount. Terms and conditions apply.",
+  amount_sub: 'VAT included',
+  invoice_ref: 'Invoice #{{ref}}',
+  invoice_count: '{{count}} invoice',
+  invoice_open_error: 'Unable to open the invoice. Please try again.',
   errors: {
     card_declined: 'Your card was declined. Please use another card.',
     expired_card: 'Your card is expired.',

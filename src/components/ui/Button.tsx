@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     borderWidth:     0,
   },
   filledShadow: {
-    shadowColor:   '#bc933b',
+    shadowColor:   colors.primary,
     shadowOffset:  { width: 0, height: 4 },
     shadowOpacity: 0.35,
     shadowRadius:  12,
@@ -132,3 +132,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 });
+

@@ -2,8 +2,8 @@
  * PaymentScreen — paiement natif Stripe via @stripe/stripe-react-native.
  *
  * Deux flux supportés :
- *  ─ CARD        : PaymentIntent → CardField → confirmPayment()
- *  ─ SEPA        : SetupIntent  → TextInput IBAN → confirmSetupIntent()
+ *  - CARD        : PaymentIntent ? CardField ? confirmPayment()
+ *  - SEPA        : SetupIntent  ? TextInput IBAN ? confirmSetupIntent()
  *                  (FIX: was incorrectly calling confirmPayment() with a
  *                   setup_intent client_secret — broken at runtime)
  *
@@ -35,10 +35,11 @@ import { useAuthStore }            from '@store/authStore';
 import { paymentsApi }              from '@api/endpoints/payments';
 import type { PaymentMethod }        from '@models/index';
 import type { MissionStackParamList } from '@models/index';
+import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'PaymentScreen'>;
 
-// ── IBAN helpers ──────────────────────────────────────────────────────────────
+// -- IBAN helpers --------------------------------------------------------------
 
 /** Basic IBAN format validator (FR + general European). */
 const isValidIban = (v: string): boolean => {
@@ -50,7 +51,7 @@ const isValidIban = (v: string): boolean => {
 const formatIban = (raw: string): string =>
   raw.replace(/\s/g, '').toUpperCase().replace(/(.{4})/g, '$1 ').trim();
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// -- Component -----------------------------------------------------------------
 
 export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const {
@@ -63,24 +64,40 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // FIX — import both confirmPayment and confirmSetupIntent
   const { confirmPayment, confirmSetupIntent } = useStripe();
+  const { t } = useTranslation('payment');
+
+  // -- Stripe error mapping (local so it closes over t) ----------------------
+  const mapStripeError = (code?: string, fallback?: string): string => {
+    const messages: Record<string, string> = {
+      card_declined:                     t('errors.card_declined'),
+      expired_card:                      t('errors.expired_card'),
+      incorrect_number:                  t('errors.incorrect_number'),
+      invalid_expiry_year:               t('errors.invalid_expiry_year'),
+      processing_error:                  t('errors.processing_error'),
+      do_not_honor:                      t('errors.do_not_honor'),
+      invalid_bank_account_iban_invalid: t('errors.invalid_iban'),
+      setup_intent_unexpected_state:     t('errors.sepa_unexpected'),
+    };
+    return messages[code ?? ''] ?? fallback ?? t('errors.generic');
+  };
 
   // Pre-fill billing details from auth store for better UX
   const user = useAuthStore(s => s.user);
 
-  // ── Card state ──────────────────────────────────────────────────────────────
+  // -- Card state --------------------------------------------------------------
   const [cardComplete, setCardComplete] = useState(false);
 
-  // ── SEPA state ──────────────────────────────────────────────────────────────
+  // -- SEPA state --------------------------------------------------------------
   const [iban,        setIban]        = useState('');
   const [ibanFocused, setIbanFocused] = useState(false);
   const ibanValid = isValidIban(iban);
 
-  // ── Shared state ────────────────────────────────────────────────────────────
+  // -- Shared state ------------------------------------------------------------
   const [loading,  setLoading]  = useState(false);
   const [paid,     setPaid]     = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ── Saved payment methods ────────────────────────────────────────────────
+  // -- Saved payment methods ------------------------------------------------
   const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(false);
@@ -122,14 +139,14 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     if (errorMsg) setErrorMsg(null);
   };
 
-  // ── Confirm handler ─────────────────────────────────────────────────────────
+  // -- Confirm handler ---------------------------------------------------------
 
   const handleConfirm = async () => {
     if (!canConfirm) {
       setErrorMsg(
         isSepa
           ? 'Veuillez saisir un IBAN valide (ex : FR76 3000 4028 3798 7654 3210 943).'
-          : 'Veuillez saisir vos informations de carte complètes.',
+          : t('incomplete_card'),
       );
       return;
     }
@@ -139,7 +156,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
     try {
       if (isSepa) {
-        // ── SEPA path ─────────────────────────────────────────────────────────
+        // -- SEPA path ---------------------------------------------------------
         //
         // FIX: A setup_intent client_secret MUST be confirmed with
         //      confirmSetupIntent(), NOT confirmPayment().
@@ -170,11 +187,11 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           setPaid(true);
         } else {
           setErrorMsg(
-            "Le mandat SEPA n'a pas pu être confirmé. Veuillez réessayer.",
+            t('sepa_failed'),
           );
         }
       } else {
-        // ── Card path ─────────────────────────────────────────────────────────
+        // -- Card path ---------------------------------------------------------
         const cardConfirmOptions: any = usingSaved && selectedMethodId
           ? { paymentMethodType: 'Card', paymentMethodData: { paymentMethodId: selectedMethodId } }
           : { paymentMethodType: 'Card', paymentMethodData: { billingDetails: { email: user?.email ?? '', name: user?.fullName ?? '' } } };
@@ -191,7 +208,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         ) {
           setPaid(true);
         } else {
-          setErrorMsg("Le paiement n'a pas pu être confirmé. Veuillez réessayer.");
+          setErrorMsg(t('card_failed'));
         }
       }
     } catch (err: unknown) {
@@ -201,7 +218,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  // ── Success screen ──────────────────────────────────────────────────────────
+  // -- Success screen ----------------------------------------------------------
   if (paid) {
     return (
       <View style={styles.successScreen}>
@@ -209,21 +226,21 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <CheckCircle2 size={54} color={colors.success} strokeWidth={1.5} />
         </View>
         <Text style={styles.successTitle}>
-          {isSepa ? 'Mandat SEPA enregistré !' : 'Paiement confirmé !'}
+          {isSepa ? t('sepa_success') : t('card_success')}
         </Text>
         <Text style={styles.successSubtitle}>
           {isSepa
-            ? "Votre mandat SEPA est enregistré. Le débit sera effectué dans 1–2 jours ouvrés. Votre mission sera activée dès confirmation du paiement."
-            : "Votre mission est confirmée. Les agents qualifiés dans votre secteur vont recevoir une notification. Vous recevrez votre facture par email."
+            ? t('sepa_success_body')
+            : t('card_success_body')
           }
         </Text>
         <Button
-          label="Voir ma mission"
+          label={t('offline.follow_mission')}
           onPress={() => navigation.navigate('MissionDetail', { missionId })}
           fullWidth size="lg" style={styles.successBtn}
         />
         <Button
-          label="Retour à l'accueil"
+          label={t('home')}
           onPress={() => navigation.navigate('MissionSuccess', { missionId })}
           fullWidth variant="ghost" size="md"
         />
@@ -233,17 +250,17 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
     // Stripe CardField only accepts solid hex colors — rgba() crashes on Android.
     const stripeCardStyle = {
-      backgroundColor:  '#071e38',
-      textColor:        '#FFFFFF',
-      placeholderColor: '#66809F',
-      cursorColor:      '#bc933b',
+      backgroundColor:  palette.panelSolid,
+      textColor:        palette.white,
+      placeholderColor: palette.muted,
+      cursorColor:      palette.gold,
       fontSize:         15,
     };
   return (
     <View style={styles.screen}>
       <ScreenHeader
         title="Paiement"
-        subtitle="Sécurisé par Stripe"
+        subtitle={t('secured_by')}
         onBack={() => navigation.goBack()}
       />
 
@@ -255,7 +272,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.amountValue}>
             {totalTTC ? formatCurrency(totalTTC * 100) : '–'}
           </Text>
-          <Text style={styles.amountSub}>TVA 20% incluse · Virement agent à J+15</Text>
+          <Text style={styles.amountSub}>{t('amount_sub')}</Text>
         </Card>
 
         {/* Method badge */}
@@ -265,7 +282,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             : <CreditCard size={15} color={colors.primary} strokeWidth={1.8} />
           }
           <Text style={styles.methodBadgeText}>
-            {isSepa ? 'Débit SEPA' : 'Carte bancaire'}
+            {isSepa ? t('title_sepa') : t('title_card')}
           </Text>
         </View>
 
@@ -408,8 +425,8 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           }
           <Text style={styles.secureText}>
             {isSepa
-              ? "Vos coordonnées bancaires sont transmises directement à Stripe et ne transitent jamais par les serveurs SecurBook. Conforme au règlement SEPA UE 260/2012."
-              : "Vos données bancaires sont chiffrées par Stripe et ne transitent jamais par les serveurs SecurBook. Paiement 3DS conforme DSP2."
+              ? t('stripe_info_sepa')
+              : t('stripe_info_card')
             }
           </Text>
         </View>
@@ -433,7 +450,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         />
         <Text style={styles.footerNote}>
           {isSepa
-            ? "En confirmant, vous autorisez le débit SEPA du montant indiqué. CGV applicables."
+            ? t('sepa_legal')
             : "En confirmant, vous acceptez les CGV SecurBook et la politique de remboursement."
           }
         </Text>
@@ -442,28 +459,8 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
-// ── Stripe error mapping ──────────────────────────────────────────────────────
 
-function mapStripeError(code?: string, fallback?: string): string {
-  const messages: Record<string, string> = {
-    card_declined:                     'Votre carte a été refusée. Veuillez utiliser une autre carte.',
-    insufficient_funds:                'Fonds insuffisants sur votre carte.',
-    expired_card:                      'Votre carte est expirée.',
-    incorrect_cvc:                     'Le code CVC est incorrect.',
-    incorrect_number:                  'Le numéro de carte est incorrect.',
-    invalid_expiry_month:              "Le mois d'expiration est invalide.",
-    invalid_expiry_year:               "L'année d'expiration est invalide.",
-    processing_error:                  'Une erreur de traitement est survenue. Veuillez réessayer.',
-    authentication_required:           'Authentification 3DS requise. Veuillez suivre les instructions.',
-    do_not_honor:                      'Paiement refusé par votre banque. Contactez-la pour plus d\'informations.',
-    invalid_bank_account_iban_invalid: "L'IBAN saisi est invalide. Vérifiez le format.",
-    payment_method_not_available:      "Ce mode de paiement n'est pas disponible.",
-    setup_intent_unexpected_state:     "Le mandat SEPA est dans un état inattendu. Réessayez.",
-  };
-  return messages[code ?? ''] ?? fallback ?? 'Opération refusée. Vérifiez vos informations.';
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
+// -- Styles --------------------------------------------------------------------
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: colors.background },
@@ -487,12 +484,12 @@ const styles = StyleSheet.create({
   cardFieldWrapper: {
     borderRadius:    12,
     borderWidth:     1,
-    borderColor:     '#1a3d5e',
+    borderColor:     palette.panelBorder,
     overflow:        'hidden',
-    backgroundColor: '#071e38',
+    backgroundColor: palette.panelSolid,
   },
   cardFieldWrapperActive: {
-    borderColor: '#bc933b',
+    borderColor: colors.primary,
     borderWidth: 1.5,
   },
   cardField: { width: '100%', height: 52 },
@@ -513,7 +510,7 @@ const styles = StyleSheet.create({
     color:             colors.textPrimary,
     letterSpacing:     1,
   },
-  ibanInputFocused: { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: 'rgba(59,130,246,0.06)' },
+  ibanInputFocused: { borderColor: colors.primary, borderWidth: 1.5, backgroundColor: colors.borderSubtle },
   ibanInputValid:   { borderColor: colors.success },
   ibanError:        { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger, marginTop: spacing[1] },
   ibanValidRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[1], marginTop: spacing[1] },
@@ -555,3 +552,4 @@ const styles = StyleSheet.create({
   savedSelectedText: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.success },
   successBtn:      { marginTop: spacing[2] },
 });
+

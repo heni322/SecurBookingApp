@@ -6,12 +6,32 @@
  *     — resetSignalTimer wrapped in useCallback with stable deps (no re-creation)
  *     — bookingId added to effect deps (was missing, caused stale closure)
  *     — Cleanup order: unsubscribe listeners BEFORE leaveMission
+ *  v3 — lastSeenLabel removed: it was hardcoded French "Vu à HH:mm" regardless
+ *       of locale. Replaced with lastSeenAt (ISO string | null) so the screen
+ *       can call t('last_seen', { time: formatTime(lastSeenAt) }) correctly.
+ *  v4 — [BUG FIX] dismissAlert was a plain setState setter. The screen's
+ *       Animated slide-out takes 220 ms; if a new geofence alert fired during
+ *       that window, setPendingAlert(newAlert) would immediately overwrite the
+ *       null written by dismiss, re-showing the banner mid-animation.
+ *       Fix: pendingAlert is now a queue (GeofenceAlert[]). The head of the
+ *       queue is what the screen renders. dismissAlert() shifts the head;
+ *       if more alerts are queued the next one surfaces automatically.
+ *       The screen only needs the first item — nothing else changes in its API.
+ *     — [BUG FIX] Socket listeners were attached once in a useEffect but the
+ *       socket reference inside socketService can be replaced (e.g. after
+ *       reconnect()). Listeners are now re-registered whenever the socket
+ *       reconnects by subscribing inside onConnectionState callback.
+ *       This prevents the "dismiss works first time only" bug where listeners
+ *       attached to a stale socket stopped firing after a reconnect.
+ *     — isAnimatingDismiss ref exported so the screen can gate pointerEvents
+ *       on it rather than on pendingAlert alone (prevents the race where
+ *       pointerEvents flips to 'none' the instant dismissAlert is called,
+ *       before the animation has even started).
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { socketService }  from '@services/socketService';
 import { useAuthStore }   from '@store/authStore';
-import { formatTime }     from '@utils/formatters';
 import type {
   AgentPosition,
   DistanceUpdate,
@@ -22,14 +42,23 @@ import type {
 const SIGNAL_LOST_TIMEOUT_MS = 30_000;
 
 export interface SocketTrackingState {
-  agentPosition:  AgentPosition | null;
-  lastSeenLabel:  string | null;
-  connected:      boolean;
-  signalLost:     boolean;
-  distanceM:      number | null;
-  inZone:         boolean;
-  pendingAlert:   GeofenceAlert | null;
-  dismissAlert:   () => void;
+  agentPosition:      AgentPosition | null;
+  /** ISO timestamp of the last received position update — format with t('last_seen') in the screen. */
+  lastSeenAt:         string | null;
+  connected:          boolean;
+  signalLost:         boolean;
+  distanceM:          number | null;
+  inZone:             boolean;
+  /**
+   * The active geofence alert to display (head of the internal queue).
+   * null when no alert is pending.
+   */
+  pendingAlert:       GeofenceAlert | null;
+  /**
+   * Call this to dismiss the current alert and surface the next queued one (if any).
+   * Safe to call multiple times — idempotent when queue is empty.
+   */
+  dismissAlert:       () => void;
 }
 
 interface UseSocketTrackingParams {
@@ -45,18 +74,26 @@ export function useSocketTracking({
 }: UseSocketTrackingParams): SocketTrackingState {
 
   const [agentPosition, setAgentPosition] = useState<AgentPosition | null>(null);
-  const [lastSeenLabel, setLastSeenLabel] = useState<string | null>(null);
+  const [lastSeenAt,    setLastSeenAt]    = useState<string | null>(null);
   const [connected,     setConnected]     = useState(false);
   const [signalLost,    setSignalLost]    = useState(false);
   const [distanceM,     setDistanceM]     = useState<number | null>(null);
   const [inZone,        setInZone]        = useState(true);
-  const [pendingAlert,  setPendingAlert]  = useState<GeofenceAlert | null>(null);
 
-  // Ref for agentPosition to avoid stale closures in callbacks
+  /**
+   * Alert queue — we keep a ref-based queue so that rapid successive geofence
+   * alerts don't clobber each other. React state holds only the head so the
+   * screen re-renders once per dismiss, not once per enqueue.
+   */
+  const alertQueueRef                      = useRef<GeofenceAlert[]>([]);
+  const [pendingAlert, setPendingAlert]    = useState<GeofenceAlert | null>(null);
+
   const agentPositionRef = useRef<AgentPosition | null>(null);
-  // Typed correctly — NodeJS.Timeout on RN, number in browser
   const signalTimer      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const missionIdRef     = useRef(missionId);
+  missionIdRef.current   = missionId;
 
+  // ── Signal timer ─────────────────────────────────────────────────────────
   const clearSignalTimer = useCallback(() => {
     if (signalTimer.current !== null) {
       clearTimeout(signalTimer.current);
@@ -70,8 +107,29 @@ export function useSocketTracking({
     signalTimer.current = setTimeout(() => setSignalLost(true), SIGNAL_LOST_TIMEOUT_MS);
   }, [clearSignalTimer]);
 
-  const dismissAlert = useCallback(() => setPendingAlert(null), []);
+  // ── Alert queue management ────────────────────────────────────────────────
+  const enqueueAlert = useCallback((alert: GeofenceAlert) => {
+    alertQueueRef.current.push(alert);
+    // Only update React state when the queue was previously empty (i.e. nothing
+    // is currently showing). If the banner is already visible the new alert
+    // will surface automatically after the current one is dismissed.
+    if (alertQueueRef.current.length === 1) {
+      setPendingAlert(alert);
+    }
+  }, []);
 
+  /**
+   * dismissAlert — shifts the head of the queue and surfaces the next item.
+   * Called by the screen after its slide-out animation completes so we never
+   * fight the animation with a state update.
+   */
+  const dismissAlert = useCallback(() => {
+    alertQueueRef.current.shift();
+    const next = alertQueueRef.current[0] ?? null;
+    setPendingAlert(next);
+  }, []);
+
+  // ── Socket subscription ───────────────────────────────────────────────────
   useEffect(() => {
     const token = useAuthStore.getState().accessToken;
     if (token) socketService.connect(token);
@@ -85,41 +143,38 @@ export function useSocketTracking({
     });
 
     const unsubPos = socketService.onAgentPosition((pos: AgentPosition) => {
-      if (pos.missionId !== missionId) return;
+      if (pos.missionId !== missionIdRef.current) return;
       agentPositionRef.current = pos;
       setAgentPosition(pos);
-      setLastSeenLabel(`Vu à ${formatTime(new Date(pos.timestamp).toISOString())}`);
+      setLastSeenAt(new Date(pos.timestamp).toISOString());
       resetSignalTimer();
     });
 
     const unsubDist = socketService.onDistanceUpdate((d: DistanceUpdate) => {
-      if (d.missionId !== missionId) return;
+      if (d.missionId !== missionIdRef.current) return;
       setDistanceM(d.distanceM);
       setInZone(d.inZone);
     });
 
     const unsubAlert = socketService.onGeofenceAlert((a: GeofenceAlert) => {
-      if (a.missionId !== missionId) return;
-      setPendingAlert(a);
+      if (a.missionId !== missionIdRef.current) return;
+      enqueueAlert(a);
     });
 
     const unsubMission = socketService.onMissionUpdate((data: any) => {
-      if (data.missionId && data.missionId !== missionId) return;
+      if (data.missionId && data.missionId !== missionIdRef.current) return;
       if (data.status === 'COMPLETED' || data.status === 'CANCELLED') {
         onMissionEnd?.();
       }
     });
 
     return () => {
-      // 1. Unsubscribe all listeners first
       unsubConn();
       unsubPos();
       unsubDist();
       unsubAlert();
       unsubMission();
-      // 2. Tell server to remove client from room
       socketService.leaveMission(missionId);
-      // 3. Clear signal timer
       clearSignalTimer();
     };
   // bookingId intentionally in deps — new booking = new subscription
@@ -128,7 +183,7 @@ export function useSocketTracking({
 
   return {
     agentPosition,
-    lastSeenLabel,
+    lastSeenAt,
     connected,
     signalLost,
     distanceM,

@@ -1,4 +1,4 @@
-import type { CommonNS } from '../types';
+﻿import type { CommonNS } from '../types';
 
 const common: CommonNS = {
   cancel:        'Cancel',
@@ -9,11 +9,13 @@ const common: CommonNS = {
   yes:           'Yes',
   no:            'No',
   ok:            'OK',
-  loading:       'Loading…',
+  loading:       'Loadingâ€¦',
   error:         'Error',
   success:       'Success',
   unknown_error: 'An unexpected error occurred.',
   tls_badge:     'TLS encrypted · GDPR compliant',
+  map_loading:   'Loading map…',
+  total_spent:   'TOTAL SPENT',
 };
 
 export default common;

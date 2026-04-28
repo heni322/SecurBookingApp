@@ -1,5 +1,6 @@
-/**
- * MainNavigator — Tab bar CLIENT premium.
+﻿/**
+ * MainNavigator â€” Tab bar CLIENT premium.
+ * 4 tabs: Home · Missions · Notifications · Profile
  */
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, StyleSheet, Platform } from 'react-native';
@@ -8,8 +9,8 @@ import { Home, Shield, Bell, User } from 'lucide-react-native';
 import { useNotificationsStore }  from '@store/notificationsStore';
 import { MissionStackNavigator }  from './MissionStackNavigator';
 import { ProfileStackNavigator }  from './ProfileStackNavigator';
-import { NotificationsScreen }    from '@screens/client/NotificationsScreen';
 import { HomeScreen }             from '@screens/client/HomeScreen';
+import { NotificationsScreen }    from '@screens/client/NotificationsScreen';
 import { colors, palette }        from '@theme/colors';
 import { spacing, radius }        from '@theme/spacing';
 import { fontFamily, fontSize }   from '@theme/typography';
@@ -21,21 +22,21 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
 
 interface TabDef {
-  name:    keyof MainTabParamList;
+  name:     keyof MainTabParamList;
   labelKey: 'home' | 'missions' | 'notifications' | 'profile';
-  Icon:    LucideIcon;
+  Icon:     LucideIcon;
 }
 
 const TAB_DEFS: TabDef[] = [
-  { name: 'Home',          labelKey: 'home',          Icon: Home   },
-  { name: 'Missions',      labelKey: 'missions',      Icon: Shield },
-  { name: 'Notifications', labelKey: 'notifications', Icon: Bell   },
-  { name: 'Profile',       labelKey: 'profile',       Icon: User   },
+  { name: 'Home',          labelKey: 'home',          Icon: Home    },
+  { name: 'Missions',      labelKey: 'missions',      Icon: Shield  },
+  { name: 'Notifications', labelKey: 'notifications', Icon: Bell    },
+  { name: 'Profile',       labelKey: 'profile',       Icon: User    },
 ];
 
 export const MainNavigator: React.FC = () => {
-  const { t }        = useTranslation('navigation');
-  const unreadCount  = useNotificationsStore(s => s.unreadCount);
+  const { t }       = useTranslation('navigation');
+  const unreadCount = useNotificationsStore(s => s.unreadCount);
 
   return (
     <Tab.Navigator
@@ -65,7 +66,7 @@ export const MainNavigator: React.FC = () => {
   );
 };
 
-// ── TabItem ───────────────────────────────────────────────────────────────────
+// â”€â”€ TabItem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TabItem: React.FC<{
   Icon: LucideIcon; label: string; focused: boolean; badge?: number;
 }> = ({ Icon, label, focused, badge = 0 }) => {
@@ -95,7 +96,7 @@ const TabItem: React.FC<{
       <View style={[tabStyles.pill, focused && tabStyles.pillActive]}>
         {focused && <Animated.View style={[tabStyles.glow, { shadowOpacity: glowOpacity }]} />}
         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-          <Icon size={22} color={iconColor} strokeWidth={focused ? 2.4 : 1.8} />
+          <Icon size={20} color={iconColor} strokeWidth={focused ? 2.4 : 1.8} />
         </Animated.View>
         {badge > 0 && (
           <View style={tabStyles.badge}>
@@ -122,7 +123,7 @@ const TAB_BAR_HEIGHT = 74;
 const styles = StyleSheet.create({
   tabBar: {
     height:          TAB_BAR_HEIGHT + (Platform.OS === 'ios' ? 16 : 0),
-    backgroundColor: 'rgba(20,24,32,0.97)',
+    backgroundColor: 'rgba(12,18,32,0.97)',
     borderTopWidth:  0,
     borderTopColor:  colors.borderPrimary,
     ...Platform.select({
@@ -135,8 +136,8 @@ const styles = StyleSheet.create({
 });
 
 const tabStyles = StyleSheet.create({
-  outer: { width: 72, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: spacing[2] },
-  pill:  { width: 52, height: 36, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  outer: { width: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: spacing[2] },
+  pill:  { width: 48, height: 34, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   pillActive: {
     backgroundColor: palette.gold,
     ...Platform.select({
@@ -144,9 +145,9 @@ const tabStyles = StyleSheet.create({
       android: { elevation: 10 },
     }),
   },
-  glow: { position: 'absolute', width: 52, height: 36, borderRadius: radius.full, backgroundColor: palette.gold, shadowColor: palette.gold, shadowOffset: { width: 0, height: 0 }, shadowRadius: 18 },
-  badge: { position: 'absolute', top: -3, right: -3, backgroundColor: colors.danger, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.navy80 },
-  badgeText:   { fontFamily: fontFamily.monoMedium, fontSize: 8, color: colors.white, lineHeight: 11 },
-  label:       { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, letterSpacing: 0.2, textAlign: 'center' },
-  labelActive: { fontFamily: fontFamily.bodyMedium, color: palette.gold },
+  glow:      { position: 'absolute', width: 48, height: 34, borderRadius: radius.full, backgroundColor: palette.gold, shadowColor: palette.gold, shadowOffset: { width: 0, height: 0 }, shadowRadius: 18 },
+  badge:     { position: 'absolute', top: -3, right: -3, backgroundColor: colors.dangerSurface, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.panelSolid },
+  badgeText: { fontFamily: fontFamily.monoMedium, fontSize: 8, color: colors.white, lineHeight: 11 },
+  label:     { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, letterSpacing: 0.2, textAlign: 'center' },
+  labelActive:{ fontFamily: fontFamily.bodyMedium, color: palette.gold, fontSize: 10 },
 });

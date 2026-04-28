@@ -63,8 +63,17 @@ const booking: BookingNS = {
     CYNOPHILE:    '🐕 K9',
   },
 
+  statuses: {
+    open:        'Open',
+    assigned:    'Assigned',
+    in_progress: 'In progress',
+    completed:   'Completed',
+    cancelled:   'Cancelled',
+    abandoned:   'Abandoned',
+  },
+
   errors: {
-    load:   'Unable to load booking.',
+    load:    'Unable to load booking.',
     generic: 'An error occurred.',
   },
 };

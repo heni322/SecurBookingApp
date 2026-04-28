@@ -3,6 +3,7 @@
  * Adapté aux champs plats du backend (pas d'objet breakdown imbriqué).
  */
 import React from 'react';
+import { useTranslation } from '@i18n';
 import { View, Text, StyleSheet } from 'react-native';
 import { Card }      from '@components/ui/Card';
 import { Separator } from '@components/ui/Separator';
@@ -27,20 +28,21 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
   readonly = false,
 }) => {
   const isAccepted = quote.status === 'ACCEPTED';
+  const { t } = useTranslation('quote');
 
   // Lignes financières depuis les champs plats du backend
   const rows: Array<{ label: string; value: number; muted?: boolean }> = [
-    { label: 'Base HT',               value: quote.totalClientPrice - quote.nightSurcharge - quote.weekendSurcharge - quote.urgencySurcharge },
-    { label: 'Majoration nuit',       value: quote.nightSurcharge,   muted: quote.nightSurcharge === 0 },
-    { label: 'Majoration week-end',   value: quote.weekendSurcharge, muted: quote.weekendSurcharge === 0 },
-    { label: 'Majoration urgence',    value: quote.urgencySurcharge, muted: quote.urgencySurcharge === 0 },
-    { label: 'Sous-total HT',        value: quote.totalClientPrice },
-    { label: 'TVA 20%',              value: quote.vatAmount },
+    { label: t('row_base_ht'),               value: quote.totalClientPrice - quote.nightSurcharge - quote.weekendSurcharge - quote.urgencySurcharge },
+    { label: t('row_night'),       value: quote.nightSurcharge,   muted: quote.nightSurcharge === 0 },
+    { label: t('row_weekend'),   value: quote.weekendSurcharge, muted: quote.weekendSurcharge === 0 },
+    { label: t('row_urgency'),    value: quote.urgencySurcharge, muted: quote.urgencySurcharge === 0 },
+    { label: t('row_subtotal'),        value: quote.totalClientPrice },
+    { label: t('row_vat'),              value: quote.vatAmount },
   ];
 
   return (
     <Card elevated style={styles.card}>
-      <Text style={styles.heading}>Détail du devis</Text>
+      <Text style={styles.heading}>{t('breakdown_title')}</Text>
 
       <View style={styles.rows}>
         {rows.map((row) => (
@@ -57,19 +59,19 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
 
       {/* Total TTC */}
       <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>TOTAL TTC</Text>
+        <Text style={styles.totalLabel}>{t('row_total_ttc')}</Text>
         <Text style={styles.totalValue}>{formatCurrency(quote.totalWithVat * 100)}</Text>
       </View>
 
       {/* Rémunération agent */}
       <View style={styles.row}>
-        <Text style={styles.agentLabel}>↳ Rémunération agent (virement J+15)</Text>
+        <Text style={styles.agentLabel}>{t('agent_payout')}</Text>
         <Text style={styles.agentValue}>{formatCurrency(quote.totalAgentSalary * 100)}</Text>
       </View>
 
       {/* Commission plateforme */}
       <View style={[styles.row, { marginTop: 4 }]}>
-        <Text style={styles.agentLabel}>↳ Commission SecurBook</Text>
+        <Text style={styles.agentLabel}>{t('row_commission')}</Text>
         <Text style={[styles.agentValue, { color: colors.textMuted }]}>
           {formatCurrency(quote.platformMargin * 100)}
         </Text>
@@ -80,21 +82,21 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
         <>
           <Separator marginV={spacing[3]} />
           <Button
-            label="Accepter ce devis"
+            label={t('accept_label')}
             onPress={onAccept}
             loading={loading}
             fullWidth
             variant="filled"
           />
           <Text style={styles.expiryNote}>
-            Valable jusqu'au {formatDate(quote.expiresAt)}
+            {t('valid_until', { date: formatDate(quote.expiresAt) })}
           </Text>
         </>
       )}
 
       {isAccepted && (
         <View style={styles.acceptedBadge}>
-          <Text style={styles.acceptedText}>✓ Devis accepté</Text>
+          <Text style={styles.acceptedText}>{t('accepted_badge')}</Text>
         </View>
       )}
     </Card>

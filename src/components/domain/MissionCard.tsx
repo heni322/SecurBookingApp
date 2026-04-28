@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   touch: { marginBottom: spacing[3] },
   card: {
     flexDirection:   'row',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.backgroundElevated,
     borderRadius:    radius.xl,
     borderWidth:     1,
     borderColor:     colors.border,

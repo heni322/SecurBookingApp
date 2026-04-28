@@ -321,7 +321,7 @@ const rowStyles = StyleSheet.create({
 const modalStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.scrim,
     justifyContent: 'flex-end',
   },
   sheet: {
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   content:         { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[12], gap: spacing[4] },
   heroCard:        { padding: spacing[5], gap: spacing[4] },
   avatarSection:   { flexDirection: 'row', alignItems: 'center', gap: spacing[4] },
-  avatarRingOuter: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(188,147,59,0.08)', borderWidth: 1, borderColor: 'rgba(188,147,59,0.15)', alignItems: 'center', justifyContent: 'center' },
+  avatarRingOuter: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: 'rgba(188,147,59,0.15)', alignItems: 'center', justifyContent: 'center' },
   avatarRingInner: { width: 76, height: 76, borderRadius: 38, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   heroInfo:        { flex: 1, gap: spacing[1] },
   fullName:        { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4 },
@@ -413,3 +413,6 @@ const styles = StyleSheet.create({
   deleteText:      { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.danger },
   uid:             { textAlign: 'center', fontFamily: fontFamily.mono, fontSize: 10, color: colors.textMuted, opacity: 0.5, marginTop: spacing[2] },
 });
+
+
+

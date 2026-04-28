@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   // Modal
   overlay: {
     flex:            1,
-    backgroundColor: 'rgba(5,23,43,0.80)',
+    backgroundColor: colors.overlay,
     justifyContent:  'flex-end',
   },
   sheet: {
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     borderRadius:    radius.xl,
     height:          52,
-    shadowColor:     '#bc933b',
+    shadowColor:     colors.primary,
     shadowOffset:    { width: 0, height: 4 },
     shadowOpacity:   0.35,
     shadowRadius:    12,
@@ -539,7 +539,8 @@ const styles = StyleSheet.create({
   confirmText: {
     fontFamily:    fontFamily.bodySemiBold,
     fontSize:      fontSize.base,
-    color:         '#fff',
+    color:         colors.white,
     letterSpacing: 0.1,
   },
 });
+

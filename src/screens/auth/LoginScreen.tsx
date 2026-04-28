@@ -203,14 +203,14 @@ const styles = StyleSheet.create({
 
   logoOuter: {
     width: 108, height: 108, borderRadius: 54,
-    backgroundColor: 'rgba(188,147,59,0.06)',
-    borderWidth: 1, borderColor: 'rgba(188,147,59,0.12)',
+    backgroundColor: colors.primarySurface,
+    borderWidth: 1, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center',
   },
   logoMid: {
     width: 84, height: 84, borderRadius: 42,
-    backgroundColor: 'rgba(188,147,59,0.10)',
-    borderWidth: 1, borderColor: 'rgba(188,147,59,0.20)',
+    backgroundColor: colors.primarySurface,
+    borderWidth: 1, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center',
   },
   logoInner: {
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySurface,
     borderWidth: 1.5, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#bc933b', shadowOffset: { width: 0, height: 4 },
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
   },
 
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
     borderRadius: radius['2xl'], borderWidth: 1, borderColor: colors.border,
     padding: spacing[6], gap: spacing[4],
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowColor: colors.scrim, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35, shadowRadius: 20, elevation: 10,
   },
   formHeader: { gap: spacing[1] },
@@ -271,3 +271,4 @@ const styles = StyleSheet.create({
   footerText: { fontFamily: fontFamily.body,         fontSize: fontSize.sm, color: colors.textSecondary },
   footerLink: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
 });
+

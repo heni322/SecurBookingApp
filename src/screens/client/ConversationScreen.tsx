@@ -201,7 +201,7 @@ const msgStyles = StyleSheet.create({
     color:      colors.textMuted,
     alignSelf:  'flex-end',
   },
-  timeMe: { color: 'rgba(10,12,15,0.5)' },
+  timeMe: { color: colors.textMuted },
 });
 
 const styles = StyleSheet.create({
@@ -256,3 +256,4 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { backgroundColor: colors.border },
 });
+

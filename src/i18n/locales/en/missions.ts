@@ -1,4 +1,4 @@
-import type { MissionsNS } from '../types';
+﻿import type { MissionsNS } from '../types';
 
 const missions: MissionsNS = {
   title: 'Missions', subtitle_one: '{{count}} mission', subtitle_other: '{{count}} missions',
@@ -42,15 +42,16 @@ const missions: MissionsNS = {
     cancel_title: 'Cancel mission', cancel_body: 'This action is irreversible. Continue?',
     cancel_back: 'Back', cancel_confirm: 'Cancel', cancel_error: 'Unable to cancel',
     duration: 'Duration', created_on: 'Created on',
-    cta_get_quote: 'Get a quote',
+    cta_get_quote: 'Get a quote', radius: 'Search radius',
     cta_see_quote: 'View quote',
     cta_pay: 'View quote & pay',
     cta_select: 'Select agents',
     cta_waiting: 'Waiting for applications...',
+    cta_assigning: 'Agent being assigned automatically...',
     cta_messaging: 'Mission messaging',
   },
 
-  // Flow: CREATED → PUBLISHED → STAFFING → STAFFED → IN_PROGRESS → COMPLETED
+  // Flow: CREATED â†’ PUBLISHED â†’ STAFFING â†’ STAFFED â†’ IN_PROGRESS â†’ COMPLETED
   statuses: {
     created:     'Created',
     published:   'Published',
@@ -75,7 +76,7 @@ const missions: MissionsNS = {
     pending_title: 'Confirming payment...',
     pending_subtitle: 'We are verifying payment receipt. This usually takes a few seconds.',
     timeout_title: 'Payment being processed',
-    timeout_subtitle: 'For SEPA payments, confirmation can take 1–2 business days. You will be notified once confirmed.',
+    timeout_subtitle: 'For SEPA payments, confirmation can take 1â€“2 business days. You will be notified once confirmed.',
     timeout_info: 'Your mission will be published to agents automatically once payment is received.',
     follow_mission: 'Follow my mission',
   },
@@ -94,9 +95,9 @@ const missions: MissionsNS = {
   },
 
   create: {
-    step_one: 'Step 1 of 3 · Uniforms & agents',
-    step_two: 'Step 2 of 3 · Location',
-    step_three: 'Step 3 of 3 · Scheduling',
+    step_one: 'Step 1 of 3 Â· Uniforms & agents',
+    step_two: 'Step 2 of 3 Â· Location',
+    step_three: 'Step 3 of 3 Â· Scheduling',
     service_required_title: 'Service required', service_required_body: 'Select at least one service.',
     map_position_required: 'Select a position on the map', start_required: 'Start date is required',
     duration_min: 'Minimum duration: 6 hours (legal requirement)', duration_max: 'Maximum duration: 10 days',
@@ -111,6 +112,34 @@ const missions: MissionsNS = {
     end_hint: 'Minimum legal duration: 6 hours',
     summary_start: 'Start', summary_duration: 'Duration',
     next_btn: 'Next step', create_btn: 'Create and get a quote',
+    address_required: 'Address required', city_required: 'City required',
+    end_required: 'End date required',
+    uniform_per_agent: 'UNIFORM PER AGENT',
+    total_agents: '{{count}} agent · {{lines}} service',
+    add_service: 'Add a service',
+    summary_title: 'SUMMARY',
+    recap_section: 'SERVICES & UNIFORMS',
+    urgency_note: 'Urgency surcharge applicable',
+    title_label:       'Title (optional)',
+    notes_label:       'Notes / instructions (optional)',
+    radius_label:      'Search radius (km)',
+    radius_hint:       'Between 5 and 500 km',
+    city_label:        'City *',
+    city_placeholder:  'London',
+    zip_label:         'Postcode',
+    zip_placeholder:   'SW1A 1AA',
+    address_placeholder: 'Search an address…',
+    summary_location:  'Location',
+    summary_end:       'End',
+    end_label:         'Mission end *',
+    total_agents_label:'Total agents',
+    duration_hours:    '{{hours}} hours mission',
+    step_two_title:    'Mission location',
+    agent_label:       'Agent {{n}}',
+    amplitude_max:     'Mission too long: {{h}}h (max 12h per mission).',
+    weekly_cap:        'Weekly limit reached: {{h}}h worked (max 48h from Mon to Sun).',
+    rest_between:      'Insufficient rest: only {{h}}h between two missions (min 11h required).',
+    rest_after_cap:    '24h rest required after reaching the 48h weekly cap.',
   },
 };
 
