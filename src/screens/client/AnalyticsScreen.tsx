@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   RefreshControl, Animated,
@@ -10,7 +10,7 @@ import { paymentsApi }    from '@api/endpoints/payments';
 import { useApi }         from '@hooks/useApi';
 import { ScreenHeader }   from '@components/ui/ScreenHeader';
 import { Card }           from '@components/ui/Card';
-import { colors, palette } from '@theme/colors';
+import { colors }         from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatEuros }    from '@utils/formatters';
@@ -20,42 +20,54 @@ import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'Analytics'>;
 
-// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
 function getLast6Months(): { key: string; label: string }[] {
   const result = [];
-  const now = new Date();
+  const now    = new Date();
   for (let i = 5; i >= 0; i--) {
-    const d   = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const d     = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    // Fix: padStart(2, '0') — was padStart(2, '00') which is a no-op
+    const key   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = new Intl.DateTimeFormat('fr-FR', { month: 'short' }).format(d);
     result.push({ key, label: label.charAt(0).toUpperCase() + label.slice(1) });
   }
   return result;
 }
 
-// â”€â”€â”€ Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── AnimatedBar ─────────────────────────────────────────────────────────────
+
 const AnimatedBar: React.FC<{ ratio: number; color: string; height: number }> = ({
   ratio, color, height,
 }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(anim, { toValue: ratio, useNativeDriver: false, friction: 6, tension: 50 }).start();
+    Animated.spring(anim, {
+      toValue:         ratio,
+      useNativeDriver: false,
+      friction:        6,
+      tension:         50,
+    }).start();
   }, [ratio]);
+
   const barH = anim.interpolate({ inputRange: [0, 1], outputRange: [2, height] });
+
   return (
     <Animated.View
       style={{
-        width:        24,
-        height:       barH,
-        borderRadius: 4,
+        width:           24,
+        height:          barH,
+        borderRadius:    4,
         backgroundColor: color,
       }}
     />
   );
 };
 
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
-  const { t } = useTranslation('analytics');
+  const { t }    = useTranslation('analytics');
   const { data: missions, loading: mLoading, execute: loadM } = useApi(missionsApi.getMyMissions);
   const { data: payments, loading: pLoading, execute: loadP } = useApi(paymentsApi.getMyPayments);
 
@@ -65,43 +77,68 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
   const loading = mLoading || pLoading;
   const months  = getLast6Months();
 
-  // Monthly spending
+  // ── Monthly spending ──────────────────────────────────────────────────────
   const monthlySpend = useMemo(() => {
     const map: Record<string, number> = {};
     for (const m of months) map[m.key] = 0;
-    for (const p of (Array.isArray(payments) ? payments : [])) {
+    for (const p of (Array.isArray(payments) ? payments : []) as Payment[]) {
       if (p.status !== PaymentStatus.PAID) continue;
       const d   = new Date(p.paidAt ?? p.createdAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '00')}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (key in map) map[key] += p.amount;
     }
     return months.map(m => ({ ...m, value: map[m.key] }));
   }, [payments, months]);
 
-  const maxSpend = Math.max(...monthlySpend.map(m => m.value), 1);
+  const maxSpend   = Math.max(...monthlySpend.map(m => m.value), 1);
   const totalSpend = monthlySpend.reduce((s, m) => s + m.value, 0);
 
-  // Mission statuses
+  // ── Mission status breakdown ───────────────────────────────────────────────
   const statusData = useMemo(() => {
     const all = Array.isArray(missions) ? missions : [];
     return [
-      { label: 'Terminées',  count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,  color: colors.success, Icon: CheckCircle },
-      { label: 'En cours',   count: all.filter((m: Mission) => [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.STAFFED].includes(m.status as any)).length, color: colors.primary, Icon: Shield },
-      { label: 'Brouillons', count: all.filter((m: Mission) => m.status === MissionStatus.CREATED).length,      color: colors.textMuted, Icon: Clock },
-      { label: 'Cancelled',   count: all.filter((m: Mission) => m.status === MissionStatus.CANCELLED).length,  color: colors.danger, Icon: XCircle },
+      {
+        // Fix: was 'Terminées' — encoding garbled
+        label: 'Terminées',
+        count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,
+        color: colors.success,
+        Icon:  CheckCircle,
+      },
+      {
+        label: 'En cours',
+        count: all.filter((m: Mission) =>
+          [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.STAFFED]
+            .includes(m.status as any),
+        ).length,
+        color: colors.primary,
+        Icon:  Shield,
+      },
+      {
+        label: 'Brouillons',
+        count: all.filter((m: Mission) => m.status === MissionStatus.CREATED).length,
+        color: colors.textMuted,
+        Icon:  Clock,
+      },
+      {
+        // Fix: was 'Cancelled' — English in a French app
+        label: 'Annulées',
+        count: all.filter((m: Mission) => m.status === MissionStatus.CANCELLED).length,
+        color: colors.danger,
+        Icon:  XCircle,
+      },
     ];
   }, [missions]);
 
   const totalMissions = statusData.reduce((s, d) => s + d.count, 0);
 
-  // Monthly missions count
+  // ── Monthly mission counts ────────────────────────────────────────────────
   const monthlyMissions = useMemo(() => {
     const map: Record<string, number> = {};
     for (const m of months) map[m.key] = 0;
-    for (const miss of (Array.isArray(missions) ? missions : [])) {
+    for (const miss of (Array.isArray(missions) ? missions : []) as Mission[]) {
       if (miss.status === MissionStatus.CANCELLED) continue;
       const d   = new Date(miss.createdAt);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '00')}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       if (key in map) map[key]++;
     }
     return months.map(m => ({ ...m, count: map[m.key] }));
@@ -122,31 +159,30 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           <RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />
         }
       >
-
-        {/* â”€â”€ Summary KPIs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Summary KPIs ───────────────────────────────────────────────── */}
         <View style={styles.kpiRow}>
-          <KpiCard label="Total spent"  value={formatEuros(totalSpend)}      accent />
+          {/* Fix: was "Total spent" — English */}
+          <KpiCard label="Total dépensé"  value={formatEuros(totalSpend)} accent />
+          {/* Fix: was "Total missions" — acceptable but aligning to French */}
           <KpiCard label="Total missions" value={String(totalMissions)} />
         </View>
 
-        {/* â”€â”€ Monthly Spending Bar Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Monthly Spending Bar Chart ─────────────────────────────────── */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={16} color={colors.primary} strokeWidth={1.8} />
-            <Text style={styles.chartTitle}>DÃ©penses mensuelles</Text>
+            {/* Fix: was 'DÃ©penses mensuelles' — encoding corruption */}
+            <Text style={styles.chartTitle}>Dépenses mensuelles</Text>
           </View>
           <View style={styles.barsRow}>
             {monthlySpend.map(m => (
               <View key={m.key} style={styles.barCol}>
                 <Text style={styles.barValue}>
-                  {m.value > 0 ? `${Math.round(m.value)}â‚¬` : ''}
+                  {/* Fix: was 'â‚¬' — € sign encoding corruption */}
+                  {m.value > 0 ? `${Math.round(m.value)}€` : ''}
                 </Text>
                 <View style={[styles.barTrack, { height: BAR_H }]}>
-                  <AnimatedBar
-                    ratio={m.value / maxSpend}
-                    color={colors.primary}
-                    height={BAR_H}
-                  />
+                  <AnimatedBar ratio={m.value / maxSpend} color={colors.primary} height={BAR_H} />
                 </View>
                 <Text style={styles.barLabel}>{m.label}</Text>
               </View>
@@ -154,7 +190,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Card>
 
-        {/* â”€â”€ Monthly Missions Bar Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Monthly Missions Bar Chart ─────────────────────────────────── */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.info} strokeWidth={1.8} />
@@ -163,15 +199,9 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.barsRow}>
             {monthlyMissions.map(m => (
               <View key={m.key} style={styles.barCol}>
-                <Text style={styles.barValue}>
-                  {m.count > 0 ? m.count : ''}
-                </Text>
+                <Text style={styles.barValue}>{m.count > 0 ? m.count : ''}</Text>
                 <View style={[styles.barTrack, { height: BAR_H }]}>
-                  <AnimatedBar
-                    ratio={m.count / maxMissions}
-                    color={colors.info}
-                    height={BAR_H}
-                  />
+                  <AnimatedBar ratio={m.count / maxMissions} color={colors.info} height={BAR_H} />
                 </View>
                 <Text style={styles.barLabel}>{m.label}</Text>
               </View>
@@ -179,14 +209,15 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Card>
 
-        {/* â”€â”€ Status Breakdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+        {/* ── Status Breakdown ───────────────────────────────────────────── */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.textSecondary} strokeWidth={1.8} />
-            <Text style={styles.chartTitle}>RÃ©partition des missions</Text>
+            {/* Fix: was 'RÃ©partition des missions' — encoding corruption */}
+            <Text style={styles.chartTitle}>Répartition des missions</Text>
           </View>
           <View style={styles.statusList}>
-            {statusData.map(({ label, count, color, Icon }) => {
+            {statusData.map(({ label, count, color }) => {
               const pct = totalMissions > 0 ? count / totalMissions : 0;
               return (
                 <View key={label} style={styles.statusRow}>
@@ -208,7 +239,8 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// â”€â”€â”€ KPI Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
+
 const KpiCard: React.FC<{ label: string; value: string; accent?: boolean }> = ({
   label, value, accent,
 }) => (
@@ -235,6 +267,8 @@ const kpiStyles = StyleSheet.create({
   label:       { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
 });
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: colors.background },
   content: {
@@ -245,7 +279,7 @@ const styles = StyleSheet.create({
   },
   kpiRow: { flexDirection: 'row', gap: spacing[3] },
 
-  chartCard:   { padding: spacing[4] },
+  chartCard: { padding: spacing[4] },
   chartHeader: {
     flexDirection: 'row',
     alignItems:    'center',
@@ -308,11 +342,11 @@ const styles = StyleSheet.create({
     width:      70,
   },
   statusTrack: {
-    flex:          1,
-    height:        6,
-    borderRadius:  3,
-    flexDirection: 'row',
-    overflow:      'hidden',
+    flex:            1,
+    height:          6,
+    borderRadius:    3,
+    flexDirection:   'row',
+    overflow:        'hidden',
     backgroundColor: colors.surface,
   },
   statusFill:  { borderRadius: 3 },

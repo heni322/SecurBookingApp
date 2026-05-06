@@ -12,7 +12,8 @@ export { serviceTypesApi }   from './endpoints/serviceTypes';
 // Flux principal client
 export { missionsApi }       from './endpoints/missions';
 export { quotesApi }         from './endpoints/quotes';
-export { bookingsApi }       from './endpoints/bookings';
+export { bookingsApi }            from './endpoints/bookings';
+export { agentAvailabilitiesApi } from './endpoints/agentAvailabilities';
 export { paymentsApi }       from './endpoints/payments';
 
 // Communication & post-mission

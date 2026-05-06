@@ -29,17 +29,22 @@ export const Card: React.FC<Props> = ({
   const borderColor = glow
     ? colors.borderPrimary
     : danger
-    ? colors.danger + '55'
+    // Fix #9: danger+ '55' for muted red border (was colors.danger + '55' — wrong, danger = txtRed text color)
+    ? colors.dangerSurface + '55'
     : success
-    ? colors.success + '55'
+    // Fix #10: success + '55' for muted green border
+    ? colors.successSurface + '55'
     : colors.border;
 
   const bgColor = glow
     ? colors.primarySurface
     : danger
-    ? colors.dangerSurface
+    // Fix #9: was colors.dangerSurface = vivid '#e11d48' (icon fill token) — wrong for card bg
+    // Use a muted rgba tint that reads as a surface, not a vivid icon fill
+    ? 'rgba(225, 29, 72, 0.10)'
     : success
-    ? colors.successSurface
+    // Fix #10: was colors.successSurface = vivid '#4ade80' (dot/border token) — wrong for card bg
+    ? 'rgba(74, 222, 128, 0.10)'
     : elevated
     ? colors.backgroundElevated
     : colors.surface;
@@ -83,4 +88,3 @@ const styles = StyleSheet.create({
     elevation:     6,
   },
 });
-

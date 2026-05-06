@@ -1,37 +1,37 @@
 ﻿/**
- * LiveTrackingScreen â€” Real-time agent tracking (CLIENT app).
+ * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
  * Map engine: WebView + Leaflet (zero Google dependency, zero API key)
  * Real-time updates: injectJavaScript() â†’ Leaflet JS API
  *
  * FIX HISTORY:
- *  v2 â€” html memoized with useMemo (was rebuilt every render â†’ WebView remounted
+ *  v2 — html memoized with useMemo (was rebuilt every render â†’ WebView remounted
  *        every second â†’ tracking reset on every GPS update) [CRITICAL]
- *     â€” Removed dead react-native-svg imports
- *     â€” WebView readiness confirmed via postMessage ('ready') not just onLoad
- *     â€” inject() guard: skip if webRef null or not ready
- *     â€” leaveMission now emits socket event to stop server-side forwarding
- *  v3 â€” [BUG FIX] alertBanner elevation raised from 14 â†’ 30.
+ *     — Removed dead react-native-svg imports
+ *     — WebView readiness confirmed via postMessage ('ready') not just onLoad
+ *     — inject() guard: skip if webRef null or not ready
+ *     — leaveMission now emits socket event to stop server-side forwarding
+ *  v3 — [BUG FIX] alertBanner elevation raised from 14 â†’ 30.
  *        On Android, elevation determines z-order inside a stacking context.
  *        The bottom card had elevation:24, which placed it ABOVE the alertBanner
  *        (elevation:14), hiding the out-of-zone error popup completely on Android.
- *     â€” [BUG FIX] Hardcoded French strings replaced with t() calls.
- *     â€” [BUG FIX] useSocketTracking now returns lastSeenAt (ISO string).
- *     â€” useTranslation import fixed: '@i18n' instead of 'react-i18next'.
- *  v4 â€” [BUG FIX] Alert banner âœ• close button completely unresponsive.
+ *     — [BUG FIX] Hardcoded French strings replaced with t() calls.
+ *     — [BUG FIX] useSocketTracking now returns lastSeenAt (ISO string).
+ *     — useTranslation import fixed: '@i18n' instead of 'react-i18next'.
+ *  v4 — [BUG FIX] Alert banner ✕ close button completely unresponsive.
  *
  *       ROOT CAUSES (all fixed):
  *
- *       1. pointerEvents race â€” Animated.View had pointerEvents={pendingAlert ?
+ *       1. pointerEvents race — Animated.View had pointerEvents={pendingAlert ?
  *          'auto' : 'none'}. The moment dismissAlert() was called, React set
  *          pendingAlert=null in the SAME synchronous frame, flipping pointerEvents
  *          to 'none' before the 220 ms slide-out animation had even started.
- *          Any tap on âœ• during that animation was silently swallowed.
+ *          Any tap on ✕ during that animation was silently swallowed.
  *          Fix: pointerEvents is now driven by a separate isVisible ref that
  *          is set to false only after the animation callback fires, not on
  *          state change.
  *
- *       2. Animation ownership conflict â€” useEffect watched pendingAlert to
+ *       2. Animation ownership conflict — useEffect watched pendingAlert to
  *          trigger both slide-in AND slide-out. When the socket fired a new
  *          alert during the slide-out, pendingAlert became non-null again,
  *          immediately calling spring() and fighting the running timing()
@@ -41,14 +41,14 @@
  *          slideIn() / slideOut() helpers. The useEffect only calls slideIn.
  *          dismissAlert() calls slideOut directly.
  *
- *       3. Alert queue clobbering â€” rapid successive geofence alerts from the
+ *       3. Alert queue clobbering — rapid successive geofence alerts from the
  *          socket called setPendingAlert(newAlert) and overwrote the null that
  *          dismiss had just written, re-showing the banner mid-animation.
  *          Fix: useSocketTracking v4 now maintains an internal queue; the
  *          screen always sees at most one alert at a time and the next queued
  *          alert surfaces only after dismissAlert() is acknowledged.
  *
- *       4. Inline initials computation â€” duplicated 3Ã— in the component.
+ *       4. Inline initials computation — duplicated 3Ã— in the component.
  *          Replaced with getInitials() from formatters.ts.
  *
  *       5. handleDismissAlert was defined after the useEffect that referenced
@@ -273,21 +273,21 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   // â”€â”€ Alert banner animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const alertSlide     = useRef(new Animated.Value(-160)).current;
   /**
-   * isAlertVisible â€” ref (not state) so it can be read synchronously inside
+   * isAlertVisible — ref (not state) so it can be read synchronously inside
    * animation callbacks and set without triggering re-renders.
    * true  = banner is on screen (either sliding in, fully visible, or sliding out)
    * false = banner is completely off screen
    *
    * pointerEvents on the Animated.View is derived from this ref via the
    * [alertPointerEvents, setAlertPointerEvents] state pair below so React
-   * can still update the prop â€” but we only flip it to 'none' inside the
+   * can still update the prop — but we only flip it to 'none' inside the
    * slide-out completion callback, NOT on pendingAlert state change.
    */
   const isAlertVisible = useRef(false);
   const [alertPointerEvents, setAlertPointerEvents] = useState<'auto' | 'none'>('none');
 
   /**
-   * slideIn â€” starts the spring animation and enables touches immediately.
+   * slideIn — starts the spring animation and enables touches immediately.
    * Safe to call when already visible (spring will settle from current position).
    */
   const slideIn = useCallback(() => {
@@ -300,10 +300,10 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, [alertSlide]);
 
   /**
-   * slideOut â€” starts the timing animation. Only disables touches and calls
+   * slideOut — starts the timing animation. Only disables touches and calls
    * dismissAlert() AFTER the animation completes. This is the critical fix:
    * pointerEvents stays 'auto' for the full 220 ms of the animation so the
-   * user can always tap âœ•.
+   * user can always tap ✕.
    */
   const slideOut = useCallback(() => {
     Animated.timing(alertSlide, {
@@ -323,7 +323,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, [alertSlide, dismissAlert]);
 
   /**
-   * handleDismissAlert â€” public handler wired to the âœ• button and the
+   * handleDismissAlert — public handler wired to the ✕ button and the
    * auto-dismiss effect. Guards against double-tap: if the banner is already
    * sliding out (isAlertVisible = false) subsequent calls are ignored.
    */
@@ -349,7 +349,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, [inZone, handleDismissAlert]);
 
-  // â”€â”€ Map HTML (memoized â€” must never change identity or WebView remounts) â”€â”€
+  // â”€â”€ Map HTML (memoized — must never change identity or WebView remounts) â”€â”€
   const html = useMemo(
     () => buildTrackingHTML(siteLat, siteLng),
     [siteLat, siteLng],
@@ -487,8 +487,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
       {/* â”€â”€ Geofence alert banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
        *  pointerEvents is driven by alertPointerEvents state, which is only
-       *  set to 'none' inside the slide-out animation callback â€” NOT on
-       *  pendingAlert state change. This prevents the race where a tap on âœ•
+       *  set to 'none' inside the slide-out animation callback — NOT on
+       *  pendingAlert state change. This prevents the race where a tap on ✕
        *  was swallowed because React had already flipped pointerEvents to
        *  'none' in the same render that started the animation.
        * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
@@ -500,7 +500,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         <View style={styles.alertTextBlock}>
           <Text style={styles.alertTitle}>{t('out_of_zone')}</Text>
           <Text style={styles.alertBody} numberOfLines={1}>
-            {pendingAlert ? `${pendingAlert.agentName} â€” ${pendingAlert.distanceStr}` : ''}
+            {pendingAlert ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}` : ''}
           </Text>
         </View>
         <TouchableOpacity
@@ -509,7 +509,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           activeOpacity={0.6}
           style={styles.alertCloseBtn}
         >
-          <Text style={styles.alertClose}>âœ•</Text>
+          <Text style={styles.alertClose}>✕</Text>
         </TouchableOpacity>
       </Animated.View>
 
@@ -546,8 +546,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         <View style={[styles.zoneStrip, !inZone && styles.zoneStripAlert]}>
           <Text style={[styles.zoneTxt, !inZone && styles.zoneTxtAlert]}>
             {inZone
-              ? `âœ“ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
-              : `âš  ${t('out_of_zone')}`}
+              ? `✓ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
+              : `⚠ ${t('out_of_zone')}`}
           </Text>
         </View>
 

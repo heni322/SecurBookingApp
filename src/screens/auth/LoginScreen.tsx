@@ -21,11 +21,13 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User } from '@models/index';
 import { useTranslation }    from '@i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { t } = useTranslation('auth');
+  const { top } = useSafeAreaInsets();
 
   const [email,    setEmail]    = useState(__DEV__ ? 'client@demo.fr' : '');
   const [password, setPassword] = useState(__DEV__ ? 'Demo@Client2026!' : '');
@@ -94,7 +96,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingTop: top + spacing[10] }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -194,7 +196,6 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow:          1,
     paddingHorizontal: layout.screenPaddingH,
-    paddingTop:        spacing[16],
     paddingBottom:     spacing[10],
     justifyContent:    'center',
   },

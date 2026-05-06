@@ -1,9 +1,13 @@
 import type { DisputeNS } from '../types';
 
 const dispute: DisputeNS = {
-  screen_title: 'Ouvrir un litige',
-  done_title:   'Litige ouvert',
-  back_btn:     'Retour à mes missions',
+  screen_title:      'Ouvrir un litige',
+  done_title:        'Litige ouvert',
+  done_subtitle:     'Votre demande a été transmise à notre équipe. Un responsable examinera le litige sous 48h ouvrées.',
+  back_btn:          'Retour à mes missions',
+  info_banner:       'Décrivez précisément les faits. Notre équipe examinera votre litige sous 48h ouvrées et vous recontactera.',
+  reason_label:      'Motif *',
+  description_label: 'Description *',
 
   reasons: {
     agent_absent: {

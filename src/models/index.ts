@@ -1,4 +1,4 @@
-﻿import {
+import {
   UserRole, UserStatus, MissionStatus, BookingStatus,
   DocumentStatus, PaymentStatus, ClientType,
 } from '@constants/enums';
@@ -71,7 +71,7 @@ export interface UpdateUserPayload {
 
 export interface DeleteAccountPayload {
   password:        string;
-  confirmPhrase:   string;   // must equal "SUPPRIMER MON COMPTE"
+  confirmPhrase:   string;
 }
 
 // -----------------------------------------------------------------------------
@@ -107,15 +107,85 @@ export interface Quote {
   urgencySurcharge: number;
 }
 
+/**
+ * One booking line — one service type, N agents, optional per-agent uniforms.
+ * Used in both the quote payload and embedded in MissionSlot.
+ */
 export interface BookingLine {
-  serviceTypeId: string;
-  agentCount:    number;
-  agentUniforms?: string[];   // one entry per agent — nulls stripped before sending
+  serviceTypeId:   string;
+  agentCount:      number;
+  /** One uniform value per agent. Nulls are stripped to 'STANDARD' before sending. */
+  agentUniforms?:  string[];
 }
 
+/**
+ * Payload for POST /quotes/calculate.
+ *
+ * Single-slot missions: use `bookingLines`.
+ * Multi-slot missions: use `slotLines` (per-slot service types + agents).
+ * When both are provided, `slotLines` takes priority (backend behaviour).
+ */
 export interface CreateQuotePayload {
   missionId:    string;
-  bookingLines: BookingLine[];
+  /** For single-slot missions (legacy). */
+  bookingLines?: BookingLine[];
+  /**
+   * For multi-slot missions — per-slot staffing requirements.
+   * Each entry references a slotId from the created MissionSlot records
+   * (returned by POST /missions in the `slots` array).
+   */
+  slotLines?: Array<{
+    slotId:       string;
+    bookingLines: BookingLine[];
+  }>;
+}
+
+// -----------------------------------------------------------------------------
+// SLOT BOOKING LINE — local draft, carries display metadata not sent to API
+// -----------------------------------------------------------------------------
+/**
+ * Local representation of one service-type need within a slot draft.
+ * `name` and `accent` are UI-only and stripped before building the API payload.
+ */
+export interface SlotBookingLine {
+  serviceTypeId: string;
+  agentCount:    number;
+  name:          string;
+  accent:        string;
+  agentUniforms: (string | null)[];
+}
+
+// -----------------------------------------------------------------------------
+// MISSION SLOT — mirrors backend MissionSlotDto (with per-slot bookingLines)
+// -----------------------------------------------------------------------------
+/**
+ * One time window within a multi-day / variable-hours mission.
+ *
+ * `bookingLines` enables per-slot staffing:
+ *   Day 08-18h   → 3x SECURITE STANDARD
+ *   Night 22-06h → 1x SSIAP + 1x CYNOPHILE
+ *
+ * If `bookingLines` is omitted the backend uses the mission-level
+ * `bookingLines` (if any) or leaves bookings for a later /quotes/calculate.
+ */
+export interface MissionSlot {
+  startAt:       string;
+  endAt:         string;
+  durationHours: number;
+  notes?:        string;
+  bookingLines?: Array<{
+    serviceTypeId:  string;
+    agentCount:     number;
+    agentUniforms?: string[];
+  }>;
+}
+
+/** A created slot as returned by the API — has a server-assigned `id`. */
+export interface MissionSlotRecord extends Omit<MissionSlot, 'bookingLines'> {
+  id:        string;
+  slotIndex: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // -----------------------------------------------------------------------------
@@ -137,6 +207,7 @@ export interface Mission {
   notes?:        string;
   isUrgent:      boolean;
   radiusKm:      number;
+  slots?:        MissionSlotRecord[];
   quote?:        Quote;
   payment?:      Payment;
   bookings?:     Booking[];
@@ -144,19 +215,39 @@ export interface Mission {
   updatedAt:     string;
 }
 
+/**
+ * Payload for POST /missions — mirrors backend CreateMissionDto.
+ *
+ * Single-slot (legacy):
+ *   { startAt, endAt, durationHours, bookingLines?, ...location }
+ *
+ * Multi-slot (per-slot agents):
+ *   { slots: MissionSlot[], ...location }
+ *   Each slot carries its own bookingLines.  Falls back to root bookingLines
+ *   when a slot has none.
+ */
 export interface CreateMissionPayload {
-  address:       string;
-  city:          string;
-  zipCode?:      string;
-  latitude:      number;
-  longitude:     number;
-  startAt:       string;
-  endAt:         string;
-  durationHours: number;
-  title?:        string;
-  notes?:        string;
-  isUrgent?:     boolean;
-  radiusKm?:     number;
+  address:   string;
+  city:      string;
+  zipCode?:  string;
+  latitude:  number;
+  longitude: number;
+
+  // Single-slot fields
+  startAt?:       string;
+  endAt?:         string;
+  durationHours?: number;
+
+  // Multi-slot fields
+  slots?: MissionSlot[];
+
+  // Global booking lines (single-slot or per-slot fallback)
+  bookingLines?: BookingLine[];
+
+  title?:    string;
+  notes?:    string;
+  isUrgent?: boolean;
+  radiusKm?: number;
 }
 
 export type UpdateMissionPayload = Partial<CreateMissionPayload>;
@@ -214,6 +305,56 @@ export interface SelectAgentPayload {
   applicationId: string;
 }
 
+/**
+ * Payload for POST /bookings/:id/assign-agent — CLIENT direct-pick flow.
+ * Lets the client assign an agent without waiting for an application.
+ */
+export interface AssignAgentPayload {
+  agentId: string;
+}
+
+/**
+ * Returned by GET /bookings/:id/eligible-agents.
+ * Combines AgentSummary + per-booking annotations (distance, R1-R4, availability).
+ */
+export interface EligibleAgent {
+  id:                       string;
+  fullName:                 string;
+  avatarUrl?:               string;
+  avgRating:                number;
+  completedCount:           number;
+  isValidated:              boolean;
+  city?:                    string;
+  bio?:                     string;
+  profileType:              string;
+  hourlyRateConvention:     number;
+  /** Distance from agent's home to mission site, in km — undefined if no GPS. */
+  distanceKm?:              number;
+  /** Agent in the current client's favorites list. */
+  isFavorite:               boolean;
+  /** At least one declared AgentAvailability covers the slot window. */
+  hasDeclaredAvailability:  boolean;
+  /** R1-R4 conflict messages — empty if assignable. */
+  schedulingConflicts:      string[];
+  /** True iff schedulingConflicts is empty. UI greys others out. */
+  canBeAssigned:            boolean;
+}
+
+/**
+ * Mirrors backend AgentAvailability — declared free windows.
+ */
+export interface AgentAvailability {
+  id:        string;
+  agentId:   string;
+  /** ISO date of the day (UTC midnight). */
+  date:      string;
+  /** "HH:MM" 24h format. */
+  startTime: string;
+  /** "HH:MM" 24h format. */
+  endTime:   string;
+  createdAt: string;
+}
+
 export interface IncidentReportPayload {
   description: string;
   latitude?:   number;
@@ -251,7 +392,6 @@ export interface CreateDisputePayload {
   description: string;
 }
 
-// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 // PAYMENT METHOD (Stripe saved card / SEPA)
 // -----------------------------------------------------------------------------
@@ -294,7 +434,6 @@ export interface CreatePaymentIntentPayload {
 
 export interface PaymentIntentResponse {
   clientSecret:  string;
-  /** 'payment_intent' for CARD, 'setup_intent' for SEPA */
   type?:          'payment_intent' | 'setup_intent';
   paymentId:     string;
   invoiceNumber: string;
@@ -308,7 +447,6 @@ export interface PaymentIntentResponse {
   };
 }
 
-// -----------------------------------------------------------------------------
 // -----------------------------------------------------------------------------
 // OFFLINE PAYMENT (Virement / Cheque)
 // -----------------------------------------------------------------------------
@@ -465,6 +603,7 @@ export type MissionStackParamList = {
   MissionDetail:  { missionId: string };
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
+  SelectCreneau:  { missionId: string };
   SelectAgent:    { bookingId: string };
   PaymentScreen:  {
     missionId:     string;

@@ -1,9 +1,13 @@
 import type { DisputeNS } from '../types';
 
 const dispute: DisputeNS = {
-  screen_title: 'Open a dispute',
-  done_title:   'Dispute opened',
-  back_btn:     'Back to my missions',
+  screen_title:      'Open a dispute',
+  done_title:        'Dispute opened',
+  done_subtitle:     'Your request has been sent to our team. A manager will review the dispute within 48 business hours.',
+  back_btn:          'Back to my missions',
+  info_banner:       'Describe the facts precisely. Our team will review your dispute within 48 business hours and get back to you.',
+  reason_label:      'Reason *',
+  description_label: 'Description *',
 
   reasons: {
     agent_absent: {

@@ -16,6 +16,8 @@ export { MapLocationPicker }  from './MapLocationPicker';
 export { MissionMapView }     from './MissionMapView';
 export { DateTimePicker }     from './DateTimePicker';
 export { SearchBar }          from './SearchBar';
+export { FilterBar }          from './FilterBar';
+export type { FilterChipDef } from './FilterBar';
 export { OfflineBanner }      from './OfflineBanner';
 export { ErrorBoundary }      from './ErrorBoundary';
 export {

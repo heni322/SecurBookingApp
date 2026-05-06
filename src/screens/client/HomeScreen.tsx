@@ -1,5 +1,5 @@
-﻿/**
- * HomeScreen â€” Premium client dashboard.
+/**
+ * HomeScreen — Premium client dashboard.
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
@@ -30,6 +30,7 @@ import { MissionStatus }         from '@constants/enums';
 import { isActiveMission }       from '@utils/typeGuards';
 import type { Mission, MainTabParamList, MissionStackParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
+import { useSafeAreaInsets }    from 'react-native-safe-area-context';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -40,6 +41,7 @@ type Nav = CompositeNavigationProp<
 
 export const HomeScreen: React.FC = () => {
   const { t }          = useTranslation('home');
+  const { top }        = useSafeAreaInsets(); // Fix #3: real safe area top
   const navigation     = useNavigation<Nav>();
   const { user }       = useAuthStore();
   const setUnreadCount = useNotificationsStore(s => s.setUnreadCount);
@@ -98,8 +100,8 @@ export const HomeScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
       >
-        {/* â”€â”€ Header â”€â”€ */}
-        <View style={styles.header}>
+        {/* ── Header ── */}
+        <View style={[styles.header, { paddingTop: top + spacing[4] }]}>
           <View style={styles.headerLeft}>
             <Text style={styles.greeting}>{greeting}, {firstName}</Text>
             <Text style={styles.date}>
@@ -111,7 +113,7 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* â”€â”€ Stats row â”€â”€ */}
+        {/* ── Stats row ── */}
         {loading && !missions ? (
           <View style={styles.statsRow}>
             <StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton />
@@ -126,7 +128,7 @@ export const HomeScreen: React.FC = () => {
           </View>
         )}
 
-        {/* â”€â”€ CTA Banner â”€â”€ */}
+        {/* ── CTA Banner ── */}
         {activeMissions.length === 0 && !loading && (
           <TouchableOpacity style={styles.ctaBanner} activeOpacity={0.85} onPress={goToServicePicker}>
             <View style={styles.ctaDots} pointerEvents="none">
@@ -147,7 +149,7 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* â”€â”€ Active mission card â”€â”€ */}
+        {/* ── Active mission card ── */}
         {activeMissions.length > 0 && (
           <TouchableOpacity
             style={styles.activeMissionCard}
@@ -166,7 +168,7 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* â”€â”€ Recent missions â”€â”€ */}
+        {/* ── Recent missions ── */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionTitleRow}>
@@ -199,12 +201,12 @@ export const HomeScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      {/* â”€â”€ SOS floating button â”€â”€ */}
+      {/* ── SOS floating button ── */}
       <TouchableOpacity style={styles.sosBtn} onPress={() => setSosVisible(true)} activeOpacity={0.85}>
         <AlertOctagon size={22} color={colors.white} strokeWidth={2.2} />
       </TouchableOpacity>
 
-      {/* â”€â”€ SOS Modal â”€â”€ */}
+      {/* ── SOS Modal ── */}
       <Modal visible={sosVisible} transparent animationType="fade" onRequestClose={() => setSosVisible(false)}>
         <View style={sosStyles.overlay}>
           <View style={sosStyles.sheet}>
@@ -233,13 +235,13 @@ export const HomeScreen: React.FC = () => {
 };
 
 /**
- * StatCard â€” unified design for all three stats:
- *  â€¢ Background : colors.surface (standard navy tint, same as inputs/chips)
- *  â€¢ Border     : colors.border  (standard subtle border)
+ * StatCard — unified design for all three stats:
+ *  • Background : colors.surface (standard navy tint, same as inputs/chips)
+ *  • Border     : colors.border  (standard subtle border)
  *  u2022 Icon color : colors.primary u2014 gold (brand accent)
  *  u2022 Icon bg    : colors.primarySurface (gold tint)
- *  â€¢ Value text : colors.textPrimary (white)
- *  â€¢ Label text : colors.textSecondary
+ *  • Value text : colors.textPrimary (white)
+ *  • Label text : colors.textSecondary
  */
 const StatCard: React.FC<{
   Icon: React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -261,7 +263,7 @@ const statStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing[4],
     paddingHorizontal: spacing[2],
-    backgroundColor: colors.surface,   // standard surface â€” same for all 3
+    backgroundColor: colors.surface,   // standard surface — same for all 3
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,        // standard subtle border
@@ -292,7 +294,7 @@ const styles = StyleSheet.create({
   screenWrapper:        { flex: 1 },
   screen:               { flex: 1, backgroundColor: colors.background },
   content:              { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[10] },
-  header:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[10], marginBottom: spacing[6] },
+  header:               { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[6] }, // paddingTop applied inline via useSafeAreaInsets
   headerLeft:           { flex: 1 },
   greeting:             { fontFamily: fontFamily.display, fontSize: fontSize['2xl'], color: colors.textPrimary, letterSpacing: -0.6 },
   date:                 { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing[1], textTransform: 'capitalize', letterSpacing: 0.2 },
@@ -320,7 +322,22 @@ const styles = StyleSheet.create({
   sectionTitle:         { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.3 },
   seeAllBtn:            { flexDirection: 'row', alignItems: 'center', gap: 2 },
   sectionLink:          { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.primary },
-  sosBtn:               { position: 'absolute', bottom: spacing[6], right: layout.screenPaddingH, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.dangerSurface, alignItems: 'center', justifyContent: 'center', shadowColor: colors.dangerSurface, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 12, elevation: 8 },
+  sosBtn:               {
+    position: 'absolute',
+    bottom: layout.tabBarHeight + spacing[3], // Fix #4: clear the 72px tab bar
+    right: layout.screenPaddingH,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.dangerSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.dangerSurface,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 8,
+  },
 });
 
 const sosStyles = StyleSheet.create({

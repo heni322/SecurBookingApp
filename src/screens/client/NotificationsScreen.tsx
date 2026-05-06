@@ -1,5 +1,5 @@
-﻿/**
- * NotificationsScreen â€” notification feed with unread management + deep navigation.
+/**
+ * NotificationsScreen — notification feed with unread management + deep navigation.
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
@@ -19,6 +19,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }  from '@theme/typography';
 import type { AppNotification, MainTabParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
+import { useSafeAreaInsets }    from 'react-native-safe-area-context';
 
 function resolveNavAction(notif: AppNotification) {
   const meta = (notif.metadata ?? {}) as Record<string, string>;
@@ -77,6 +78,7 @@ function resolveNavAction(notif: AppNotification) {
 
 export const NotificationsScreen: React.FC = () => {
   const { t }          = useTranslation('notifications');
+  const { top }        = useSafeAreaInsets(); // Fix #5
   const navigation     = useNavigation<NavigationProp<MainTabParamList>>();
   const { setUnreadCount, decrement, reset } = useNotificationsStore();
   const { data: notifications, loading, execute } = useApi(notificationsApi.getAll);
@@ -119,8 +121,8 @@ export const NotificationsScreen: React.FC = () => {
 
   return (
     <View style={styles.screen}>
-      {/* â”€â”€ Header â”€â”€ */}
-      <View style={styles.header}>
+      {/* ── Header ── */}
+      <View style={[styles.header, { paddingTop: top + spacing[4] }]}>
         <View style={styles.headerLeft}>
           <View style={styles.bellWrap}>
             <Bell size={24} color={colors.primary} strokeWidth={1.8} />
@@ -148,7 +150,7 @@ export const NotificationsScreen: React.FC = () => {
         )}
       </View>
 
-      {/* â”€â”€ Unread strip â”€â”€ */}
+      {/* ── Unread strip ── */}
       {unread > 0 && (
         <View style={styles.unreadStrip}>
           <View style={styles.unreadDot} />
@@ -158,7 +160,7 @@ export const NotificationsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* â”€â”€ List â”€â”€ */}
+      {/* ── List ── */}
       {loading && !notifications ? (
         <LoadingState message={t('loading')} />
       ) : (
@@ -186,7 +188,7 @@ export const NotificationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   screen:          { flex: 1, backgroundColor: colors.background },
   list:            { flexGrow: 1, paddingBottom: spacing[10] },
-  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[10], paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border },
+  header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.borderStrong }, // Fix #5 paddingTop inline; Fix #6 borderStrong
   headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   bellWrap:        { width: 44, height: 44, borderRadius: radius.xl, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   bellBadge:       { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.dangerSurface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background },

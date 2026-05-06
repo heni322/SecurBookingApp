@@ -1,4 +1,4 @@
-/**
+﻿/**
  * DisputeScreen — client dispute opening after a mission.
  * 6 predefined reasons · Free-form description · 48h admin review
  */
@@ -86,8 +86,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
           </View>
           <Text style={styles.doneTitle}>{t('done_title')}</Text>
           <Text style={styles.doneSub}>
-            {/* static informational text — no dedicated key needed */}
-            {t('done_title')}
+            {t('done_subtitle')}
           </Text>
           <Button
             label={t('back_btn')}
@@ -118,12 +117,12 @@ export default function DisputeScreen({ navigation, route }: Props) {
         <View style={styles.infoBanner}>
           <AlertTriangle size={16} color={colors.info} strokeWidth={2} />
           <Text style={styles.infoText}>
-            {t('errors.generic')}
+            {t('info_banner')}
           </Text>
         </View>
 
         {/* Reason picker */}
-        <Text style={styles.sectionLabel}>Motif *</Text>
+        <Text style={styles.sectionLabel}>{t('reason_label')}</Text>
         {REASON_IDS.map((id) => {
           const { Icon, color } = REASON_ICONS[id];
           const active = reason === id;
@@ -151,7 +150,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
         })}
 
         {/* Description */}
-        <Text style={styles.sectionLabel}>Description *</Text>
+        <Text style={styles.sectionLabel}>{t('description_label')}</Text>
         <Card style={styles.textareaCard}>
           <TextInput
             style={styles.textarea}

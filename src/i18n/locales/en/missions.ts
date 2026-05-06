@@ -49,9 +49,17 @@ const missions: MissionsNS = {
     cta_waiting: 'Waiting for applications...',
     cta_assigning: 'Agent being assigned automatically...',
     cta_messaging: 'Mission messaging',
+    badge_live: 'LIVE',
+    badge_approach: 'AGENT EN ROUTE',
+    badge_urgent: 'URGENT',
+    section_approach: 'Agent approaching',
+    section_location: 'Mission location',
+    section_notes: 'Notes & instructions',
+    section_bookings: 'Positions',
+    total_ttc: 'Total incl. VAT',
   },
 
-  // Flow: CREATED â†’ PUBLISHED â†’ STAFFING â†’ STAFFED â†’ IN_PROGRESS â†’ COMPLETED
+  // Flow: CREATED → PUBLISHED → STAFFING → STAFFED → IN_PROGRESS → COMPLETED
   statuses: {
     created:     'Created',
     published:   'Published',
@@ -76,7 +84,7 @@ const missions: MissionsNS = {
     pending_title: 'Confirming payment...',
     pending_subtitle: 'We are verifying payment receipt. This usually takes a few seconds.',
     timeout_title: 'Payment being processed',
-    timeout_subtitle: 'For SEPA payments, confirmation can take 1â€“2 business days. You will be notified once confirmed.',
+    timeout_subtitle: 'For SEPA payments, confirmation can take 1–2 business days. You will be notified once confirmed.',
     timeout_info: 'Your mission will be published to agents automatically once payment is received.',
     follow_mission: 'Follow my mission',
   },
@@ -95,9 +103,9 @@ const missions: MissionsNS = {
   },
 
   create: {
-    step_one: 'Step 1 of 3 Â· Uniforms & agents',
-    step_two: 'Step 2 of 3 Â· Location',
-    step_three: 'Step 3 of 3 Â· Scheduling',
+    step_one: 'Step 1 of 3 · Uniforms & agents',
+    step_two: 'Step 2 of 3 · Location',
+    step_three: 'Step 3 of 3 · Scheduling',
     service_required_title: 'Service required', service_required_body: 'Select at least one service.',
     map_position_required: 'Select a position on the map', start_required: 'Start date is required',
     duration_min: 'Minimum duration: 6 hours (legal requirement)', duration_max: 'Maximum duration: 10 days',
@@ -133,6 +141,7 @@ const missions: MissionsNS = {
     summary_end:       'End',
     end_label:         'Mission end *',
     total_agents_label:'Total agents',
+    step_one_title:    'Uniforms & agents',
     duration_hours:    '{{hours}} hours mission',
     step_two_title:    'Mission location',
     agent_label:       'Agent {{n}}',
@@ -140,6 +149,37 @@ const missions: MissionsNS = {
     weekly_cap:        'Weekly limit reached: {{h}}h worked (max 48h from Mon to Sun).',
     rest_between:      'Insufficient rest: only {{h}}h between two missions (min 11h required).',
     rest_after_cap:    '24h rest required after reaching the 48h weekly cap.',
+
+    // ── Multi-slot scheduling ───────────────────────────────────────────────
+    slot_mode_single: 'Single time window',
+    slot_mode_multi:  'Multiple time windows',
+    slot_mode_hint:   'Add multiple time windows for multi-day missions or variable hours. Each window must be at least 6 hours.',
+
+    slots_section_title: 'TIME WINDOWS',
+    slot_add_btn:        'Add a time window',
+    slot_label:          'Window {{n}}',
+    slot_notes_placeholder: 'E.g. Monday night shift…',
+    slot_remove:         'Remove this time window',
+
+    slot_start_required:   'Window start date is required',
+    slot_end_required:     'Window end date is required',
+    slot_end_before_start: 'Window end must be after its start',
+    slot_duration_min:     'Minimum window duration: 6 hours (legal requirement)',
+    slot_overlap:          'Time windows cannot overlap',
+    slot_required:         'Add at least one time window',
+    slot_max:              'Maximum 30 time windows',
+
+    slot_duration_badge:  '{{hours}} h',
+    slots_total_duration: 'Total: {{hours}} h · {{count}} window',
+
+    summary_slots:       'Time windows',
+    summary_slots_one:   '{{count}} window',
+    summary_slots_other: '{{count}} windows',
+
+    slot_lines_default:  'Default agents: {{count}}',
+    slot_lines_custom:   'Custom agents: {{count}}',
+    slot_lines_reset:    'Reset to default agents',
+    slot_lines_required: 'Add at least one position for this slot',
   },
 };
 

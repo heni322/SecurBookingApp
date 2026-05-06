@@ -96,6 +96,9 @@ export interface MissionsNS {
     cancel_error: string; duration: string; created_on: string;
     cta_get_quote: string; cta_see_quote: string; cta_pay: string; radius: string;
     cta_select: string; cta_waiting: string; cta_assigning: string; cta_messaging: string;
+    badge_live: string; badge_approach: string; badge_urgent: string;
+    section_approach: string; section_location: string; section_notes: string; section_bookings: string;
+    total_ttc: string;
   };
   statuses: { created: string; published: string; staffing: string; staffed: string; in_progress: string; completed: string; cancelled: string; };
   success: {
@@ -134,8 +137,63 @@ export interface MissionsNS {
     zip_label: string; zip_placeholder: string;
     end_label: string;
     summary_location: string; summary_end: string; total_agents_label: string;
-    duration_hours: string; step_two_title: string; agent_label: string;
+    step_one_title: string; duration_hours: string; step_two_title: string; agent_label: string;
     amplitude_max: string; weekly_cap: string; rest_between: string; rest_after_cap: string;
+
+    // ── Multi-slot scheduling ─────────────────────────────────────────────
+    /** Toggle label — switch between single-slot and multi-slot mode. */
+    slot_mode_single: string;
+    slot_mode_multi:  string;
+    /** Informational banner shown when multi-slot mode is active. */
+    slot_mode_hint:   string;
+
+    /** Section header above the slots list. */
+    slots_section_title: string;
+    /** "Add a time window" button label. */
+    slot_add_btn:        string;
+    /** Slot card title — e.g. "Window 1". */
+    slot_label:          string;
+    /** Optional notes placeholder inside a slot card. */
+    slot_notes_placeholder: string;
+    /** Remove slot button tooltip / a11y label. */
+    slot_remove:         string;
+
+    /** Validation: slot start date required. */
+    slot_start_required: string;
+    /** Validation: slot end date required. */
+    slot_end_required:   string;
+    /** Validation: slot end must be after start. */
+    slot_end_before_start: string;
+    /** Validation: each slot must be ≥ 6 h. */
+    slot_duration_min:   string;
+    /** Validation: slots cannot overlap. */
+    slot_overlap:        string;
+    /** Validation: at least one slot required when in multi-slot mode. */
+    slot_required:       string;
+    /** Validation: maximum 30 slots. */
+    slot_max:            string;
+
+    /** Duration badge inside a valid slot card — "{{hours}} h". */
+    slot_duration_badge: string;
+    /** Total duration footer — e.g. "Total: 36.0 h over 3 windows". */
+    slots_total_duration: string;
+
+    /** Summary row label for multi-slot mode — replaces single start/end rows. */
+    summary_slots:       string;
+    /** E.g. "{{count}} window" / "{{count}} windows" (singular). */
+    summary_slots_one:   string;
+    /** Plural variant. */
+    summary_slots_other: string;
+
+    // Per-slot booking lines panel
+    /** Accordion label when slot uses same lines as Step 1 — "Default: N agents". */
+    slot_lines_default:  string;
+    /** Accordion label when slot has custom lines — "Custom: N agents". */
+    slot_lines_custom:   string;
+    /** Link to reset slot lines back to global defaults. */
+    slot_lines_reset:    string;
+    /** Validation: slot must have at least one service line. */
+    slot_lines_required: string;
   };
 }
 
@@ -297,7 +355,8 @@ export interface RatingNS {
 }
 
 export interface DisputeNS {
-  screen_title: string; done_title: string; back_btn: string;
+  screen_title: string; done_title: string; done_subtitle: string; back_btn: string;
+  info_banner: string; reason_label: string; description_label: string;
   reasons: {
     agent_absent: { label: string; desc: string; };
     agent_late:   { label: string; desc: string; };
@@ -352,7 +411,7 @@ export interface AnalyticsNS {
 export interface OfflineBannerNS {
   no_connection: string;
 }
-/** Union of all namespaces â€” drives i18next CustomTypeOptions. */
+/** Union of all namespaces — drives i18next CustomTypeOptions. */
 export interface LocaleResources {
   common:        CommonNS;
   auth:          AuthNS;
@@ -369,4 +428,3 @@ export interface LocaleResources {
   dispute:       DisputeNS;
   tracking:      TrackingNS;
   conversation: ConversationNS; services: ServicesNS; map_picker: MapPickerNS; analytics: AnalyticsNS; offline_banner: OfflineBannerNS; }
-

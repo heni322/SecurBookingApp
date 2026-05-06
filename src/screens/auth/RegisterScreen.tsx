@@ -20,11 +20,13 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User as UserModel } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
 export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { t } = useTranslation('auth');
+  const { top } = useSafeAreaInsets();
 
   const [fullName,   setFullName]   = useState('');
   const [email,      setEmail]      = useState('');
@@ -85,7 +87,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingTop: top + spacing[5] }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -213,7 +215,7 @@ const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: colors.background },
   scroll: {
     flexGrow: 1, paddingHorizontal: layout.screenPaddingH,
-    paddingTop: spacing[10], paddingBottom: spacing[10], gap: spacing[5],
+    paddingBottom: spacing[10], gap: spacing[5], // Fix #8: safe area moved to inline prop
   },
   header:  { gap: spacing[4] },
   backBtn: {

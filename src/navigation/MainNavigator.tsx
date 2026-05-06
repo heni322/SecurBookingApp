@@ -1,5 +1,5 @@
-﻿/**
- * MainNavigator â€” Tab bar CLIENT premium.
+/**
+ * MainNavigator — Tab bar CLIENT premium.
  * 4 tabs: Home · Missions · Notifications · Profile
  */
 import React, { useEffect, useRef } from 'react';
@@ -12,7 +12,7 @@ import { ProfileStackNavigator }  from './ProfileStackNavigator';
 import { HomeScreen }             from '@screens/client/HomeScreen';
 import { NotificationsScreen }    from '@screens/client/NotificationsScreen';
 import { colors, palette }        from '@theme/colors';
-import { spacing, radius }        from '@theme/spacing';
+import { spacing, radius, layout } from '@theme/spacing';
 import { fontFamily, fontSize }   from '@theme/typography';
 import type { MainTabParamList }  from '@models/index';
 import { useTranslation }         from '@i18n';
@@ -66,13 +66,13 @@ export const MainNavigator: React.FC = () => {
   );
 };
 
-// â”€â”€ TabItem â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TabItem ───────────────────────────────────────────────────────────────────
 const TabItem: React.FC<{
   Icon: LucideIcon; label: string; focused: boolean; badge?: number;
 }> = ({ Icon, label, focused, badge = 0 }) => {
-  const scaleAnim  = useRef(new Animated.Value(1)).current;
-  const glowAnim   = useRef(new Animated.Value(0)).current;
-  const labelAnim  = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim  = useRef(new Animated.Value(0)).current;
+  const labelAnim = useRef(new Animated.Value(focused ? 1 : 0)).current;
 
   useEffect(() => {
     if (focused) {
@@ -118,14 +118,15 @@ const TabItem: React.FC<{
   );
 };
 
-const TAB_BAR_HEIGHT = 74;
+// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   tabBar: {
-    height:          TAB_BAR_HEIGHT + (Platform.OS === 'ios' ? 16 : 0),
+    // Fix #5: use design token instead of hardcoded 74
+    height:          layout.tabBarHeight + (Platform.OS === 'ios' ? 16 : 0),
     backgroundColor: 'rgba(12,18,32,0.97)',
+    // Fix #6: borderTopWidth: 0 makes borderTopColor dead code — removed
     borderTopWidth:  0,
-    borderTopColor:  colors.borderPrimary,
     ...Platform.select({
       ios:     { shadowColor: palette.gold, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.08, shadowRadius: 20 },
       android: { elevation: 24 },
@@ -136,8 +137,8 @@ const styles = StyleSheet.create({
 });
 
 const tabStyles = StyleSheet.create({
-  outer: { width: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: spacing[2] },
-  pill:  { width: 48, height: 34, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
+  outer:      { width: 64, alignItems: 'center', justifyContent: 'center', gap: 4, paddingTop: spacing[2] },
+  pill:       { width: 48, height: 34, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
   pillActive: {
     backgroundColor: palette.gold,
     ...Platform.select({
@@ -145,9 +146,9 @@ const tabStyles = StyleSheet.create({
       android: { elevation: 10 },
     }),
   },
-  glow:      { position: 'absolute', width: 48, height: 34, borderRadius: radius.full, backgroundColor: palette.gold, shadowColor: palette.gold, shadowOffset: { width: 0, height: 0 }, shadowRadius: 18 },
-  badge:     { position: 'absolute', top: -3, right: -3, backgroundColor: colors.dangerSurface, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.panelSolid },
-  badgeText: { fontFamily: fontFamily.monoMedium, fontSize: 8, color: colors.white, lineHeight: 11 },
-  label:     { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, letterSpacing: 0.2, textAlign: 'center' },
-  labelActive:{ fontFamily: fontFamily.bodyMedium, color: palette.gold, fontSize: 10 },
+  glow:        { position: 'absolute', width: 48, height: 34, borderRadius: radius.full, backgroundColor: palette.gold, shadowColor: palette.gold, shadowOffset: { width: 0, height: 0 }, shadowRadius: 18 },
+  badge:       { position: 'absolute', top: -3, right: -3, backgroundColor: colors.dangerSurface, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.panelSolid },
+  badgeText:   { fontFamily: fontFamily.monoMedium, fontSize: 8, color: colors.white, lineHeight: 11 },
+  label:       { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, letterSpacing: 0.2, textAlign: 'center' },
+  labelActive: { fontFamily: fontFamily.bodyMedium, color: palette.gold, fontSize: 10 },
 });

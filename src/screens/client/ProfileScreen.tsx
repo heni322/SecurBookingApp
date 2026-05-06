@@ -325,7 +325,7 @@ const modalStyles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.backgroundElevated, // Fix #12: surface=rgba(0.5) was semi-transparent; elevated=rgba(0.8)
     borderTopLeftRadius: radius['2xl'],
     borderTopRightRadius: radius['2xl'],
     paddingHorizontal: spacing[5],

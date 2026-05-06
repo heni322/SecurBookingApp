@@ -464,7 +464,7 @@ const AgentRow: React.FC<{ index: number; agent: AgentSlot; accent: string; onCh
       >
         <Text style={agentRowStyles.chipEmoji}>❓</Text>
         <Text style={[agentRowStyles.chipLabel, agent.uniform === null && agentRowStyles.chipLabelNone]}>
-          Non précisée
+          {t('uniforms_none')}
         </Text>
       </TouchableOpacity>
 

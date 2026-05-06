@@ -34,11 +34,21 @@ export const ScreenHeader: React.FC<Props> = ({
   style,
   accent = false,
 }) => {
-  const renderBack  = showBack !== false && !!onBack;
-  const rightSlot   = rightAction ?? rightElement;
+  // Fix #1: actually consume the inset — was imported but never called
+  const { top } = useSafeAreaInsets();
+  const renderBack = showBack !== false && !!onBack;
+  const rightSlot  = rightAction ?? rightElement;
 
   return (
-    <View style={[styles.container, accent && styles.containerAccent, style]}>
+    <View
+      style={[
+        styles.container,
+        accent && styles.containerAccent,
+        // Fix #1: dynamic top padding so title never clips behind status bar
+        { paddingTop: top + spacing[2] },
+        style,
+      ]}
+    >
       <View style={styles.left}>
         {renderBack && (
           <TouchableOpacity
@@ -64,13 +74,15 @@ export const ScreenHeader: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   container: {
-    height:            layout.headerHeight + 4,
+    // height is intentionally removed — let paddingTop + content define it
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
     paddingHorizontal: spacing[5],
+    paddingBottom:     spacing[3],
+    // Fix #2: borderStrong (rgba 0.2) — border (rgba 0.1) was invisible
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderStrong,
     backgroundColor:   colors.background,
   },
   containerAccent: {

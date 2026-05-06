@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     width:           20,
     height:          20,
     borderRadius:    10,
-    backgroundColor: colors.surfaceBorder,
+    backgroundColor: colors.borderStrong, // Fix #11: surfaceBorder=rgba(0.1) invisible; borderStrong=rgba(0.2)
     alignItems:      'center',
     justifyContent:  'center',
   },
