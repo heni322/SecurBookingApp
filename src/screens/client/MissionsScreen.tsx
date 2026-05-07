@@ -148,7 +148,7 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
       key,
       label:    t(`filters.${FILTER_I18N_KEY[key]}`),
       count:    counts[key],
-      dotColor: key === 'ACTIVE' ? colors.successSurface : undefined,
+      dotColor: key === 'ACTIVE' ? colors.successDot : undefined,
       variant:  (key === 'ALL' || key === 'ACTIVE') ? 'meta' : 'status',
     })),
     [counts, t],

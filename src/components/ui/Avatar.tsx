@@ -114,10 +114,10 @@ const styles = StyleSheet.create({
   },
   onlineDot: {
     position:        'absolute',
-    backgroundColor: colors.successSurface,
+    backgroundColor: colors.successDot,
     borderWidth:     2.5,
     borderColor:     colors.background,
-    shadowColor:     colors.successSurface,
+    shadowColor:     colors.successDot,
     shadowOffset:    { width: 0, height: 0 },
     shadowOpacity:   0.6,
     shadowRadius:    4,

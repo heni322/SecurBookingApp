@@ -147,7 +147,7 @@ const tabStyles = StyleSheet.create({
     }),
   },
   glow:        { position: 'absolute', width: 48, height: 34, borderRadius: radius.full, backgroundColor: palette.gold, shadowColor: palette.gold, shadowOffset: { width: 0, height: 0 }, shadowRadius: 18 },
-  badge:       { position: 'absolute', top: -3, right: -3, backgroundColor: colors.dangerSurface, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.panelSolid },
+  badge:       { position: 'absolute', top: -3, right: -3, backgroundColor: colors.dangerDot, borderRadius: radius.full, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: palette.panelSolid },
   badgeText:   { fontFamily: fontFamily.monoMedium, fontSize: 8, color: colors.white, lineHeight: 11 },
   label:       { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, letterSpacing: 0.2, textAlign: 'center' },
   labelActive: { fontFamily: fontFamily.bodyMedium, color: palette.gold, fontSize: 10 },

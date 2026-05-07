@@ -1,4 +1,4 @@
-﻿/**
+/**
  * QuoteDetailScreen — displays the quote and triggers Stripe payment.
  *
  * FIX #7: Added a live TTL countdown (30 min) so the client knows when the
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   bannerText:          { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.info, lineHeight: fontSize.sm * 1.6 },
   paySection:          { gap: spacing[3] },
   secureRow:           { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  secureNote:          { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, lineHeight: fontSize.xs * 1.7 },
+  secureNote:          { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.7 },
   methodSection:       { marginTop: spacing[2], marginBottom: spacing[2] },
   methodTitle:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary, marginBottom: spacing[3], textTransform: 'uppercase', letterSpacing: 0.5 },
   methodRow:           { flexDirection: 'row', gap: spacing[3] },

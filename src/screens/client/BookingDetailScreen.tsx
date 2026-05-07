@@ -1,4 +1,4 @@
-﻿/**
+/**
  * BookingDetailScreen — détail d'un booking côté CLIENT.
  * Affiche : agent, statut, pointages GPS, photos check-in/checkout, incidents, actions.
  *
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     borderRadius:radius.lg, paddingVertical:12,
   },
   trackingBtnTxt: { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.sm, color:colors.white, flex:1 },
-  trackingDot:    { width:8, height:8, borderRadius:4, backgroundColor:colors.successSurface, shadowColor:colors.successSurface, shadowRadius:4, shadowOpacity:0.8, shadowOffset:{width:0,height:0} },
+  trackingDot:    { width:8, height:8, borderRadius:4, backgroundColor:colors.successDot, shadowColor:colors.successDot, shadowRadius:4, shadowOpacity:0.8, shadowOffset:{width:0,height:0} },
 
   timesCard:   { gap:0 },
   timeRow:     { flexDirection:'row', alignItems:'center', marginBottom:spacing[3] },

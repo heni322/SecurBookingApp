@@ -1,14 +1,16 @@
-﻿/**
+/**
  * SecurBook Design System — Color Palette
  *
- * Minimized token set aligned to the CSS variable system:
- *   --background   --foreground   --panel   --panel-border
- *   --muted        --muted-strong
- *   --ui-gold-grad --ui-green  --ui-purple  --ui-blue  --ui-red
- *   --txt-gold     --txt-green --txt-purple --txt-blue --txt-red
+ * Token philosophy
+ * ─────────────────
+ * Each status (success / danger / info / warning) has THREE roles:
+ *   X            : the vivid foreground tone — readable on dark bg
+ *                   AND dark enough to read on the tinted X-Surface bg.
+ *   X-Surface    : translucent tinted background for banners/cards.
+ *   X-Dot        : the saturated solid fill for tiny indicators
+ *                   (status dots, online badges, glow shadows).
  *
- * Rule: ui-* = vivid accent (icons, pills, borders)
- *        txt-* = soft tint  (readable text on dark panels)
+ * Rule: never put `colors.X` text on `colors.X-Dot` bg. Use X-Surface for bg.
  */
 
 export const palette = {
@@ -29,17 +31,31 @@ export const palette = {
   goldTxt:  '#f1c47d',   // --txt-gold (readable text on dark)
   goldDark: '#8f6e27',   // pressed / shadow tint
 
-  // -- UI accent colors (icons, rings, vivid pill bgs) -------------------------
-  uiGreen:  '#4ade80',   // --ui-green
-  uiPurple: '#c084fc',   // --ui-purple
-  uiBlue:   '#60a5fa',   // --ui-blue
-  uiRed:    '#e11d48',   // --ui-red
+  // -- Status accent dots (vivid solid fills) ----------------------------------
+  uiGreen:  '#4ade80',
+  uiPurple: '#c084fc',
+  uiBlue:   '#60a5fa',
+  uiRed:    '#e11d48',
 
-  // -- Text tints (soft, readable on --panel) ----------------------------------
-  txtGreen:  '#86efac',  // --txt-green
-  txtPurple: '#d8b4fe',  // --txt-purple
-  txtBlue:   '#93c5fd',  // --txt-blue
-  txtRed:    '#fb7185',  // --txt-red
+  // -- Status text/icon tints (mid-saturation, readable on both dark + tinted) -
+  txtGreen:  '#34d399',  // emerald-400 — readable on dark AND on green tinted bg
+  txtPurple: '#a78bfa',  // violet-400
+  txtBlue:   '#60a5fa',  // blue-400 — same as uiBlue, intentional
+  txtRed:    '#f87171',  // red-400
+
+  // -- Status background tints (translucent, for banners/cards) ----------------
+  bgGreen:   'rgba(52, 211, 153, 0.13)',
+  bgPurple:  'rgba(167, 139, 250, 0.13)',
+  bgBlue:    'rgba(96, 165, 250, 0.13)',
+  bgRed:     'rgba(248, 113, 113, 0.13)',
+  bgGold:    'rgba(188, 147, 59, 0.13)',
+
+  // -- Status borders for tinted bgs -------------------------------------------
+  borderGreen:  'rgba(52, 211, 153, 0.45)',
+  borderPurple: 'rgba(167, 139, 250, 0.45)',
+  borderBlue:   'rgba(96, 165, 250, 0.45)',
+  borderRed:    'rgba(248, 113, 113, 0.45)',
+  borderGold:   'rgba(188, 147, 59, 0.45)',
 
   // -- Neutrals -----------------------------------------------------------------
   white:   '#ffffff',
@@ -56,19 +72,18 @@ export const palette = {
   black:   '#000000',
 
   // -- Back-compat aliases -------------------------------------------------------
-  // Referenced by files that import `palette` directly. Do not remove.
-  /** @deprecated ? palette.bg */           navy:        '#0c1220',
-  /** @deprecated ? palette.panelSolid */   navy80:      '#0f172a',
-  /** @deprecated ? border/surface */       navy50:      '#1e2d45',
-  /** @deprecated ? palette.txtPurple */    violet:      '#d8b4fe',
-  /** @deprecated ? palette.uiGreen */      emeraldDim:  '#4ade80',
-  /** @deprecated ? palette.txtGreen */     emerald:     '#86efac',
-  /** @deprecated ? palette.uiRed */        crimsonDim:  '#e11d48',
-  /** @deprecated ? palette.txtRed */       crimson:     '#fb7185',
-  /** @deprecated ? palette.panelSolid */   azureDim:    '#0f2b5c',
-  /** @deprecated ? palette.uiBlue */       azure:       '#60a5fa',
-  /** @deprecated ? palette.uiBlue */       lightBlue:   '#60a5fa',
-  /** @deprecated ? darker blue */          lightBlueDim:'#1d4ed8',
+  /** @deprecated palette.bg */            navy:        '#0c1220',
+  /** @deprecated palette.panelSolid */    navy80:      '#0f172a',
+  /** @deprecated border/surface */        navy50:      '#1e2d45',
+  /** @deprecated palette.txtPurple */     violet:      '#a78bfa',
+  /** @deprecated palette.uiGreen */       emeraldDim:  '#4ade80',
+  /** @deprecated palette.txtGreen */      emerald:     '#34d399',
+  /** @deprecated palette.uiRed */         crimsonDim:  '#e11d48',
+  /** @deprecated palette.txtRed */        crimson:     '#f87171',
+  /** @deprecated palette.panelSolid */    azureDim:    '#0f2b5c',
+  /** @deprecated palette.uiBlue */        azure:       '#60a5fa',
+  /** @deprecated palette.uiBlue */        lightBlue:   '#60a5fa',
+  /** @deprecated darker blue */           lightBlueDim:'#1d4ed8',
 } as const;
 
 export const colors = {
@@ -90,25 +105,33 @@ export const colors = {
   primary:        palette.gold,
   primaryLight:   palette.goldTxt,
   primaryDark:    palette.goldDark,
-  primarySurface: 'rgba(188, 147, 59, 0.13)',
+  primarySurface: palette.bgGold,
   primaryGlow:    'rgba(188, 147, 59, 0.25)',
 
-  // -- Status --------------------------------------------------------------------
-  /** soft text green — badge labels, validated text */
+  // -- Status (success / danger / info / warning) -------------------------------
+  // text/icon foreground — readable on dark AND on the tinted surface
   success:        palette.txtGreen,
-  /** vivid ui green — icon fills, ring borders, dot indicators */
-  successSurface: palette.uiGreen,
-  /** soft text red */
   danger:         palette.txtRed,
-  /** vivid ui red — danger buttons, icon fills */
-  dangerSurface:  palette.uiRed,
-  /** soft text blue */
   info:           palette.txtBlue,
-  /** vivid ui blue — info icons, tracking button */
-  infoSurface:    palette.uiBlue,
-  /** gold text — star ratings, warnings */
   warning:        palette.goldTxt,
-  warningSurface: 'rgba(188, 147, 59, 0.15)',
+
+  // translucent bg for banners/badges — text uses success/danger/info/warning ON TOP
+  successSurface: palette.bgGreen,
+  dangerSurface:  palette.bgRed,
+  infoSurface:    palette.bgBlue,
+  warningSurface: palette.bgGold,
+
+  // dedicated borders for tinted surfaces (1px, soft accent)
+  successBorder:  palette.borderGreen,
+  dangerBorder:   palette.borderRed,
+  infoBorder:     palette.borderBlue,
+  warningBorder:  palette.borderGold,
+
+  // saturated solid fills — for tiny indicators (status dots, glow rings, online pulse)
+  successDot:     palette.uiGreen,
+  dangerDot:      palette.uiRed,
+  infoDot:        palette.uiBlue,
+  warningDot:     palette.gold,
 
   // -- Semantic shorthands -------------------------------------------------------
   lightBlue:  palette.uiBlue,
@@ -118,7 +141,7 @@ export const colors = {
   // -- Borders -------------------------------------------------------------------
   border:        palette.panelBorder,
   borderStrong:  'rgba(255, 255, 255, 0.2)',
-  borderPrimary: 'rgba(188, 147, 59, 0.45)',
+  borderPrimary: palette.borderGold,
   borderSubtle:  'rgba(255, 255, 255, 0.06)',
 
   // -- Overlays -----------------------------------------------------------------
@@ -128,10 +151,8 @@ export const colors = {
   // -- Utility -------------------------------------------------------------------
   transparent: 'transparent',
   white:       palette.white,
-  /** @deprecated ? colors.background */
+  /** @deprecated colors.background */
   navy:        palette.bg,
 } as const;
 
 export type ColorKey = keyof typeof colors;
-
-

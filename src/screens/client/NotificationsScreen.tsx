@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.borderStrong }, // Fix #5 paddingTop inline; Fix #6 borderStrong
   headerLeft:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   bellWrap:        { width: 44, height: 44, borderRadius: radius.xl, backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  bellBadge:       { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.dangerSurface, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background },
+  bellBadge:       { position: 'absolute', top: -4, right: -4, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.dangerDot, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background },
   bellBadgeText:   { fontFamily: fontFamily.bodySemiBold, fontSize: 9, color: palette.white, lineHeight: 12 },
   title:           { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4 },
   subtitle:        { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, marginTop: 2 },
