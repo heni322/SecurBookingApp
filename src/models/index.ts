@@ -34,12 +34,23 @@ export interface LoginPayload {
 }
 
 export interface RegisterPayload {
-  email:       string;
-  password:    string;
-  fullName:    string;
-  phone?:      string;
-  role?:       UserRole;
-  clientType?: ClientType;
+  email:           string;
+  password:        string;
+  fullName:        string;
+  phone?:          string;
+  role?:           UserRole;
+  clientType?:     ClientType;
+  /** RGPD/CGU consent — must be true for the backend to accept the request. */
+  acceptTerms:     boolean;
+  /** Required when role === PARTNER (and no companyId) OR clientType === COMPANY. */
+  companyName?:    string;
+  /** 14-digit SIRET — required for COMPANY clients and new partner companies. */
+  siret?:          string;
+  /** Optional billing fields for COMPANY clients. */
+  billingAddress?: string;
+  billingCity?:    string;
+  billingZipCode?: string;
+  vatNumber?:      string;
 }
 
 export interface TwoFaSetupResponse {

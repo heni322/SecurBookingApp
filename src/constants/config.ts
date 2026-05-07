@@ -33,5 +33,5 @@ export const STALE_TIME = {
 export const CHECKIN_RADIUS_METERS = 30; // rayon toléré pour le check-in
 
 // ─── App ─────────────────────────────────────────────────────────────────────
-export const APP_NAME    = 'SecurBook';
+export const APP_NAME    = 'Provalk';
 export const APP_VERSION = '1.0.0';

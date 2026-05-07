@@ -1,4 +1,4 @@
-import type { AuthNS } from '../types';
+﻿import type { AuthNS } from '../types';
 
 const auth: AuthNS = {
   login: {
@@ -20,8 +20,12 @@ const auth: AuthNS = {
     phone_label: 'Téléphone (optionnel)', phone_placeholder: '+33 6 00 00 00 00',
     password_hint: 'Lettres, chiffres et caractères spéciaux recommandés', password_placeholder: '8 caractères minimum',
     submit: 'Créer mon compte', rgpd: "En créant un compte, vous acceptez nos CGV et notre politique de confidentialité. Vos données sont protégées conformément au RGPD.",
+    company_name_label: 'Raison sociale', company_name_placeholder: 'Ex: ACME SARL',
+    siret_label: 'SIRET', siret_hint: '14 chiffres INSEE',
+    accept_terms: "J'accepte les CGU et la politique de confidentialité (RGPD).",
+    strength: { weak: 'Faible', fair: 'Moyen', good: 'Bon', strong: 'Excellent' },
     has_account: 'Déjà inscrit ?', login_link: 'Se connecter',
-    errors: { full_name_required: 'Nom complet requis', email_required: 'Email requis', email_invalid: 'Email invalide', password_length: '8 caractères minimum', generic: 'Erreur lors de la création du compte' },
+    errors: { full_name_required: 'Nom complet requis', email_required: 'Email requis', email_invalid: 'Email invalide', password_length: '8 caractères minimum', password_complexity: 'Doit contenir une majuscule et un chiffre', phone_invalid: 'Numéro de téléphone invalide', company_name_required: 'Raison sociale requise', siret_invalid: 'SIRET invalide (14 chiffres requis)', terms_required: 'Vous devez accepter les CGU pour continuer', email_taken: 'Cet email est déjà utilisé', too_many_attempts: 'Trop de tentatives. Réessayez dans 1 minute.', network: 'Connexion impossible — vérifiez votre réseau', generic: 'Erreur lors de la création du compte' },
     alert: { title: 'Inscription impossible' },
   },
   onboarding: {

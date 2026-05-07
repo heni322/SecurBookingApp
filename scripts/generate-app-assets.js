@@ -81,6 +81,53 @@ function circularMask(size) {
   );
 }
 
+/**
+ * Chroma-keys the dark navy background (#061a32) of the source JPEG, recolors
+ * every visible pixel to brand gold, and writes a transparent PNG cutout of
+ * the eagle. This is what the login hero displays — no ring, no card, just
+ * the mark.
+ *
+ * Why recolor instead of preserving original tones:
+ *   - JPEG quantization leaves ~3-5% color shift along edges. Recoloring to a
+ *     uniform brand gold removes that artifact and gives a clean engraved look.
+ *   - The original logo is monochrome gold-on-navy, so recoloring loses no
+ *     intentional design information.
+ */
+async function generateLogoMark(outPath) {
+  const { data, info } = await sharp(SRC).raw().toBuffer({ resolveWithObject: true });
+  const w = info.width, h = info.height, c = info.channels;
+
+  const bg = [6, 26, 50];                    // #061a32 — source background
+  const goldR = 241, goldG = 196, goldB = 125; // palette.goldEnd
+
+  const out = Buffer.alloc(w * h * 4);
+  for (let p = 0, q = 0; p < data.length; p += c, q += 4) {
+    const r = data[p], g = data[p + 1], b = data[p + 2];
+    const dr = r - bg[0], dg = g - bg[1], db = b - bg[2];
+    const dist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+    // Soft alpha mask: hard transparent < 12, soft ramp 12..35, opaque > 35.
+    let alpha;
+    if (dist < 12)      alpha = 0;
+    else if (dist < 35) alpha = Math.round(((dist - 12) / 23) * 255);
+    else                alpha = 255;
+
+    // Recolor visible pixels to brand gold, blending toward dark gold for
+    // mid-luminance pixels so detail (line work, etched grooves) is preserved.
+    const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    const k = Math.min(1, lum / 180);
+    out[q]     = Math.round(goldR * k + 70 * (1 - k));
+    out[q + 1] = Math.round(goldG * k + 50 * (1 - k));
+    out[q + 2] = Math.round(goldB * k + 25 * (1 - k));
+    out[q + 3] = alpha;
+  }
+
+  await sharp(out, { raw: { width: w, height: h, channels: 4 } })
+    .png()
+    .trim()
+    .resize(512, 512, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .toFile(outPath);
+}
 // ── Pipeline ─────────────────────────────────────────────────────────────────
 async function run() {
   if (!fs.existsSync(SRC)) {
@@ -162,6 +209,11 @@ async function run() {
     .png({ compressionLevel: 9 })
     .toFile(path.join(APP_ASSET, 'logo.png'));
   console.log(`  src/assets/logo.png  256x256`);
+
+  // Eagle-only cutout for the login hero — chroma-keys the dark JPEG bg
+  // and recolors visible pixels to brand gold. 512x512 trimmed bbox.
+  await generateLogoMark(path.join(APP_ASSET, 'logo-mark.png'));
+  console.log(`  src/assets/logo-mark.png  512x512 (transparent, brand gold)`);
 
   console.log('\n✓ All assets generated successfully.\n');
 }

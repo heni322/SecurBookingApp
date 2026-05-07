@@ -1,4 +1,4 @@
-import type { AuthNS } from '../types';
+﻿import type { AuthNS } from '../types';
 
 const auth: AuthNS = {
   login: {
@@ -20,8 +20,12 @@ const auth: AuthNS = {
     phone_label: 'Phone (optional)', phone_placeholder: '+1 555 000 0000',
     password_hint: 'Letters, numbers and special characters recommended', password_placeholder: '8 characters minimum',
     submit: 'Create my account', rgpd: 'By creating an account you agree to our Terms & Conditions and Privacy Policy. Your data is protected in accordance with GDPR.',
+    company_name_label: 'Company name', company_name_placeholder: 'E.g. ACME LLC',
+    siret_label: 'SIRET', siret_hint: '14-digit INSEE registration number',
+    accept_terms: 'I accept the Terms of Service and Privacy Policy (GDPR).',
+    strength: { weak: 'Weak', fair: 'Fair', good: 'Good', strong: 'Strong' },
     has_account: 'Already registered?', login_link: 'Sign in',
-    errors: { full_name_required: 'Full name is required', email_required: 'Email is required', email_invalid: 'Invalid email address', password_length: '8 characters minimum', generic: 'Error while creating account' },
+    errors: { full_name_required: 'Full name is required', email_required: 'Email is required', email_invalid: 'Invalid email address', password_length: '8 characters minimum', password_complexity: 'Must contain an uppercase letter and a digit', phone_invalid: 'Invalid phone number', company_name_required: 'Company name is required', siret_invalid: 'Invalid SIRET (14 digits required)', terms_required: 'You must accept the Terms to continue', email_taken: 'This email is already in use', too_many_attempts: 'Too many attempts. Try again in 1 minute.', network: 'Connection failed — check your network', generic: 'Error while creating account' },
     alert: { title: 'Unable to register' },
   },
   onboarding: {

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * locales/types.ts — Complete namespace shape definitions.
  * Both EN and FR implement these interfaces — no literal-type cross-lock.
  */
@@ -37,8 +37,8 @@ export interface AuthNS {
     full_name_label: string; full_name_placeholder: string;
     phone_label: string; phone_placeholder: string;
     password_hint: string; password_placeholder: string;
-    submit: string; rgpd: string; has_account: string; login_link: string;
-    errors: { full_name_required: string; email_required: string; email_invalid: string; password_length: string; generic: string; };
+    submit: string; rgpd: string; has_account: string; login_link: string; company_name_label: string; company_name_placeholder: string; siret_label: string; siret_hint: string; accept_terms: string; strength: { weak: string; fair: string; good: string; strong: string; };
+    errors: { full_name_required: string; email_required: string; email_invalid: string; password_length: string; password_complexity: string; phone_invalid: string; company_name_required: string; siret_invalid: string; terms_required: string; email_taken: string; too_many_attempts: string; network: string; generic: string; };
     alert: { title: string; };
   };
   onboarding: {
