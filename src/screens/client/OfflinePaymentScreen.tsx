@@ -1,4 +1,4 @@
-﻿/**
+/**
  * OfflinePaymentScreen — Virement bancaire ou cheque (FIX #6).
  */
 import React, { useState } from 'react';
@@ -79,7 +79,7 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
               <>
                 <Text style={styles.instructTitle}>COORDONNEES BANCAIRES</Text>
                 <Separator marginV={spacing[3]} />
-                <InstructRow label="Beneficiaire" value={instructions.beneficiary ?? 'SecurBook SAS'} copyKey="beneficiary" copiedKey={copiedKey} onCopy={handleCopy} />
+                <InstructRow label="Beneficiaire" value={instructions.beneficiary ?? 'Provalk SAS'} copyKey="beneficiary" copiedKey={copiedKey} onCopy={handleCopy} />
                 <InstructRow label="IBAN" value={instructions.iban ?? ''} copyKey="iban" copiedKey={copiedKey} onCopy={handleCopy} mono />
                 <InstructRow label="BIC / SWIFT" value={instructions.bic ?? ''} copyKey="bic" copiedKey={copiedKey} onCopy={handleCopy} mono />
                 <InstructRow label="Reference obligatoire" value={instructions.reference ?? ''} copyKey="ref" copiedKey={copiedKey} onCopy={handleCopy} accent />
@@ -92,7 +92,7 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
               <>
                 <Text style={styles.instructTitle}>ENVOI DU CHEQUE</Text>
                 <Separator marginV={spacing[3]} />
-                <InstructRow label="A l'ordre de" value={instructions.payable ?? 'SecurBook SAS'} copyKey="payable" copiedKey={copiedKey} onCopy={handleCopy} />
+                <InstructRow label="A l'ordre de" value={instructions.payable ?? 'Provalk SAS'} copyKey="payable" copiedKey={copiedKey} onCopy={handleCopy} />
                 <InstructRow label="Adresse d'envoi" value={instructions.address ?? ''} copyKey="address" copiedKey={copiedKey} onCopy={handleCopy} />
                 <View style={styles.amountRow}>
                   <Text style={styles.amountLabel}>Montant du cheque</Text>

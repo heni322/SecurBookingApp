@@ -12,8 +12,9 @@ const auth: AuthNS = {
     alert: { title: 'Unable to sign in' },
   },
   register: {
-    title: 'Create account', subtitle: 'Join SecurBook in seconds',
+    title: 'Create account', subtitle: 'Join Provalk in seconds',
     perks: { verified: 'Verified & insured agents', quote: 'Instant online quote', payment: '100% secure payment' },
+    email_label: 'Email address', email_placeholder: 'you@example.com',
     account_type: 'ACCOUNT TYPE', individual: 'Individual', individual_sub: 'Personal use', company: 'Business', company_sub: 'B2B invoicing',
     full_name_label: 'Full name', full_name_placeholder: 'John Smith',
     phone_label: 'Phone (optional)', phone_placeholder: '+1 555 000 0000',

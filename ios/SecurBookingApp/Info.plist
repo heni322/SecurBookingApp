@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>SecurBook</string>
+	<string>Provalk</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,7 +29,7 @@
 
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Allow OSM tile server — required for OpenStreetMap tiles -->
+		<!-- Allow OSM tile server â€” required for OpenStreetMap tiles -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
 		<key>NSAllowsLocalNetworking</key>
@@ -46,11 +46,11 @@
 		</dict>
 	</dict>
 
-	<!-- ── Permissions ──────────────────────────────────────────────────── -->
+	<!-- â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SecurBook accède à votre position pour afficher votre localisation sur la carte de suivi.</string>
+	<string>SecurBook accÃ¨de Ã  votre position pour afficher votre localisation sur la carte de suivi.</string>
 
-	<!-- iOS 11+ — required for MapKit overlays + react-native-maps -->
+	<!-- iOS 11+ â€” required for MapKit overlays + react-native-maps -->
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

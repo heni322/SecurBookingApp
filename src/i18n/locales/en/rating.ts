@@ -18,7 +18,7 @@ const rating: RatingNS = {
   },
 
   step_nps: {
-    title:      'Would you recommend SecurBook?',
+    title:      'Would you recommend Provalk?',
     subtitle:   'From 0 (not at all) to 10 (definitely)',
     detractors: 'Detractors 0–6',
     passives:   'Passives 7–8',

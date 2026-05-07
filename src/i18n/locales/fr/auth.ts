@@ -12,10 +12,11 @@ const auth: AuthNS = {
     alert: { title: 'Connexion impossible' },
   },
   register: {
-    title: 'Créer un compte', subtitle: 'Rejoignez SecurBook en quelques secondes',
+    title: 'Créer un compte', subtitle: 'Rejoignez Provalk en quelques secondes',
     perks: { verified: 'Agents vérifiés & assurés', quote: 'Devis instantané en ligne', payment: 'Paiement 100% sécurisé' },
     account_type: 'TYPE DE COMPTE', individual: 'Particulier', individual_sub: 'Usage personnel', company: 'Entreprise', company_sub: 'Facturation B2B',
     full_name_label: 'Nom complet', full_name_placeholder: 'Jean Dupont',
+    email_label: 'Adresse email', email_placeholder: 'vous@exemple.com',
     phone_label: 'Téléphone (optionnel)', phone_placeholder: '+33 6 00 00 00 00',
     password_hint: 'Lettres, chiffres et caractères spéciaux recommandés', password_placeholder: '8 caractères minimum',
     submit: 'Créer mon compte', rgpd: "En créant un compte, vous acceptez nos CGV et notre politique de confidentialité. Vos données sont protégées conformément au RGPD.",

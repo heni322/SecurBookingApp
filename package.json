@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "assets:generate": "node scripts/generate-app-assets.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",
@@ -60,6 +61,7 @@
     "patch-package": "^8.0.1",
     "prettier": "^3.4.2",
     "react-test-renderer": "19.2.3",
+    "sharp": "^0.34.5",
     "typescript": "^5.8.3"
   },
   "engines": {

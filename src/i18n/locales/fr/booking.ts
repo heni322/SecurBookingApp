@@ -45,7 +45,7 @@ const booking: BookingNS = {
     report_title:    'Signaler un incident',
     placeholder:     "Décrivez l'incident…",
     reported_title:  'Incident signalé',
-    reported_body:   "Votre rapport a été transmis à l'équipe SecurBook.",
+    reported_body:   "Votre rapport a été transmis à l'équipe Provalk.",
     report_error:    "Impossible de signaler l'incident.",
   },
 

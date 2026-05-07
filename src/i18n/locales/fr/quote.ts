@@ -1,4 +1,4 @@
-﻿import type { QuoteNS } from '../types';
+import type { QuoteNS } from '../types';
 
 const quote: QuoteNS = {
   title: 'Devis',
@@ -62,7 +62,7 @@ const quote: QuoteNS = {
   row_subtotal:  'Sous-total HT',
   row_vat:       'TVA 20%',
   row_total_ttc: 'TOTAL TTC',
-  row_commission:'↳ Commission SecurBook',
+  row_commission:'↳ Commission Provalk',
   valid_until:   "Valable jusqu'au {{date}}",
   accept_label:  'Accepter ce devis',
 };

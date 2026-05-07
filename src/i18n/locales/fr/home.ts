@@ -28,7 +28,7 @@ const home: HomeNS = {
   },
   sos: {
     title:           'Alerte SOS',
-    body:            "En appuyant sur « Envoyer l'alerte », vous notifiez immédiatement les équipes d'urgence SecurBook ainsi que les autorités compétentes.",
+    body:            "En appuyant sur « Envoyer l'alerte », vous notifiez immédiatement les équipes d'urgence Provalk ainsi que les autorités compétentes.",
     send:            "Envoyer l'alerte",
     cancel:          'Annuler',
     success_title:   '🚨 Alerte envoyée',

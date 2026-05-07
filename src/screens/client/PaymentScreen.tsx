@@ -379,7 +379,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.sepaMandate}>
                 <Info size={13} color={colors.primary} strokeWidth={2} />
                 <Text style={styles.sepaMandateText}>
-                  En fournissant votre IBAN, vous autorisez SecurBook à débiter votre compte
+                  En fournissant votre IBAN, vous autorisez Provalk à débiter votre compte
                   du montant indiqué conformément au mandat SEPA. Vous bénéficiez d'un droit
                   au remboursement dans les 8 semaines suivant le débit.
                 </Text>
@@ -451,7 +451,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.footerNote}>
           {isSepa
             ? t('sepa_legal')
-            : "En confirmant, vous acceptez les CGV SecurBook et la politique de remboursement."
+            : "En confirmant, vous acceptez les CGV Provalk et la politique de remboursement."
           }
         </Text>
       </View>

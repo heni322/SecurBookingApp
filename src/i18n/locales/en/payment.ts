@@ -1,4 +1,4 @@
-﻿import type { PaymentNS } from '../types';
+import type { PaymentNS } from '../types';
 
 const payment: PaymentNS = {
   title_card: 'Bank card', title_sepa: 'SEPA debit', secured_by: 'Secured by Stripe',
@@ -9,8 +9,8 @@ const payment: PaymentNS = {
   sepa_success_body: "Your SEPA mandate is registered. The debit will be processed in 1-2 business days. Your mission will be activated upon payment confirmation.",
   card_success_body: "Your mission is confirmed. Qualified agents in your area will receive a notification. You will receive your invoice by email.",
   home: 'Back to home',
-  stripe_info_sepa: "Your bank details are transmitted directly to Stripe and never pass through SecurBook servers. Compliant with SEPA regulation EU 260/2012.",
-  stripe_info_card: "Your card details are encrypted by Stripe and never pass through SecurBook servers. 3DS payment compliant with PSD2.",
+  stripe_info_sepa: "Your bank details are transmitted directly to Stripe and never pass through Provalk servers. Compliant with SEPA regulation EU 260/2012.",
+  stripe_info_card: "Your card details are encrypted by Stripe and never pass through Provalk servers. 3DS payment compliant with PSD2.",
   sepa_legal: "By confirming, you authorize the SEPA debit of the indicated amount. Terms and conditions apply.",
   amount_sub: 'VAT included',
   invoice_ref: 'Invoice #{{ref}}',

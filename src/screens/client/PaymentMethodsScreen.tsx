@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PaymentMethodsScreen — manage saved cards & SEPA mandates.
  * Lists Stripe payment methods, allows deletion with confirmation.
  */
@@ -106,7 +106,7 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.infoBanner}>
         <ShieldCheck size={14} color={colors.success} strokeWidth={2} />
         <Text style={styles.infoText}>
-          Vos données bancaires sont stockées de manière sécurisée par Stripe. SecurBook n'y a jamais accès.
+          Vos données bancaires sont stockées de manière sécurisée par Stripe. Provalk n'y a jamais accès.
         </Text>
       </View>
 

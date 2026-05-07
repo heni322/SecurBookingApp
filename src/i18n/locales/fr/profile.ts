@@ -41,7 +41,7 @@ const profile: ProfileNS = {
   logout: {
     button:  'Se déconnecter',
     title:   'Déconnexion',
-    message: 'Voulez-vous vous déconnecter de SecurBook ?',
+    message: 'Voulez-vous vous déconnecter de Provalk ?',
     confirm: 'Déconnecter',
     cancel:  'Annuler',
   },

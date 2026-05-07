@@ -2,10 +2,10 @@
  * LoginScreen — Premium dark auth screen.
  * Design: floating logo on navy depth, gold accent glow, clean form.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  View, Text, ScrollView, TouchableOpacity, Image,
+  KeyboardAvoidingView, Platform, StyleSheet, Alert, Animated, Easing,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Fingerprint } from 'lucide-react-native';
@@ -37,6 +37,35 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { hydrate } = useAuthStore();
   const [bioAvail,  setBioAvail]  = React.useState(false);
   const [bioLabel,  setBioLabel]  = React.useState<string>(t('login.biometrics'));
+
+  // Entrance animation for the hero logo: scale + fade in once, plus a slow
+  // breathing pulse on the glow halo. Runs once on mount, native-driver only.
+  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const glowPulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(logoOpacity, {
+        toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+      }),
+      Animated.timing(logoScale, {
+        toValue: 1, duration: 800, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true,
+      }),
+    ]).start();
+
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowPulse, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(glowPulse, { toValue: 0, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [logoOpacity, logoScale, glowPulse]);
+
+  const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
 
   React.useEffect(() => {
     biometricService.isAvailable().then(({ available, biometryType }) => {
@@ -102,15 +131,48 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       >
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <View style={styles.hero}>
-          <View style={styles.logoOuter}>
-            <View style={styles.logoMid}>
-              <View style={styles.logoInner}>
-                <ShieldCheck size={34} color={colors.primary} strokeWidth={1.6} />
-              </View>
-            </View>
+          {/*
+            Logo presentation: the eagle alone — no ring, no card, no border.
+            The mark sits on a soft radial glow that reinforces the brand without
+            containing it. The glow pulses gently (2.4s sin curve) and the logo
+            scales in with a back-ease on mount for a premium feel.
+
+            Implementation notes:
+              - Glow is a stack of 3 nested circles with decreasing opacity, simulating
+                a radial gradient (which RN doesn't support natively without extra deps).
+              - Pointer events disabled on the glow stack so the logo is fully tappable.
+          */}
+          <View style={styles.logoStage} pointerEvents="none">
+            <Animated.View
+              style={[
+                styles.glowOuter,
+                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.glowMid,
+                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.glowInner,
+                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+              ]}
+            />
+            <Animated.Image
+              source={require('@assets/logo-mark.png')}
+              style={[
+                styles.logoImage,
+                { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+              ]}
+              resizeMode="contain"
+              accessibilityLabel="Provalk"
+            />
           </View>
           <View style={styles.brandBlock}>
-            <Text style={styles.brand}>SecurBook</Text>
+            <Text style={styles.brand}>Provalk</Text>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.tagline}>{t('login.tagline')}</Text>
@@ -200,28 +262,46 @@ const styles = StyleSheet.create({
     justifyContent:    'center',
   },
 
-  hero: { alignItems: 'center', marginBottom: spacing[10], gap: spacing[5] },
+  hero: { alignItems: 'center', marginBottom: spacing[10], gap: spacing[3] },
 
-  logoOuter: {
-    width: 108, height: 108, borderRadius: 54,
-    backgroundColor: colors.primarySurface,
-    borderWidth: 1, borderColor: colors.borderPrimary,
+  /**
+   * Logo stage — uncontained brand mark with radiating glow.
+   *
+   * The eagle floats free on the dark canvas. Three nested translucent circles
+   * fake a radial gradient (RN core has no native radial gradient) and provide
+   * the "briance" — a soft halo that gives the mark luminosity without enclosing
+   * it. Stage is 200x200 to give the glow room to bloom past the logo silhouette.
+   *
+   * Visual hierarchy: glow layers sit BEHIND the logo (drawn first), the eagle
+   * sits at z-top with full opacity. Each glow circle uses primarySurface
+   * (gold @ 13%) so they stack additively into a single luminous wash without
+   * visible banding.
+   */
+  logoStage: {
+    width: 200, height: 200,
     alignItems: 'center', justifyContent: 'center',
   },
-  logoMid: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: colors.primarySurface,
-    borderWidth: 1, borderColor: colors.borderPrimary,
-    alignItems: 'center', justifyContent: 'center',
+  glowOuter: {
+    position: 'absolute',
+    width: 200, height: 200, borderRadius: 100,
+    backgroundColor: 'rgba(188, 147, 59, 0.08)',
   },
-  logoInner: {
-    width: 64, height: 64, borderRadius: 22,
-    backgroundColor: colors.primarySurface,
-    borderWidth: 1.5, borderColor: colors.borderPrimary,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4, shadowRadius: 16, elevation: 8,
+  glowMid: {
+    position: 'absolute',
+    width: 150, height: 150, borderRadius: 75,
+    backgroundColor: 'rgba(188, 147, 59, 0.12)',
   },
+  glowInner: {
+    position: 'absolute',
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: 'rgba(188, 147, 59, 0.18)',
+    shadowColor:   colors.primary,
+    shadowOffset:  { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius:  30,
+    elevation:     8,
+  },
+  logoImage: { width: 120, height: 120 },
 
   brandBlock:  { alignItems: 'center', gap: spacing[2] },
   brand: {

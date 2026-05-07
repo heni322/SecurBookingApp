@@ -180,7 +180,7 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
               {ibanValid && <View style={s.ibanOkRow}><CheckCircle2 size={13} color={colors.success} strokeWidth={2} /><Text style={s.ibanOkText}>IBAN valide</Text></View>}
               <View style={s.mandate}>
                 <Info size={13} color={colors.primary} strokeWidth={2} />
-                <Text style={s.mandateText}>En fournissant votre IBAN vous autorisez SecurBook a debiter votre compte conformement au mandat SEPA. Droit au remboursement dans les 8 semaines.</Text>
+                <Text style={s.mandateText}>En fournissant votre IBAN vous autorisez Provalk a debiter votre compte conformement au mandat SEPA. Droit au remboursement dans les 8 semaines.</Text>
               </View>
             </>
           ) : (
@@ -216,7 +216,7 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
           label={loading ? 'Enregistrement...' : isSepa ? "Enregistrer l'IBAN" : 'Enregistrer la carte'}
           onPress={handleConfirm} loading={loading} disabled={!canConfirm || loading} fullWidth size="lg"
         />
-        <Text style={s.footerNote}>{isSepa ? 'En confirmant vous autorisez SecurBook a utiliser cet IBAN.' : 'Donnees tokenisees par Stripe, jamais stockees sur nos serveurs.'}</Text>
+        <Text style={s.footerNote}>{isSepa ? 'En confirmant vous autorisez Provalk a utiliser cet IBAN.' : 'Donnees tokenisees par Stripe, jamais stockees sur nos serveurs.'}</Text>
       </View>
     </View>
   );

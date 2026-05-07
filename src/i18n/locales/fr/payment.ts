@@ -1,4 +1,4 @@
-﻿import type { PaymentNS } from '../types';
+import type { PaymentNS } from '../types';
 
 const payment: PaymentNS = {
   title_card: 'Carte bancaire',
@@ -21,10 +21,10 @@ const payment: PaymentNS = {
   home: "Retour à l'accueil",
 
   stripe_info_sepa:
-    "Vos coordonnées bancaires sont transmises directement à Stripe et ne transitent jamais par les serveurs SecurBook. Conforme au règlement SEPA UE 260/2012.",
+    "Vos coordonnées bancaires sont transmises directement à Stripe et ne transitent jamais par les serveurs Provalk. Conforme au règlement SEPA UE 260/2012.",
 
   stripe_info_card:
-    "Vos données bancaires sont chiffrées par Stripe et ne transitent jamais par les serveurs SecurBook. Paiement 3D Secure conforme à la DSP2.",
+    "Vos données bancaires sont chiffrées par Stripe et ne transitent jamais par les serveurs Provalk. Paiement 3D Secure conforme à la DSP2.",
 
   sepa_legal:
     "En confirmant, vous autorisez le débit SEPA du montant indiqué. CGV applicables.",

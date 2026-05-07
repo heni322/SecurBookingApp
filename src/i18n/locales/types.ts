@@ -31,6 +31,7 @@ export interface AuthNS {
   register: {
     title: string; subtitle: string;
     perks: { verified: string; quote: string; payment: string; };
+    email_label: string; email_placeholder: string;
     account_type: string; individual: string; individual_sub: string;
     company: string; company_sub: string;
     full_name_label: string; full_name_placeholder: string;
