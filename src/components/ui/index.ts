@@ -20,6 +20,8 @@ export { FilterBar }          from './FilterBar';
 export type { FilterChipDef } from './FilterBar';
 export { OfflineBanner }      from './OfflineBanner';
 export { ErrorBoundary }      from './ErrorBoundary';
+export { Toast }              from './Toast';
+export { ToastHost }          from './ToastHost';
 export {
   SkeletonBox,
   MissionCardSkeleton,

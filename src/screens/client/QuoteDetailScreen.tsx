@@ -6,7 +6,7 @@
  * and an "expired" state with a "Recalculate" button once the quote has expired.
  */
 import React, { useEffect, useCallback, useState, useRef } from 'react';
-import { View, Text, ScrollView, Alert, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Clock, CheckCircle2, CreditCard, FileText, Lock, Info, Landmark, AlertTriangle, RefreshCw, Building2 } from 'lucide-react-native';
 import { quotesApi }          from '@api/endpoints/quotes';
@@ -22,6 +22,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'QuoteDetail'>;
 
@@ -36,6 +37,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }     = useTranslation('quote');
   const { t: tc } = useTranslation('common');
 
+  const toast = useToast();
   const { missionId }                     = route.params;
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
   const [accepting,   setAccepting]       = useState(false);
@@ -75,7 +77,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       await quotesApi.accept(quote.id);
       await load();
     } catch (err: unknown) {
-      Alert.alert(tc('error'), (err as any)?.response?.data?.message ?? t('error_accept'));
+      toast.error((err as any)?.response?.data?.message ?? t('error_accept'), { title: tc('error') });
     } finally {
       setAccepting(false);
     }
@@ -102,7 +104,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         intentType:    intent.type as 'payment_intent' | 'setup_intent',
       });
     } catch (err: unknown) {
-      Alert.alert(tc('error'), (err as any)?.response?.data?.message ?? t('error_pay'));
+      toast.error((err as any)?.response?.data?.message ?? t('error_pay'), { title: tc('error') });
     } finally {
       setPaying(false);
     }

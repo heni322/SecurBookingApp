@@ -1,4 +1,4 @@
-﻿/**
+/**
  * QuoteBreakdownCard — détail financier d'un devis.
  * Adapté aux champs plats du backend (pas d'objet breakdown imbriqué).
  */
@@ -30,14 +30,37 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
   const isAccepted = quote.status === 'ACCEPTED';
   const { t } = useTranslation('quote');
 
+  // ── Numeric guard: every field is coerced to a finite number ────────────────
+  // Backend returns Float (Prisma) but legacy rows / older API versions may omit
+  // some fields. Coerce defensively so we never feed NaN/undefined into
+  // formatCurrency() — the UI must never show "NaN €".
+  const num = (v: unknown): number => {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const totalClientPrice = num(quote.totalClientPrice);
+  const totalWithVat     = num(quote.totalWithVat);
+  const nightSurcharge   = num(quote.nightSurcharge);
+  const weekendSurcharge = num(quote.weekendSurcharge);
+  const urgencySurcharge = num(quote.urgencySurcharge);
+  const totalAgentSalary = num(quote.totalAgentSalary);
+  const platformMargin   = num(quote.platformMargin);
+
+  // VAT is derived. Prefer backend value; fall back to (TTC − HT) which is
+  // always correct when both totals are finite.
+  const vatAmount = quote.vatAmount != null && Number.isFinite(quote.vatAmount)
+    ? num(quote.vatAmount)
+    : Math.round((totalWithVat - totalClientPrice) * 100) / 100;
+
   // Lignes financières depuis les champs plats du backend
   const rows: Array<{ label: string; value: number; muted?: boolean }> = [
-    { label: t('row_base_ht'),               value: quote.totalClientPrice - quote.nightSurcharge - quote.weekendSurcharge - quote.urgencySurcharge },
-    { label: t('row_night'),       value: quote.nightSurcharge,   muted: quote.nightSurcharge === 0 },
-    { label: t('row_weekend'),   value: quote.weekendSurcharge, muted: quote.weekendSurcharge === 0 },
-    { label: t('row_urgency'),    value: quote.urgencySurcharge, muted: quote.urgencySurcharge === 0 },
-    { label: t('row_subtotal'),        value: quote.totalClientPrice },
-    { label: t('row_vat'),              value: quote.vatAmount },
+    { label: t('row_base_ht'),     value: totalClientPrice - nightSurcharge - weekendSurcharge - urgencySurcharge },
+    { label: t('row_night'),       value: nightSurcharge,   muted: nightSurcharge === 0 },
+    { label: t('row_weekend'),     value: weekendSurcharge, muted: weekendSurcharge === 0 },
+    { label: t('row_urgency'),     value: urgencySurcharge, muted: urgencySurcharge === 0 },
+    { label: t('row_subtotal'),    value: totalClientPrice },
+    { label: t('row_vat'),         value: vatAmount },
   ];
 
   return (
@@ -60,20 +83,20 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
       {/* Total TTC */}
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>{t('row_total_ttc')}</Text>
-        <Text style={styles.totalValue}>{formatCurrency(quote.totalWithVat * 100)}</Text>
+        <Text style={styles.totalValue}>{formatCurrency(totalWithVat * 100)}</Text>
       </View>
 
       {/* Rémunération agent */}
       <View style={styles.row}>
         <Text style={styles.agentLabel}>{t('agent_payout')}</Text>
-        <Text style={styles.agentValue}>{formatCurrency(quote.totalAgentSalary * 100)}</Text>
+        <Text style={styles.agentValue}>{formatCurrency(totalAgentSalary * 100)}</Text>
       </View>
 
       {/* Commission plateforme */}
       <View style={[styles.row, { marginTop: 4 }]}>
         <Text style={styles.agentLabel}>{t('row_commission')}</Text>
         <Text style={[styles.agentValue, { color: colors.textMuted }]}>
-          {formatCurrency(quote.platformMargin * 100)}
+          {formatCurrency(platformMargin * 100)}
         </Text>
       </View>
 

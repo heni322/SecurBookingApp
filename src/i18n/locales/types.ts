@@ -264,7 +264,12 @@ export interface PaymentNS {
     status: { paid: string; failed: string; refunded: string; pending: string; processing: string; };
   };
   methods: {
-    title: string; delete_error: string;
+    title: string; screen_title: string;
+    delete_error: string; delete_error_title: string;
+    delete_confirm_title: string; delete_confirm_body: string;
+    delete_confirm_btn: string; delete_cancel_btn: string;
+    empty_title: string; empty_subtitle: string;
+    saved_label: string; how_title: string; stripe_info: string;
     security_1: string; security_2: string; security_3: string;
   };
   offline: {

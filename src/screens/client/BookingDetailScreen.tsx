@@ -11,8 +11,7 @@
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity,
-  Alert, TextInput, Modal, StyleSheet, Image,
+  View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Image,
   Dimensions,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -38,6 +37,7 @@ import { isActiveBooking }      from '@utils/typeGuards';
 import { BookingStatus }        from '@constants/enums';
 import type { BookingNS }       from '@i18n/locales/types';
 import { useTranslation }       from '@i18n';
+import { useToast } from '@hooks/useToast';
 import type { Application, MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'BookingDetail'>;
@@ -68,7 +68,8 @@ const BOOKING_STATUS_I18N_KEY: Record<BookingStatus, keyof BookingNS['statuses']
 
 export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { bookingId }                             = route.params;
-  const { t }                                     = useTranslation('booking');
+  const { t }                                     = useTranslation('booking');
+  const toast = useToast();
   const { data: booking, loading, execute }       = useApi(bookingsApi.getById);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
     const [incidentDesc,      setIncidentDesc]      = useState('');
@@ -97,8 +98,8 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       await bookingsApi.reportIncident(bookingId, { description: incidentDesc.trim() });
       setShowIncidentModal(false);
       setIncidentDesc('');
-      Alert.alert(t('incidents.reported_title'), t('incidents.reported_body'));
-    } catch { Alert.alert(t('errors.generic'), t('incidents.report_error')); }
+      toast.success(t('incidents.reported_body'), { title: t('incidents.reported_title') });
+    } catch { toast.error(t('incidents.report_error'), { title: t('errors.generic') }); }
     finally   { setSubmitting(false); }
   };
 

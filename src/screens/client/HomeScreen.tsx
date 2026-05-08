@@ -4,7 +4,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  RefreshControl, StyleSheet, Alert, Modal, ActivityIndicator,
+  RefreshControl, StyleSheet, Modal, ActivityIndicator,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { CompositeNavigationProp } from '@react-navigation/native';
@@ -30,6 +30,7 @@ import { MissionStatus }         from '@constants/enums';
 import { isActiveMission }       from '@utils/typeGuards';
 import type { Mission, MainTabParamList, MissionStackParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
+import { useToast } from '@hooks/useToast';
 import { useSafeAreaInsets }    from 'react-native-safe-area-context';
 
 type Nav = CompositeNavigationProp<
@@ -40,7 +41,8 @@ type Nav = CompositeNavigationProp<
 
 
 export const HomeScreen: React.FC = () => {
-  const { t }          = useTranslation('home');
+  const { t }          = useTranslation('home');
+  const toast = useToast();
   const { top }        = useSafeAreaInsets(); // Fix #3: real safe area top
   const navigation     = useNavigation<Nav>();
   const { user }       = useAuthStore();
@@ -84,9 +86,9 @@ export const HomeScreen: React.FC = () => {
     try {
       await sosApi.trigger({ message: t('sos.trigger_message') });
       setSosVisible(false);
-      Alert.alert(t('sos.success_title'), t('sos.success_body'));
+      toast.success(t('sos.success_body'), { title: t('sos.success_title') });
     } catch {
-      Alert.alert(t('sos.title'), t('sos.error_body'));
+      toast.error(t('sos.error_body'), { title: t('sos.title') });
     } finally {
       setSosSending(false);
     }

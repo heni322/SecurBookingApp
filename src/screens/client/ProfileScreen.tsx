@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Switch, RefreshControl, Modal, Pressable,
+  StyleSheet, Switch, RefreshControl, Modal, Pressable,
 } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -26,6 +26,7 @@ import { fontSize, fontFamily }    from '@theme/typography';
 import { formatDate }       from '@utils/formatters';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation }   from '@i18n';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
 import i18n, { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@i18n';
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList>;
@@ -35,6 +36,7 @@ export const ProfileScreen: React.FC = () => {
   const { t }                       = useTranslation('profile');
   const navigation                  = useNavigation<Nav>();
   const { user, logout, setUser }   = useAuthStore();
+  const confirm = useConfirmDialogStore((s) => s.confirm);
   const [loading,    setLoading]    = useState(false);
   const [bioAvail,   setBioAvail]   = useState(false);
   const [bioEnabled, setBioEnabled] = useState(false);
@@ -70,15 +72,15 @@ export const ProfileScreen: React.FC = () => {
     setBioEnabled(val);
   }, [bioLabel, t]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      t('logout.title'),
-      t('logout.message'),
-      [
-        { text: t('logout.cancel'),  style: 'cancel' },
-        { text: t('logout.confirm'), style: 'destructive', onPress: logout },
-      ],
-    );
+  const handleLogout = async () => {
+    const ok = await confirm({
+      title:        t('logout.title'),
+      message:      t('logout.message'),
+      confirmLabel: t('logout.confirm'),
+      cancelLabel:  t('logout.cancel'),
+      confirmStyle: 'destructive',
+    });
+    if (ok) logout();
   };
 
   const handleSelectLanguage = useCallback((lang: SupportedLanguage) => {

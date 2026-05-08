@@ -23,6 +23,8 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { PaymentMethod, ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PaymentMethods'>;
 
@@ -52,44 +54,40 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: methods, loading, execute } = useApi(paymentsApi.getMyMethods);
   const [deleting, setDeleting] = useState<string | null>(null);
   const { t } = useTranslation('payment');
-
+  const toast = useToast();
+  const confirm = useConfirmDialogStore((s) => s.confirm);
   useEffect(() => { execute(); }, [execute]);
 
-  const handleDelete = useCallback((method: PaymentMethod) => {
+  const handleDelete = useCallback(async (method: PaymentMethod) => {
     const label = method.type === 'card'
-      ? `la carte ${BRAND_LABEL[method.card?.brand ?? ''] ?? 'Carte'} ···${method.card?.last4}`
-      : `le mandat SEPA ···${method.sepa?.last4}`;
+      ? `${BRAND_LABEL[method.card?.brand ?? ''] ?? 'Carte'} ···${method.card?.last4}`
+      : `SEPA ···${method.sepa?.last4}`;
 
-    Alert.alert(
-      'Supprimer',
-      `Voulez-vous supprimer ${label} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text:    'Supprimer',
-          style:   'destructive',
-          onPress: async () => {
-            setDeleting(method.id);
-            try {
-              await paymentsApi.detachMethod(method.id);
-              execute(); // refresh list
-            } catch {
-              Alert.alert('Erreur', t('methods.delete_error'));
-            } finally {
-              setDeleting(null);
-            }
-          },
-        },
-      ],
-    );
-  }, [execute]);
+    const ok = await confirm({
+      title:        t('methods.delete_confirm_title'),
+      message:      t('methods.delete_confirm_body', { label }),
+      confirmLabel: t('methods.delete_confirm_btn'),
+      cancelLabel:  t('methods.delete_cancel_btn'),
+      confirmStyle: 'destructive',
+    });
+    if (!ok) return;
+    setDeleting(method.id);
+    try {
+      await paymentsApi.detachMethod(method.id);
+      execute();
+    } catch {
+      toast.error(t('methods.delete_error'), { title: t('methods.delete_error_title') });
+    } finally {
+      setDeleting(null);
+    }
+  }, [execute, confirm, t]);
 
   const methodList = (methods as any as PaymentMethod[]) ?? [];
 
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="Moyens de paiement"
+        title={t('methods.screen_title')}
         onBack={() => navigation.goBack()}
         rightElement={
           <TouchableOpacity
@@ -106,7 +104,7 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.infoBanner}>
         <ShieldCheck size={14} color={colors.success} strokeWidth={2} />
         <Text style={styles.infoText}>
-          Vos données bancaires sont stockées de manière sécurisée par Stripe. Provalk n'y a jamais accès.
+          {t('methods.stripe_info')}
         </Text>
       </View>
 
@@ -125,12 +123,12 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
           {methodList.length === 0 ? (
             <EmptyState
               Icon={CreditCard}
-              title="Aucun moyen de paiement"
-              subtitle="Ajoutez une carte ou un IBAN via le bouton + pour payer vos missions plus rapidement."
+              title={t('methods.empty_title')}
+              subtitle={t('methods.empty_subtitle')}
             />
           ) : (
             <View style={styles.list}>
-              <Text style={styles.sectionTitle}>ENREGISTRÉS</Text>
+              <Text style={styles.sectionTitle}>{t('methods.saved_label')}</Text>
               {methodList.map(method => (
                 <MethodCard
                   key={method.id}
@@ -144,9 +142,9 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* How it works */}
           <Card elevated style={styles.howCard}>
-            <Text style={styles.howTitle}>Comment ça fonctionne ?</Text>
+            <Text style={styles.howTitle}>{t('methods.how_title')}</Text>
             {[
-              'Vos moyens de paiement sont sauvegardés automatiquement lors d\'un paiement réussi.',
+              t('methods.security_1'),
               t('methods.security_2'),
               t('methods.security_3'),
             ].map((text, i) => (

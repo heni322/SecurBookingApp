@@ -2,17 +2,40 @@
  * formatters.ts — utilitaires de formatage SecurBook (client app)
  */
 
-/** Formate un montant en centimes → "1 250,00 €" */
-export const formatCurrency = (cents: number, currency = 'EUR', locale = 'fr-FR'): string =>
-  new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2 }).format(cents / 100);
+/**
+ * Coerce a value to a finite number, or `null` if not coercible.
+ * Tolerates: number, numeric string, Decimal-like string. Rejects: NaN, ±Infinity, null, undefined.
+ *
+ * Why this exists: Prisma `Decimal` columns can serialize as strings over JSON,
+ * and missing fields land as `undefined`. Rendering `undefined * 100` gives "NaN €"
+ * to the user — never acceptable. This helper is the universal numeric guard.
+ */
+const toFinite = (v: unknown): number | null => {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 
-/** Formate directement des euros → "125,50 €" (pour les montants déjà en €, ex: quotes, payouts) */
-export const formatEuros = (euros: number, locale = 'fr-FR'): string =>
-  new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(euros);
+/** Formate un montant en centimes → "1 250,00 €". Returns "—" for non-finite input. */
+export const formatCurrency = (cents: number, currency = 'EUR', locale = 'fr-FR'): string => {
+  const n = toFinite(cents);
+  if (n === null) return '—';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2 }).format(n / 100);
+};
 
-/** Formate un taux horaire brut → "18,50 €/h" */
-export const formatRate = (euroPerHour: number): string =>
-  `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(euroPerHour)} €/h`;
+/** Formate directement des euros → "125,50 €" (pour les montants déjà en €, ex: quotes, payouts). Returns "—" for non-finite input. */
+export const formatEuros = (euros: number, locale = 'fr-FR'): string => {
+  const n = toFinite(euros);
+  if (n === null) return '—';
+  return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(n);
+};
+
+/** Formate un taux horaire brut → "18,50 €/h". Returns "—" for non-finite input. */
+export const formatRate = (euroPerHour: number): string => {
+  const n = toFinite(euroPerHour);
+  if (n === null) return '—';
+  return `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €/h`;
+};
 
 const safeDate = (v: string | Date | number | null | undefined): Date | null => {
   if (v == null) return null;

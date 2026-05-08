@@ -2,7 +2,7 @@
  * TwoFaSetupScreen — enable / disable 2FA from profile.
  */
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Modal, Pressable, Image } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ShieldCheck, ShieldOff, KeyRound } from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
@@ -17,11 +17,14 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'TwoFaSetup'>;
 
 export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
-  const { t }     = useTranslation('account');
+  const { t }     = useTranslation('account');
+  const toast = useToast();
   const { t: tc } = useTranslation('common'); // cross-namespace: error title
 
   const { user, setUser } = useAuthStore();
@@ -32,6 +35,9 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [secret,     setSecret]     = useState('');
   const [code,       setCode]       = useState('');
   const [loading,    setLoading]    = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [disableCode,   setDisableCode]   = useState('');
+  const confirm = useConfirmDialogStore((s) => s.confirm);
 
   const handleSetup = useCallback(async () => {
     setLoading(true);
@@ -42,7 +48,7 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
       setSecret(payload.secret);
       setStep('scan');
     } catch (err: any) {
-      Alert.alert(tc('error'), err?.response?.data?.message ?? t('two_fa.error_setup'));
+      toast.error(err?.response?.data?.message ?? t('two_fa.error_setup'), { title: tc('error') });
     } finally {
       setLoading(false);
     }
@@ -50,7 +56,7 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleEnable = useCallback(async () => {
     if (code.length !== 6) {
-      Alert.alert(t('two_fa.code_required_title'), t('two_fa.code_required_body'));
+      toast.warning(t('two_fa.code_required_body'), { title: t('two_fa.code_required_title') });
       return;
     }
     setLoading(true);
@@ -60,46 +66,42 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
       setUser((userRes as any).data ?? userRes);
       setStep('done');
     } catch {
-      Alert.alert(t('two_fa.invalid_title'), t('two_fa.invalid_body'));
+      toast.error(t('two_fa.invalid_body'), { title: t('two_fa.invalid_title') });
     } finally {
       setLoading(false);
     }
   }, [code, setUser, t]);
 
-  const handleDisable = useCallback(() => {
-    Alert.alert(
-      t('two_fa.disable_title'),
-      t('two_fa.disable_body'),
-      [
-        { text: t('two_fa.disable_cancel'), style: 'cancel' },
-        {
-          text: t('two_fa.disable_confirm'), style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              Alert.prompt(
-                t('two_fa.disable_code_title'),
-                t('two_fa.disable_code_body'),
-                async inputCode => {
-                  if (!inputCode) { setLoading(false); return; }
-                  try {
-                    await authApi.disable2FA(inputCode);
-                    const { data: userRes } = await usersApi.getMe();
-                    setUser((userRes as any).data ?? userRes);
-                    Alert.alert(t('two_fa.disabled_title'), t('two_fa.disabled_body'));
-                    navigation.goBack();
-                  } catch {
-                    Alert.alert(t('two_fa.invalid_title'), t('two_fa.invalid_body'));
-                  } finally { setLoading(false); }
-                },
-                'plain-text',
-              );
-            } catch { setLoading(false); }
-          },
-        },
-      ],
-    );
-  }, [setUser, navigation, t]);
+  const handleDisable = useCallback(async () => {
+    const ok = await confirm({
+      title:        t('two_fa.disable_title'),
+      message:      t('two_fa.disable_body'),
+      confirmLabel: t('two_fa.disable_confirm'),
+      cancelLabel:  t('two_fa.disable_cancel'),
+      confirmStyle: 'destructive',
+    });
+    if (!ok) return;
+    setDisableCode('');
+    setShowCodeModal(true);
+  }, [confirm, t]);
+
+  const handleDisableConfirm = useCallback(async () => {
+    if (!disableCode) return;
+    setLoading(true);
+    setShowCodeModal(false);
+    try {
+      await authApi.disable2FA(disableCode);
+      const { data: userRes } = await usersApi.getMe();
+      setUser((userRes as any).data ?? userRes);
+      toast.success(t('two_fa.disabled_body'), { title: t('two_fa.disabled_title') });
+      navigation.goBack();
+    } catch {
+      toast.error(t('two_fa.invalid_body'), { title: t('two_fa.invalid_title') });
+    } finally {
+      setLoading(false);
+      setDisableCode('');
+    }
+  }, [disableCode, setUser, navigation, t]);
 
   if (loading && step === 'idle') return <LoadingState message={t('two_fa.loading')} />;
 
@@ -197,12 +199,58 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
           />
         )}
       </ScrollView>
+      {/* ── 2FA disable code modal (replaces Alert.prompt — cross-platform) ── */}
+      <Modal
+        visible={showCodeModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setShowCodeModal(false)}
+      >
+        <Pressable style={styles.modalScrim} onPress={() => setShowCodeModal(false)}>
+          <Pressable style={styles.modalCard} onPress={() => {}}>
+            <Text style={styles.modalTitle}>{t('two_fa.disable_code_title')}</Text>
+            <Text style={styles.modalBody}>{t('two_fa.disable_code_body')}</Text>
+            <Input
+              value={disableCode}
+              onChangeText={setDisableCode}
+              placeholder={t('two_fa.code_placeholder')}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+            />
+            <View style={styles.modalActions}>
+              <Button
+                label={t('two_fa.disable_cancel')}
+                onPress={() => setShowCodeModal(false)}
+                variant="ghost"
+                size="md"
+                style={styles.modalBtn}
+              />
+              <Button
+                label={t('two_fa.disable_confirm')}
+                onPress={handleDisableConfirm}
+                variant="danger"
+                size="md"
+                style={styles.modalBtn}
+                disabled={disableCode.length !== 6}
+              />
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   screen:         { flex: 1, backgroundColor: colors.background },
+  modalScrim:     { flex: 1, backgroundColor: colors.scrim, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[6] },
+  modalCard:      { width: '100%', maxWidth: 420, backgroundColor: colors.backgroundElevated, borderRadius: radius['2xl'], borderWidth: 1, borderColor: colors.border, padding: spacing[6], gap: spacing[4] },
+  modalTitle:     { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.4 },
+  modalBody:      { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  modalActions:   { flexDirection: 'row', gap: spacing[3], marginTop: spacing[2] },
+  modalBtn:       { flex: 1 },
   content:        { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[6], paddingBottom: spacing[12], gap: spacing[5] },
   statusBanner:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[4], borderRadius: radius.xl, padding: spacing[5], borderWidth: 1 },
   bannerEnabled:  { backgroundColor: 'rgba(134,239,172,0.12)', borderColor: colors.success + '40' },

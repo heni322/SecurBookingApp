@@ -14,6 +14,8 @@ import { tokenStorage }            from '@services/tokenStorage';
 import { fcmService }              from '@services/fcmService';
 import { ErrorBoundary }           from '@components/ui/ErrorBoundary';
 import { OfflineBanner }           from '@components/ui/OfflineBanner';
+import { ToastHost }               from '@components/ui/ToastHost';
+import { ConfirmDialogHost }        from '@components/ui/ConfirmDialog';
 import AsyncStorage                from '@react-native-async-storage/async-storage';
 import i18n                        from '@i18n';
 
@@ -58,6 +60,8 @@ function App(): React.JSX.Element {
           <View style={{ flex: 1 }}>
             <OfflineBanner />
             <RootNavigator />
+            <ToastHost />
+            <ConfirmDialogHost />
           </View>
         </SafeAreaProvider>
       </StripeProvider>

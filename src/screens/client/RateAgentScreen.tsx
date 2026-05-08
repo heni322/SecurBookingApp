@@ -4,7 +4,7 @@
  */
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Alert, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   TextInput, TouchableOpacity, Animated,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -19,6 +19,7 @@ import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { ratingsApi }       from '@api/endpoints/ratings';
 import type { MissionStackParamList } from '@models/index';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'RateAgent'>;
 
@@ -33,8 +34,11 @@ const getNpsColors = (s: number): string => {
 export default function RateAgentScreen({ navigation, route }: Props) {
   const { bookingId, agentId, agentName, missionTitle } = route.params;
   const { t }     = useTranslation('rating');
+
   const { t: tc } = useTranslation('common');
 
+
+  const toast = useToast();
   const [score,   setScore]   = useState(0);
   const [nps,     setNps]     = useState<number | null>(null);
   const [comment, setComment] = useState('');
@@ -73,7 +77,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
   const handleStarNext = () => {
     if (!score) {
-      Alert.alert(t('errors.score_required_title'), t('errors.score_required_body'));
+      toast.warning(t('errors.score_required_body'), { title: t('errors.score_required_title') });
       return;
     }
     setStep('nps');
@@ -83,7 +87,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
   const handleNpsNext = () => {
     if (nps === null) {
-      Alert.alert(t('errors.nps_required_title'), t('errors.nps_required_body'));
+      toast.warning(t('errors.nps_required_body'), { title: t('errors.nps_required_title') });
       return;
     }
     setStep('comment');
@@ -105,7 +109,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
       });
       setDone(true);
     } catch (err: any) {
-      Alert.alert(tc('error'), err?.response?.data?.message ?? t('errors.generic'));
+      toast.error(err?.response?.data?.message ?? t('errors.generic'), { title: tc('error') });
     } finally {
       setBusy(false);
     }

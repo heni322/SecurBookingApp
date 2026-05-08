@@ -1,8 +1,8 @@
-/**
- * DeleteAccountScreen — RGPD-compliant account deletion flow.
+﻿/**
+ * DeleteAccountScreen â€” RGPD-compliant account deletion flow.
  */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AlertTriangle } from 'lucide-react-native';
 import { usersApi }     from '@api/endpoints/users';
@@ -15,11 +15,16 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'DeleteAccount'>;
 
 export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
   const { t }     = useTranslation('account');
+
+  const toast = useToast();
+  const confirm = useConfirmDialogStore((s) => s.confirm);
   const { t: tc } = useTranslation('common'); // cross-namespace: error title
 
   const { logout } = useAuthStore();
@@ -30,27 +35,23 @@ export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
   const CONFIRM_PHRASE = t('delete.confirm_phrase');
   const canDelete = phrase === CONFIRM_PHRASE && password.length >= 6;
 
-  const handleDelete = () => {
-    Alert.alert(
-      t('delete.confirm_title'),
-      t('delete.confirm_body'),
-      [
-        { text: t('delete.cancel'), style: 'cancel' },
-        {
-          text: t('delete.delete_btn'), style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await usersApi.deleteMe(password);
-              logout();
-            } catch (err: any) {
-              Alert.alert(tc('error'), err?.response?.data?.message ?? t('delete.error'));
-              setLoading(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title:        t('delete.confirm_title'),
+      message:      t('delete.confirm_body'),
+      confirmLabel: t('delete.delete_btn'),
+      cancelLabel:  t('delete.cancel'),
+      confirmStyle: 'destructive',
+    });
+    if (!ok) return;
+    setLoading(true);
+    try {
+      await usersApi.deleteMe(password);
+      logout();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? t('delete.error'), { title: tc('error') });
+      setLoading(false);
+    }
   };
 
   const DELETE_ITEMS = [
@@ -148,4 +149,6 @@ const styles = StyleSheet.create({
   phraseError:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger },
   deleteBtn:     { marginTop: spacing[2] },
 });
+
+
 

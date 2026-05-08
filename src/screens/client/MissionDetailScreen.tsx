@@ -15,7 +15,7 @@
 import React, { useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  RefreshControl, Alert, StyleSheet, Animated,
+  RefreshControl, StyleSheet, Animated,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -42,6 +42,8 @@ import { MissionStatus }         from '@constants/enums';
 import type { MissionsNS }       from '@i18n/locales/types';
 import type { MissionStackParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionDetail'>;
 type Cta   = { label: string; isLive?: boolean; disabled?: boolean; onPress: () => void };
@@ -264,31 +266,34 @@ const SectionLabel: React.FC<{
 
 export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }         = useTranslation('missions');
+
+  const toast = useToast();
+  const confirm = useConfirmDialogStore((s) => s.confirm);
   const { missionId } = route.params;
   const { data: mission, loading, execute, error } = useApi(missionsApi.getById);
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
 
-  const handleCancel = useCallback(() => {
-    Alert.alert(t('detail.cancel_title'), t('detail.cancel_body'), [
-      { text: t('detail.cancel_back'), style: 'cancel' },
-      {
-        text: t('detail.cancel_confirm'), style: 'destructive',
-        onPress: async () => {
-          try {
-            await missionsApi.cancel(missionId);
-            load();
-          } catch (e: unknown) {
-            Alert.alert(
-              t('detail.cancel_title'),
-              (e as any)?.response?.data?.message ?? t('detail.cancel_error'),
-            );
-          }
-        },
-      },
-    ]);
-  }, [t, missionId, load]);
+  const handleCancel = useCallback(async () => {
+    const ok = await confirm({
+      title:        t('detail.cancel_title'),
+      message:      t('detail.cancel_body'),
+      confirmLabel: t('detail.cancel_confirm'),
+      cancelLabel:  t('detail.cancel_back'),
+      confirmStyle: 'destructive',
+    });
+    if (!ok) return;
+    try {
+      await missionsApi.cancel(missionId);
+      load();
+    } catch (e: unknown) {
+      toast.error(
+        (e as any)?.response?.data?.message ?? t('detail.cancel_error'),
+        { title: t('detail.cancel_title') },
+      );
+    }
+  }, [t, missionId, load, confirm]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   // NOTE: ALL hooks must be called unconditionally before any early returns.

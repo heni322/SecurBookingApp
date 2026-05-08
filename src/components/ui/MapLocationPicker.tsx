@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MapLocationPicker - enterprise-grade OSM/Leaflet map picker.
  *
  * THE real scroll fix:
@@ -11,11 +11,12 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useTranslation } from '@i18n';
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
-  StyleSheet, Animated, Platform, PermissionsAndroid, Alert,
+  StyleSheet, Animated, Platform, PermissionsAndroid,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import Geolocation from '@react-native-community/geolocation';
 import { MapPin, Navigation, Check, Unlock, X } from 'lucide-react-native';
+import { useToast } from '@hooks/useToast';
 import axios from 'axios';
 import { colors, palette } from '@theme/colors';
 import { spacing, radius }      from '@theme/spacing';
@@ -112,6 +113,7 @@ export const MapLocationPicker: React.FC<Props> = ({
   latitude, longitude, onSelect, onInteractionChange,
 }) => {
   const { t } = useTranslation('map_picker');
+  const toast    = useToast();
   const webRef   = useRef<WebView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const lockAnim = useRef(new Animated.Value(1)).current;
@@ -195,7 +197,7 @@ export const MapLocationPicker: React.FC<Props> = ({
         },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        Alert.alert('Permission refusee', 'Activez la localisation dans les reglages.');
+        toast.warning('Activez la localisation dans les reglages.', { title: 'Permission refusee' });
         return;
       }
     }
@@ -213,7 +215,7 @@ export const MapLocationPicker: React.FC<Props> = ({
           err.code === 2 ? 'Position introuvable. Verifiez que le GPS est active.' :
                            'Delai depasse. Reessayez.';
         setLocating(false);
-        Alert.alert('Localisation impossible', msg);
+        toast.error(msg, { title: 'Localisation impossible' });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );

@@ -67,14 +67,21 @@ const payment: PaymentNS = {
 
   methods: {
     title: 'Mes cartes et SEPA',
-    delete_error:
-      'Impossible de supprimer cette méthode de paiement.',
-    security_1:
-      "Vos moyens de paiement sont sauvegardés automatiquement lors d'un paiement réussi.",
-    security_2:
-      'Ils sont stockés exclusivement chez Stripe (PCI-DSS niveau 1).',
-    security_3:
-      'Vous pouvez les supprimer à tout moment depuis cette page.',
+    screen_title: 'Moyens de paiement',
+    delete_error: 'Impossible de supprimer cette méthode de paiement.',
+    delete_error_title: 'Erreur',
+    delete_confirm_title: 'Supprimer le moyen de paiement',
+    delete_confirm_body: 'Supprimer {{label}} ?',
+    delete_confirm_btn: 'Supprimer',
+    delete_cancel_btn: 'Annuler',
+    empty_title: 'Aucun moyen de paiement',
+    empty_subtitle: "Ajoutez une carte ou un IBAN via le bouton + pour payer vos missions plus rapidement.",
+    saved_label: 'ENREGISTRÉS',
+    how_title: 'Comment ça fonctionne ?',
+    stripe_info: "Vos données bancaires sont stockées de manière sécurisée par Stripe. Provalk n’y a jamais accès.",
+    security_1: "Vos moyens de paiement sont sauvegardés automatiquement lors d'un paiement réussi.",
+    security_2: 'Ils sont stockés exclusivement chez Stripe (PCI-DSS niveau 1).',
+    security_3: 'Vous pouvez les supprimer à tout moment depuis cette page.',
   },
 
   offline: {

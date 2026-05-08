@@ -12,7 +12,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, StyleSheet, Alert,
+  KeyboardAvoidingView, Platform, StyleSheet,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -29,6 +29,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User as UserModel, RegisterPayload } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast }       from '@hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -60,6 +61,7 @@ const computePasswordStrength = (pwd: string): number => {
 export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { t } = useTranslation('auth');
   const { top } = useSafeAreaInsets();
+  const toast   = useToast();
 
   const [fullName,    setFullName]    = useState('');
   const [email,       setEmail]       = useState('');
@@ -160,7 +162,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       hydrate(user, tokens);
     } catch (err: unknown) {
       const message = mapBackendError(err);
-      Alert.alert(t('register.alert.title'), message);
+      toast.error(message, { title: t('register.alert.title'), duration: 5000 });
     } finally {
       setLoading(false);
     }

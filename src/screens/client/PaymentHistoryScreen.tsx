@@ -1,11 +1,11 @@
-﻿/**
+/**
  * PaymentHistoryScreen â€” full payment list with invoice download.
  * Premium UI: grouped by month, status badges, PDF tap-to-open.
  */
 import React, { useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, SectionList, TouchableOpacity,
-  StyleSheet, RefreshControl, Linking, Alert,
+  StyleSheet, RefreshControl, Linking,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -23,6 +23,7 @@ import { formatEuros, formatDate, formatDateShort } from '@utils/formatters';
 import { PaymentStatus }      from '@constants/enums';
 import type { Payment, ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PaymentHistory'>;
 
@@ -43,7 +44,8 @@ function groupByMonth(payments: Payment[]) {
 
 export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const { data: payments, loading, execute } = useApi(paymentsApi.getMyPayments);
-    const { t } = useTranslation(['payment', 'common']);
+    const { t } = useTranslation(['payment', 'common']);
+    const toast = useToast();
   const STATUS_META: Record<string, { color: string; Icon: React.FC<any>; label: string }> = {
     [PaymentStatus.PAID]:       { color: colors.success, Icon: CheckCircle, label: t('history.status.paid')        },
     [PaymentStatus.FAILED]:     { color: colors.danger,  Icon: XCircle,     label: t('history.status.failed')      },
@@ -75,9 +77,9 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
       const { data: res } = await paymentsApi.getInvoiceUrl(p.id);
       const url = (res as any).data?.url ?? (res as any).url;
       if (url) await Linking.openURL(url);
-      else Alert.alert('Invoice', 'Invoice not available for this payment.');
+      else toast.info('Invoice not available for this payment.', { title: 'Invoice' });
     } catch {
-      Alert.alert(t('common:error'), t('invoice_open_error'));
+      toast.error(t('invoice_open_error'), { title: t('common:error') });
     }
   }, []);
 

@@ -19,7 +19,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, KeyboardAvoidingView,
-  Platform, Alert, StyleSheet, TouchableOpacity, Modal,
+  Platform, StyleSheet, TouchableOpacity, Modal,
 } from 'react-native';
 import type { TFunction } from 'i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -29,6 +29,7 @@ import {
   Calendar, Layers, X, ChevronDown, ChevronUp,
 } from 'lucide-react-native';
 import { useTranslation }    from '@i18n';
+import { useToast } from '@hooks/useToast';
 import { missionsApi }       from '@api/endpoints/missions';
 import { quotesApi }         from '@api/endpoints/quotes';
 import { Button }            from '@components/ui/Button';
@@ -135,8 +136,11 @@ function cloneLines(lines: BookingLineLocal[]): BookingLineLocal[] {
 
 export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }     = useTranslation('missions');
+
   const { t: tc } = useTranslation('common');
 
+
+  const toast = useToast();
   const initialLines: BookingLineLocal[] = (route.params.bookingLines ?? []).map(l => ({
     serviceTypeId: l.serviceTypeId,
     agentCount:    l.agentCount,
@@ -310,7 +314,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
     if (step === 1) {
       if (globalLines.length === 0) {
-        Alert.alert(t('create.service_required_title'), t('create.service_required_body'));
+        toast.warning(t('create.service_required_body'), { title: t('create.service_required_title') });
         return false;
       }
       const km = parseInt(form.radiusKm, 10);
@@ -529,19 +533,17 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       // If the mission was created and the failure is recoverable, offer a
       // button to jump to the mission detail screen for manual quote retry.
       if (createdMissionId && !isServerErr) {
-        Alert.alert(
-          tc('error'),
-          userMsg,
-          [
-            { text: tc('cancel'), style: 'cancel' },
-            {
-              text:    t('detail.cta_get_quote'),
-              onPress: () => navigation.replace('MissionDetail', { missionId: createdMissionId! }),
-            },
-          ],
-        );
+        // Mission created but quote failed — offer navigation to MissionDetail
+        toast.error(userMsg, {
+          title:  tc('error'),
+          action: {
+            label:   t('detail.cta_get_quote'),
+            onPress: () => navigation.replace('MissionDetail', { missionId: createdMissionId! }),
+          },
+          duration: 8000,
+        });
       } else {
-        Alert.alert(tc('error'), userMsg);
+        toast.error(userMsg, { title: tc('error') });
       }
     } finally {
       setLoading(false);

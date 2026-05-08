@@ -5,7 +5,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Image,
-  KeyboardAvoidingView, Platform, StyleSheet, Alert, Animated, Easing,
+  KeyboardAvoidingView, Platform, StyleSheet, Animated, Easing,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Fingerprint } from 'lucide-react-native';
@@ -21,12 +21,14 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User } from '@models/index';
 import { useTranslation }    from '@i18n';
+import { useToast } from '@hooks/useToast';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation('auth');
+  const toast = useToast();
   const { top } = useSafeAreaInsets();
 
   const [email,    setEmail]    = useState(__DEV__ ? 'client@demo.fr' : '');
@@ -100,9 +102,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     } catch (err: unknown) {
       const status  = (err as any)?.response?.status;
       const message = (err as any)?.response?.data?.message ?? t('login.errors.generic');
-      Alert.alert(
-        t('login.alert.title'),
+      toast.error(
         status === 401 ? t('login.errors.invalid_creds') : message,
+        { title: t('login.alert.title') },
       );
     } finally {
       setLoading(false);

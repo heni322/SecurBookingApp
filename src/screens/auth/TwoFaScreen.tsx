@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, Alert, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   KeyboardAvoidingView, Platform, TextInput,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,11 +13,13 @@ import apiClient                from '@api/client';
 import { useAuthStore }         from '@store/authStore';
 import type { AuthStackParamList, AuthTokens } from '@models/index';
 import { useTranslation }       from '@i18n';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFa'>;
 
 export default function TwoFaScreen({ route }: Props) {
-  const { t }  = useTranslation('auth');
+  const { t }  = useTranslation('auth');
+  const toast = useToast();
   const { t: tc } = useTranslation('common'); // cross-namespace alias
 
   const { tempToken } = route.params;
@@ -43,7 +45,7 @@ export default function TwoFaScreen({ route }: Props) {
   const verify = async () => {
     const otp = code.join('');
     if (otp.length < 6) {
-      Alert.alert(t('two_fa_screen.incomplete_title'), t('two_fa_screen.incomplete_body'));
+      toast.warning(t('two_fa_screen.incomplete_body'), { title: t('two_fa_screen.incomplete_title') });
       return;
     }
     setLoading(true);
@@ -58,7 +60,7 @@ export default function TwoFaScreen({ route }: Props) {
       };
       hydrate(user, tokens);
     } catch {
-      Alert.alert(t('two_fa_screen.invalid_title'), t('two_fa_screen.invalid_body'));
+      toast.error(t('two_fa_screen.invalid_body'), { title: t('two_fa_screen.invalid_title') });
       setCode(['', '', '', '', '', '']);
       inputs.current[0]?.focus();
     } finally {
@@ -69,10 +71,10 @@ export default function TwoFaScreen({ route }: Props) {
   const resend = async () => {
     try {
       await apiClient.post('/auth/2fa/resend', { tempToken });
-      Alert.alert(t('two_fa_screen.resent_title'), t('two_fa_screen.resent_body'));
+      toast.success(t('two_fa_screen.resent_body'), { title: t('two_fa_screen.resent_title') });
     } catch {
       // tc() accesses the 'common' namespace — correct cross-namespace pattern
-      Alert.alert(tc('error'), t('two_fa_screen.resend_error'));
+      toast.error(t('two_fa_screen.resend_error'), { title: tc('error') });
     }
   };
 

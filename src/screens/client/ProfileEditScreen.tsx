@@ -4,7 +4,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, Image,
+  StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -21,13 +21,17 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileEdit'>;
 
 export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
   const { t }      = useTranslation('account');
+
   const { t: tc }  = useTranslation('common');
 
+
+  const toast = useToast();
   const { user, setUser } = useAuthStore();
   const [fullName,    setFullName]    = useState(user?.fullName ?? '');
   const [phone,       setPhone]       = useState(user?.phone    ?? '');
@@ -68,7 +72,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
       }
     } catch (err: any) {
       setPreviewUri(null);
-      Alert.alert(tc('error'), err?.response?.data?.message ?? t('edit.error'));
+      toast.error(err?.response?.data?.message ?? t('edit.error'), { title: tc('error') });
     } finally {
       setAvatarUploading(false);
     }
@@ -76,7 +80,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSave = useCallback(async () => {
     if (!fullName.trim()) {
-      Alert.alert(t('edit.name_required_title'), t('edit.name_required_body'));
+      toast.warning(t('edit.name_required_body'), { title: t('edit.name_required_title') });
       return;
     }
     setLoading(true);
@@ -89,7 +93,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
       setSaved(true);
       setTimeout(() => { setSaved(false); navigation.goBack(); }, 800);
     } catch (err: any) {
-      Alert.alert(tc('error'), err?.response?.data?.message ?? t('edit.error'));
+      toast.error(err?.response?.data?.message ?? t('edit.error'), { title: tc('error') });
     } finally {
       setLoading(false);
     }

@@ -112,7 +112,14 @@ export interface Quote {
   totalAgentSalary: number;
   platformMargin:   number;
   fixedCharges:     number;
-  vatAmount:        number;
+  /** VAT rate applied to this quote (e.g. 20 for 20%). Defaults to 20 server-side. */
+  vatRate?:         number;
+  /**
+   * VAT amount in euros — derived backend field (totalWithVat - totalClientPrice).
+   * Optional because legacy DB rows or older API versions may omit it; consumers
+   * MUST fall back to `(totalWithVat - totalClientPrice)` when undefined.
+   */
+  vatAmount?:       number;
   nightSurcharge:   number;
   weekendSurcharge: number;
   urgencySurcharge: number;

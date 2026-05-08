@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, Clipboard,
+  StyleSheet, Clipboard,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -21,12 +21,14 @@ import { colors }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList, OfflinePaymentInstructions } from '@models/index';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'OfflinePayment'>;
 type OfflineMethod = 'VIREMENT' | 'CHEQUE';
 
 export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { missionId, totalTTC } = route.params;
+  const toast = useToast();
   const [method,       setMethod]       = useState<OfflineMethod>('VIREMENT');
   const [submitting,   setSubmitting]   = useState(false);
   const [instructions, setInstructions] = useState<OfflinePaymentInstructions | null>(null);
@@ -46,7 +48,7 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
       setInstructions(result.instructions);
     } catch (err: unknown) {
       const msg = (err as any)?.response?.data?.message ?? 'Une erreur est survenue.';
-      Alert.alert('Erreur', Array.isArray(msg) ? msg.join('\n') : msg);
+      toast.error(Array.isArray(msg) ? msg.join('\n') : msg, { title: 'Erreur' });
     } finally {
       setSubmitting(false);
     }

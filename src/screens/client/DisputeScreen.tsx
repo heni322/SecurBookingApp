@@ -1,10 +1,10 @@
-﻿/**
+/**
  * DisputeScreen — client dispute opening after a mission.
  * 6 predefined reasons · Free-form description · 48h admin review
  */
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, Alert, ScrollView,
+  View, Text, StyleSheet, ScrollView,
   TextInput, TouchableOpacity,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,6 +21,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import apiClient from '@api/client';
 import type { MissionStackParamList } from '@models/index';
+import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'Dispute'>;
 type LucideIcon = React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -40,8 +41,11 @@ const REASON_IDS: ReasonId[] = ['agent_absent', 'agent_late', 'quality', 'billin
 export default function DisputeScreen({ navigation, route }: Props) {
   const { missionId, bookingId, missionTitle } = route.params;
   const { t } = useTranslation('dispute');
+
   const { t: tc } = useTranslation('common');
 
+
+  const toast = useToast();
   const [reason, setReason] = useState<ReasonId | ''>('');
   const [desc,   setDesc]   = useState('');
   const [busy,   setBusy]   = useState(false);
@@ -51,11 +55,11 @@ export default function DisputeScreen({ navigation, route }: Props) {
 
   const handleSubmit = async () => {
     if (!reason) {
-      Alert.alert(t('errors.reason_required_title'), t('errors.reason_required_body'));
+      toast.warning(t('errors.reason_required_body'), { title: t('errors.reason_required_title') });
       return;
     }
     if (desc.trim().length < 20) {
-      Alert.alert(t('errors.desc_too_short_title'), t('errors.desc_too_short_body'));
+      toast.warning(t('errors.desc_too_short_body'), { title: t('errors.desc_too_short_title') });
       return;
     }
     setBusy(true);
@@ -69,7 +73,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
       setDone(true);
     } catch (err: any) {
       const msg = err?.response?.data?.message ?? t('errors.generic');
-      Alert.alert(tc('error'), msg);
+      toast.error(msg, { title: tc('error') });
     } finally {
       setBusy(false);
     }

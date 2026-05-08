@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SelectAgentScreen — sélection d'un agent pour un booking spécifique.
  *
  * Le client choisit explicitement quel agent doit prendre ce poste, sans
@@ -16,7 +16,7 @@
 import React, { useEffect, useCallback, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, RefreshControl,
-  Alert, StyleSheet, ActivityIndicator, ViewStyle,
+  StyleSheet, ActivityIndicator, ViewStyle,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -39,6 +39,9 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatDistance, formatMissionRange } from '@utils/formatters';
 import type { EligibleAgent, MissionStackParamList } from '@models/index';
+import { useToast } from '@hooks/useToast';
+import { useTranslation } from '@i18n';
+import { useConfirmDialogStore } from '@store/confirmDialogStore';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'SelectAgent'>;
 
@@ -46,6 +49,9 @@ type Props = NativeStackScreenProps<MissionStackParamList, 'SelectAgent'>;
 
 export const SelectAgentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { bookingId } = route.params;
+  const toast = useToast();
+  const { t } = useTranslation('missions');
+  const confirm = useConfirmDialogStore((s) => s.confirm);
 
   // Booking detail (for slot info + service type display)
   const {
@@ -93,47 +99,32 @@ export const SelectAgentScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [agents]);
 
   // ── Assign action ───────────────────────────────────────────────────────
-  const confirmAndAssign = (agent: EligibleAgent) => {
+  const confirmAndAssign = async (agent: EligibleAgent) => {
     if (!agent.canBeAssigned) {
-      Alert.alert(
-        'Agent non assignable',
-        `Cet agent ne peut pas prendre ce poste :\n\n${agent.schedulingConflicts.join('\n')}`,
+      toast.warning(
+        `Cet agent ne peut pas prendre ce poste :\n${agent.schedulingConflicts.join('\n')}`,
+        { title: 'Agent non assignable', duration: 6000 },
       );
       return;
     }
 
-    Alert.alert(
-      'Confirmer la sélection',
-      `Voulez-vous assigner ${agent.fullName} à ce poste ?\n\nL'agent recevra une notification immédiate.`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Confirmer',
-          style: 'default',
-          onPress: async () => {
-            setAssigningId(agent.id);
-            try {
-              await bookingsApi.assignAgent(bookingId, { agentId: agent.id });
-              Alert.alert(
-                'Agent assigné',
-                `${agent.fullName} a été notifié et viendra à votre mission.`,
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => navigation.goBack(),
-                  },
-                ],
-              );
-            } catch (e: any) {
-              const msg = e?.response?.data?.message ?? 'Une erreur est survenue';
-              Alert.alert("Échec de l'assignation", msg);
-            } finally {
-              setAssigningId(null);
-            }
-          },
-        },
-      ],
-    );
+    const ok = await confirm({
+      title:        t('select_agent.confirm_title'),
+      message:      t('select_agent.confirm_body', { name: agent.fullName }),
+      confirmLabel: t('select_agent.select_btn'),
+    });
+    if (!ok) return;
+    setAssigningId(agent.id);
+    try {
+      await bookingsApi.assignAgent(bookingId, { agentId: agent.id });
+      toast.success(t('select_agent.success_body', { name: agent.fullName }), { title: t('select_agent.success_title') });
+      navigation.goBack();
+    } catch (e: any) {
+      const msg = e?.response?.data?.message ?? t('select_agent.error');
+      toast.error(msg, { title: t('select_agent.error') });
+    } finally {
+      setAssigningId(null);
+    }
   };
 
   // ── Loading / error states ──────────────────────────────────────────────
