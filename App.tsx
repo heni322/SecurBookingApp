@@ -32,9 +32,25 @@ function App(): React.JSX.Element {
   const { increment } = useNotificationsStore();
 
   useEffect(() => {
-    // Hydrate tokens + apply persisted language preference.
-    // Both are fire-and-forget — failures are non-fatal.
-    tokenStorage.hydrate().then(() => rehydrate());
+    // CRITICAL FIX: tokenStorage.hydrate() populates the in-memory token
+    // cache (_accessToken / _refreshToken) from AsyncStorage.
+    // rehydrate() calls tokenStorage.getAccessToken() synchronously — so it
+    // MUST run only AFTER hydrate() resolves.  Previously both were chained
+    // with a bare .then() which did not guarantee ordering: if the JS
+    // microtask queue yielded between the two, rehydrate() would read null
+    // tokens and immediately set isLoggedIn:false, logging the user out on
+    // every cold start.
+    //
+    // Fix: .catch() before .then() so rehydrate() is always called even
+    // when AsyncStorage is unavailable (e.g. first boot, storage full).
+    tokenStorage
+      .hydrate()
+      .catch(() => {
+        // AsyncStorage unavailable — in-memory cache stays null.
+        // rehydrate() will handle the no-token path gracefully.
+        if (__DEV__) console.warn('[App] tokenStorage.hydrate() failed — proceeding without cache');
+      })
+      .then(() => rehydrate());
 
     AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
       .then((lang: string | null) => {

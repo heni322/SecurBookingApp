@@ -1,15 +1,18 @@
 /**
  * QuoteDetailScreen — displays the quote and triggers Stripe payment.
  *
- * FIX #7: Added a live TTL countdown (30 min) so the client knows when the
- * quote expires. Shows a warning banner at T-5 min, a red countdown at T-2 min,
- * and an "expired" state with a "Recalculate" button once the quote has expired.
+ * FIX (expired quote): The "Recalculer" button previously only called load()
+ * which re-fetched GET /quotes/mission/:id returning the same expired quote.
+ * Now it fetches the mission to get booking lines, calls POST /quotes/calculate
+ * (the backend upserts — replacing the expired quote with a fresh PENDING one),
+ * then calls load() to display the renewed quote.
  */
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Clock, CheckCircle2, CreditCard, FileText, Lock, Info, Landmark, AlertTriangle, RefreshCw, Building2 } from 'lucide-react-native';
+import { Clock, CheckCircle2, CreditCard, FileText, Lock, Info, Landmark, AlertTriangle, RefreshCw } from 'lucide-react-native';
 import { quotesApi }          from '@api/endpoints/quotes';
+import { missionsApi }        from '@api/endpoints/missions';
 import { paymentsApi }        from '@api/endpoints/payments';
 import { useApi }             from '@hooks/useApi';
 import { QuoteBreakdownCard } from '@components/domain/QuoteBreakdownCard';
@@ -20,42 +23,61 @@ import { Button }             from '@components/ui/Button';
 import { colors }             from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import type { MissionStackParamList } from '@models/index';
+import type { MissionStackParamList, Booking } from '@models/index';
 import { useTranslation } from '@i18n';
 import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'QuoteDetail'>;
 
-/** Format seconds as mm:ss */
 function fmtCountdown(secs: number): string {
   const m = Math.floor(secs / 60);
   const s = secs % 60;
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
+/**
+ * Build bookingLines for POST /quotes/calculate from mission bookings.
+ * Groups non-cancelled bookings by serviceTypeId.
+ */
+function buildBookingLines(bookings: Booking[]): Array<{
+  serviceTypeId: string; agentCount: number; agentUniforms: string[];
+}> {
+  const active = bookings.filter(b =>
+    b.serviceTypeId && !['CANCELLED', 'ABANDONED'].includes(b.status),
+  );
+  const map = new Map<string, { agentCount: number; agentUniforms: string[] }>();
+  for (const b of active) {
+    const id  = b.serviceTypeId!;
+    const row = map.get(id) ?? { agentCount: 0, agentUniforms: [] };
+    row.agentCount += 1;
+    row.agentUniforms.push(b.uniform ?? 'STANDARD');
+    map.set(id, row);
+  }
+  return Array.from(map.entries()).map(([serviceTypeId, v]) => ({
+    serviceTypeId, agentCount: v.agentCount, agentUniforms: v.agentUniforms,
+  }));
+}
+
 export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }     = useTranslation('quote');
   const { t: tc } = useTranslation('common');
+  const toast     = useToast();
 
-  const toast = useToast();
   const { missionId }                     = route.params;
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
-  const [accepting,   setAccepting]       = useState(false);
-  const [paying,      setPaying]          = useState(false);
-  const [payMethod,   setPayMethod]       = useState<'CARD' | 'SEPA' | 'OFFLINE'>('CARD');
-  const [secondsLeft, setSecondsLeft]     = useState<number | null>(null);
+  const [accepting,     setAccepting]     = useState(false);
+  const [paying,        setPaying]        = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const [payMethod,     setPayMethod]     = useState<'CARD' | 'SEPA' | 'OFFLINE'>('CARD');
+  const [secondsLeft,   setSecondsLeft]   = useState<number | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
 
-  // Start or reset the countdown whenever the quote changes
   useEffect(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
-    if (!quote || quote.status !== 'PENDING') {
-      setSecondsLeft(null);
-      return;
-    }
+    if (!quote || quote.status !== 'PENDING') { setSecondsLeft(null); return; }
     const tick = () => {
       const remaining = Math.max(0, Math.floor((new Date(quote.expiresAt).getTime() - Date.now()) / 1000));
       setSecondsLeft(remaining);
@@ -66,9 +88,10 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, [quote]);
 
-  const isExpired = secondsLeft === 0 || (quote?.status === 'PENDING' && quote?.expiresAt && new Date(quote.expiresAt) <= new Date());
-  const showWarning = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 300;  // last 5 min
-  const showUrgent  = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 120;  // last 2 min
+  // isExpired must be a strict boolean — avoid "" (empty string) which is not boolean
+  const isExpired   = secondsLeft === 0 || Boolean(quote?.status === 'PENDING' && quote?.expiresAt && new Date(quote.expiresAt) <= new Date());
+  const showWarning = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 300;
+  const showUrgent  = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 120;
 
   const handleAccept = async () => {
     if (!quote) return;
@@ -82,6 +105,38 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       setAccepting(false);
     }
   };
+
+  /**
+   * FIX: recalculate an expired quote.
+   *
+   * Previously only called load() which re-fetched GET /quotes/mission/:id
+   * returning the same expired quote — the user was stuck.
+   *
+   * Now:
+   *  1. Fetch mission to recover booking lines
+   *  2. POST /quotes/calculate — backend upserts a fresh PENDING quote (30-min TTL)
+   *  3. load() — re-fetches and displays the renewed quote
+   */
+  const handleRecalculate = useCallback(async () => {
+    setRecalculating(true);
+    try {
+      const { data: missionRes } = await missionsApi.getById(missionId);
+      const mission = (missionRes as any).data ?? missionRes;
+      const bookingLines = buildBookingLines(mission?.bookings ?? []);
+
+      if (bookingLines.length === 0) {
+        toast.error(tc('unknown_error'), { title: tc('error') });
+        return;
+      }
+
+      await quotesApi.calculate({ missionId, bookingLines });
+      await load();
+    } catch (err: unknown) {
+      toast.error((err as any)?.response?.data?.message ?? tc('unknown_error'), { title: tc('error') });
+    } finally {
+      setRecalculating(false);
+    }
+  }, [missionId, load, tc, toast]);
 
   const handleOffline = () => {
     if (!quote) return;
@@ -98,8 +153,6 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         missionId,
         clientSecret:  intent.clientSecret,
         totalTTC:      quote.totalWithVat,
-        // FIX #2 — pass paymentMethod and intentType so PaymentScreen
-        // can correctly detect isSepa and route CARD vs SEPA confirm flow.
         paymentMethod: payMethod as 'CARD' | 'SEPA',
         intentType:    intent.type as 'payment_intent' | 'setup_intent',
       });
@@ -125,41 +178,41 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-          {/* FIX #7 — Expired state: quote TTL elapsed */}
+          {/* FIX: expired banner — button now calls handleRecalculate */}
           {isExpired && quote.status === 'PENDING' && (
             <View style={styles.expiredBanner}>
               <AlertTriangle size={18} color={colors.danger} strokeWidth={2} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.expiredTitle}>{t('expired_title')}</Text>
-                <Text style={styles.expiredText}>
-                  {t('expired_body')}
-                </Text>
+                <Text style={styles.expiredText}>{t('expired_body')}</Text>
               </View>
               <TouchableOpacity
-                style={styles.recalcBtn}
-                onPress={async () => { setAccepting(true); try { await load(); } finally { setAccepting(false); } }}
-                disabled={accepting}
+                style={[styles.recalcBtn, recalculating && styles.recalcBtnDisabled]}
+                onPress={handleRecalculate}
+                disabled={recalculating}
+                activeOpacity={0.75}
               >
-                <RefreshCw size={14} color={colors.primary} strokeWidth={2} />
-                <Text style={styles.recalcText}>Recalculer</Text>
+                <RefreshCw size={14} color={recalculating ? colors.textMuted : colors.primary} strokeWidth={2} />
+                {/* FIX: 'recalculating' key doesn't exist in QuoteNS — use 'recalculate' for both states */}
+                <Text style={[styles.recalcText, recalculating && styles.recalcTextDisabled]}>
+                  {t('recalculate')}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* FIX #7 — Countdown warning banner */}
           {!isExpired && showWarning && quote.status === 'PENDING' && (
-            <View style={[styles.infoBanner, showUrgent && styles.warnBanner]}> 
+            <View style={[styles.infoBanner, showUrgent && styles.warnBanner]}>
               <Clock size={18} color={showUrgent ? colors.danger : colors.warning} strokeWidth={1.8} />
-              <Text style={[styles.bannerText, { color: showUrgent ? colors.danger : colors.warning }]}> 
+              <Text style={[styles.bannerText, { color: showUrgent ? colors.danger : colors.warning }]}>
                 {showUrgent
-                  ? t('countdown_urgent', { time: fmtCountdown(secondsLeft ?? 0) })
+                  ? t('countdown_urgent',  { time: fmtCountdown(secondsLeft ?? 0) })
                   : t('countdown_warning', { time: fmtCountdown(secondsLeft ?? 0) })
                 }
               </Text>
             </View>
           )}
 
-          {/* Pending banner (normal state) */}
           {!isExpired && quote.status === 'PENDING' && !showWarning && (
             <View style={styles.infoBanner}>
               <Clock size={18} color={colors.info} strokeWidth={1.8} />
@@ -167,7 +220,6 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* Payment method selector */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.methodSection}>
               <Text style={styles.methodTitle}>{t('payment_method')}</Text>
@@ -190,47 +242,40 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               {payMethod === 'SEPA' && (
                 <View style={styles.sepaNote}>
                   <Info size={13} color={colors.primary} strokeWidth={2} />
-                  <Text style={styles.sepaText}>
-                    Le virement SEPA sera traité en 1 à 2 jours ouvrés. Votre IBAN sera collecté sur la page suivante via Stripe.
-                  </Text>
+                  <Text style={styles.sepaText}>{t('sepa_note')}</Text>
                 </View>
               )}
             </View>
           )}
 
-          {/* Accepted banner */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.successBanner}>
               <CheckCircle2 size={18} color={colors.success} strokeWidth={2} />
-              <Text style={[styles.bannerText, { color: colors.success }]}>
-                Quote accepted — proceed to payment to confirm your mission.
-              </Text>
+              <Text style={[styles.bannerText, { color: colors.success }]}>{t('accepted_banner')}</Text>
             </View>
           )}
 
-          {/* Breakdown card */}
           <QuoteBreakdownCard
             quote={quote}
             onAccept={handleAccept}
             loading={accepting}
-            readonly={quote.status !== 'PENDING'}
+            readonly={quote.status !== 'PENDING' || Boolean(isExpired)}
           />
 
-          {/* Pay button */}
           {quote.status === 'ACCEPTED' && (
             <View style={styles.paySection}>
               <View style={styles.secureRow}>
                 <Lock size={13} color={colors.textMuted} strokeWidth={2} />
-                <Text style={styles.secureNote}>
-                  Secure payment via Stripe — your bank details never pass through our servers.
-                </Text>
+                {/* FIX: 'secure_stripe' doesn't exist in QuoteNS — use 'secure_note' */}
+                <Text style={styles.secureNote}>{t('secure_note')}</Text>
               </View>
               <Button
-                label={paying ? t('paying') : payMethod === 'CARD' ? t('pay_card') : payMethod === 'SEPA' ? t('pay_sepa') : 'Paiement hors-ligne'}
+                label={paying ? t('paying') : payMethod === 'CARD' ? t('pay_card') : payMethod === 'SEPA' ? t('pay_sepa') : t('pay_offline')}
                 onPress={payMethod === 'OFFLINE' ? handleOffline : handlePay}
                 disabled={paying}
                 loading={paying}
-                fullWidth size="lg"
+                fullWidth
+                size="lg"
               />
             </View>
           )}
@@ -258,11 +303,12 @@ const styles = StyleSheet.create({
   methodChipTextActive:{ color: colors.primary },
   sepaNote:            { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2], marginTop: spacing[3], backgroundColor: colors.primarySurface, borderRadius: radius.lg, padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary },
   sepaText:            { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primary, lineHeight: fontSize.xs * 1.6 },
-  // FIX #7 styles — expiry + countdown
-  warnBanner:    { backgroundColor: colors.warningSurface, borderColor: colors.warning },
-  expiredBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.dangerSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.danger },
-  expiredTitle:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.danger, marginBottom: 2 },
-  expiredText:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger, lineHeight: 18 },
-  recalcBtn:     { flexDirection: 'row', alignItems: 'center', gap: spacing[1]+2, backgroundColor: colors.primarySurface, borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderWidth: 1, borderColor: colors.borderPrimary, flexShrink: 0 },
-  recalcText:    { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
+  warnBanner:          { backgroundColor: colors.warningSurface, borderColor: colors.warning },
+  expiredBanner:       { flexDirection: 'row', alignItems: 'center', gap: spacing[3], backgroundColor: colors.dangerSurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.danger },
+  expiredTitle:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.danger, marginBottom: 2 },
+  expiredText:         { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger, lineHeight: 18 },
+  recalcBtn:           { flexDirection: 'row', alignItems: 'center', gap: spacing[1]+2, backgroundColor: colors.primarySurface, borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderWidth: 1, borderColor: colors.borderPrimary, flexShrink: 0 },
+  recalcBtnDisabled:   { backgroundColor: colors.surface, borderColor: colors.border },
+  recalcText:          { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
+  recalcTextDisabled:  { color: colors.textMuted },
 });

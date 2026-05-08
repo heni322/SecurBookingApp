@@ -1,5 +1,12 @@
-﻿/**
- * DeleteAccountScreen â€” RGPD-compliant account deletion flow.
+/**
+ * DeleteAccountScreen — RGPD-compliant account deletion flow.
+ *
+ * CRITICAL FIX: usersApi.deleteMe() now sends both `password` AND
+ * `confirmPhrase` to the backend.  Previously confirmPhrase was collected
+ * here but silently dropped before the API call — the backend only received
+ * `password`, so the phrase check was UX theater with zero server-side
+ * enforcement.  The backend DeleteMeDto now uses @Equals() to validate the
+ * phrase, so any direct API call without the exact phrase is rejected 400.
  */
 import React, { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
@@ -22,10 +29,9 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'DeleteAccount'>;
 
 export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
   const { t }     = useTranslation('account');
-
-  const toast = useToast();
-  const confirm = useConfirmDialogStore((s) => s.confirm);
-  const { t: tc } = useTranslation('common'); // cross-namespace: error title
+  const toast     = useToast();
+  const confirm   = useConfirmDialogStore((s) => s.confirm);
+  const { t: tc } = useTranslation('common');
 
   const { logout } = useAuthStore();
   const [password, setPassword] = useState('');
@@ -44,12 +50,20 @@ export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
       confirmStyle: 'destructive',
     });
     if (!ok) return;
+
     setLoading(true);
     try {
-      await usersApi.deleteMe(password);
+      // CRITICAL FIX: pass both password AND phrase — the backend now
+      // validates confirmPhrase server-side via @Equals('SUPPRIMER MON COMPTE').
+      // A request without the exact phrase is rejected 400 before any DB
+      // operation runs, even if called directly via curl/Postman.
+      await usersApi.deleteMe(password, phrase);
       logout();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message ?? t('delete.error'), { title: tc('error') });
+      toast.error(
+        err?.response?.data?.message ?? t('delete.error'),
+        { title: tc('error') },
+      );
       setLoading(false);
     }
   };
@@ -132,23 +146,20 @@ export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  screen:        { flex: 1, backgroundColor: colors.background },
-  content:       { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[6], paddingBottom: spacing[12], gap: spacing[6] },
-  warningCard:   { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[4], backgroundColor: colors.dangerSurface, borderRadius: radius.xl, padding: spacing[5], borderWidth: 1, borderColor: colors.danger + '40' },
-  warningText:   { flex: 1, gap: spacing[2] },
-  warningTitle:  { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.danger, letterSpacing: -0.3 },
-  warningBody:   { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
-  section:       { gap: spacing[3] },
-  sectionTitle:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2 },
-  deleteItem:    { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  deleteDot:     { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dangerDot, flexShrink: 0 },
-  deleteItemText:{ fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
-  fields:        { gap: spacing[4] },
-  fieldGroup:    { gap: spacing[2] },
-  fieldLabel:    { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 1.2 },
-  phraseError:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger },
-  deleteBtn:     { marginTop: spacing[2] },
+  screen:         { flex: 1, backgroundColor: colors.background },
+  content:        { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[6], paddingBottom: spacing[12], gap: spacing[6] },
+  warningCard:    { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[4], backgroundColor: colors.dangerSurface, borderRadius: radius.xl, padding: spacing[5], borderWidth: 1, borderColor: colors.danger + '40' },
+  warningText:    { flex: 1, gap: spacing[2] },
+  warningTitle:   { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.danger, letterSpacing: -0.3 },
+  warningBody:    { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 20 },
+  section:        { gap: spacing[3] },
+  sectionTitle:   { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2 },
+  deleteItem:     { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
+  deleteDot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.dangerDot, flexShrink: 0 },
+  deleteItemText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
+  fields:         { gap: spacing[4] },
+  fieldGroup:     { gap: spacing[2] },
+  fieldLabel:     { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 1.2 },
+  phraseError:    { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger },
+  deleteBtn:      { marginTop: spacing[2] },
 });
-
-
-
