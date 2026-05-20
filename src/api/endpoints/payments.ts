@@ -1,4 +1,4 @@
-﻿import apiClient from '@api/client';
+import apiClient from '@api/client';
 import type {
   ApiResponse, Payment, PaymentMethod, PaymentIntentResponse,
   CreatePaymentIntentPayload, DeclareOfflinePayload, OfflinePaymentResponse,
@@ -12,17 +12,17 @@ export const paymentsApi = {
 
   /** [CLIENT] Supprimer une méthode de paiement */
   detachMethod: (paymentMethodId: string) =>
-    apiClient.delete<ApiResponse<null>>(`/payments/methods/${paymentMethodId}`),
+    apiClient.delete<ApiResponse<null>>(`/payments/methods/delete/${paymentMethodId}`),
 
   /**
    * [CLIENT] Créer un PaymentIntent (CARD) ou SetupIntent (SEPA).
    */
   createIntent: (payload: CreatePaymentIntentPayload) =>
-    apiClient.post<ApiResponse<PaymentIntentResponse>>('/payments/intent', payload),
+    apiClient.post<ApiResponse<PaymentIntentResponse>>('/payments/create-intent', payload),
 
   /** Récupérer le paiement d'une mission */
   getByMission: (missionId: string) =>
-    apiClient.get<ApiResponse<Payment>>(`/payments/mission/${missionId}`),
+    apiClient.get<ApiResponse<Payment>>(`/payments/get/mission/${missionId}`),
 
   /** [CLIENT] Historique de tous les paiements du client connecté */
   getMyPayments: () =>
@@ -34,8 +34,9 @@ export const paymentsApi = {
 
   /** [CLIENT] Télécharger la facture PDF d'un paiement (retourne URL signée) */
   getInvoiceUrl: (paymentId: string) =>
-    apiClient.get<ApiResponse<{ url: string }>>(`/payments/${paymentId}/invoice`),
+    apiClient.get<ApiResponse<{ url: string }>>(`/payments/get/${paymentId}/invoice`),
+
   /** [CLIENT] Déclarer un virement bancaire ou chèque envoyé */
   declareOffline: (payload: DeclareOfflinePayload) =>
-    apiClient.post<ApiResponse<OfflinePaymentResponse>>('/payments/offline', payload),
+    apiClient.post<ApiResponse<OfflinePaymentResponse>>('/payments/create-offline', payload),
 };

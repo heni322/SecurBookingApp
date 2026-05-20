@@ -132,10 +132,6 @@ export const DateTimePicker: React.FC<Props> = ({
   const handleHour = (delta: number) => {
     setHour(h => Math.min(23, Math.max(0, h + delta)));
   };
-  const handleMinute = (delta: number) => {
-    setMinute(m => Math.min(55, Math.max(0, m + delta)));
-  };
-
   return (
     <>
       {/* ── Trigger ───────────────────────────────────────────────────────── */}

@@ -1,52 +1,79 @@
 /**
  * Button — premium interactive element.
- * Senior UI: size variants, ghost/outline/filled, full icon support, loading shimmer.
+ *
+ * A11y (WCAG 2.1 AA)
+ * ───────────────────
+ * • accessibilityRole="button" on all variants.
+ * • accessibilityLabel defaults to `label` prop — callers can override.
+ * • accessibilityState: disabled when loading or disabled.
+ * • accessibilityHint: optional hint for VoiceOver / TalkBack.
+ * • Minimum touch target: 44×44pt (WCAG 2.5.5 / Apple HIG).
+ * • Text uses allowFontScaling for Dynamic Type support.
+ *
+ * Dynamic Type
+ * ─────────────
+ * Font sizes go through rf() — scales with system font size.
  */
 import React from 'react';
+import type { ViewStyle} from 'react-native';
 import {
   TouchableOpacity, Text, ActivityIndicator,
-  StyleSheet, ViewStyle, View,
+  StyleSheet, View,
 } from 'react-native';
-import { colors } from '@theme/colors';
-import { spacing, radius, shadow, layout } from '@theme/spacing';
+import { colors }              from '@theme/colors';
+import { spacing, radius }     from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { rf }                  from '@utils/responsive';
 
 type Variant = 'filled' | 'outline' | 'ghost' | 'danger';
 type Size    = 'sm' | 'md' | 'lg' | 'xl';
 
 interface Props {
-  label:     string;
-  onPress:   () => void;
-  variant?:  Variant;
-  size?:     Size;
-  loading?:  boolean;
-  disabled?: boolean;
-  fullWidth?: boolean;
-  style?:    ViewStyle;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+  label:              string;
+  onPress:            () => void;
+  variant?:           Variant;
+  size?:              Size;
+  loading?:           boolean;
+  disabled?:          boolean;
+  fullWidth?:         boolean;
+  style?:             ViewStyle;
+  leftIcon?:          React.ReactNode;
+  rightIcon?:         React.ReactNode;
+  /** Overrides label as accessibilityLabel (use when label is icon-only). */
+  accessibilityLabel?: string;
+  /** Optional TalkBack / VoiceOver hint describing the action result. */
+  accessibilityHint?:  string;
 }
 
 const HEIGHT: Record<Size, number> = { sm: 36, md: 44, lg: 52, xl: 58 };
-const FONT:   Record<Size, number> = { sm: fontSize.sm, md: fontSize.base, lg: fontSize.base, xl: fontSize.md };
-const HPAD:   Record<Size, number> = { sm: spacing[3], md: spacing[5], lg: spacing[6], xl: spacing[7] };
+const FONT:   Record<Size, number> = {
+  sm: fontSize.sm, md: fontSize.base, lg: fontSize.base, xl: fontSize.md,
+};
+const HPAD:   Record<Size, number> = {
+  sm: spacing[3], md: spacing[5], lg: spacing[6], xl: spacing[7],
+};
 
 export const Button: React.FC<Props> = ({
   label, onPress,
-  variant  = 'filled',
-  size     = 'md',
-  loading  = false,
-  disabled = false,
-  fullWidth = false,
+  variant   = 'filled',
+  size      = 'md',
+  loading   = false,
+  disabled  = false,
+  fullWidth  = false,
   style,
   leftIcon,
   rightIcon,
+  accessibilityLabel,
+  accessibilityHint,
 }) => {
   const isDisabled = disabled || loading;
 
   const containerStyle: ViewStyle[] = [
     styles.base,
-    { height: HEIGHT[size], paddingHorizontal: HPAD[size] },
+    {
+      height:            Math.max(HEIGHT[size], 44), // WCAG 2.5.5 min 44pt
+      paddingHorizontal: HPAD[size],
+    },
     variant === 'filled'  && styles.filled,
     variant === 'outline' && styles.outline,
     variant === 'ghost'   && styles.ghost,
@@ -69,16 +96,35 @@ export const Button: React.FC<Props> = ({
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.78}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'filled' ? colors.textInverse : colors.primary} />
+        <ActivityIndicator
+          size="small"
+          color={variant === 'filled' ? colors.textInverse : colors.primary}
+          accessibilityLabel="Loading"
+        />
       ) : (
         <View style={styles.inner}>
-          {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
-          <Text style={[styles.label, { fontSize: FONT[size], color: textColor }]}>
+          {leftIcon && (
+            <View style={styles.iconLeft} importantForAccessibility="no-hide-descendants">
+              {leftIcon}
+            </View>
+          )}
+          <Text
+            style={[styles.label, { fontSize: rf(FONT[size]), color: textColor }]}
+            allowFontScaling
+          >
             {label}
           </Text>
-          {rightIcon && <View style={styles.iconRight}>{rightIcon}</View>}
+          {rightIcon && (
+            <View style={styles.iconRight} importantForAccessibility="no-hide-descendants">
+              {rightIcon}
+            </View>
+          )}
         </View>
       )}
     </TouchableOpacity>
@@ -132,4 +178,3 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
 });
-

@@ -8,9 +8,9 @@ export const quotesApi = {
 
   /** Récupérer le devis d'une mission */
   getByMission: (missionId: string) =>
-    apiClient.get<ApiResponse<Quote>>(`/quotes/mission/${missionId}`),
+    apiClient.get<ApiResponse<Quote>>(`/quotes/get/mission/${missionId}`),
 
   /** [CLIENT] Accepter un devis */
   accept: (id: string) =>
-    apiClient.patch<ApiResponse<Quote>>(`/quotes/${id}/accept`),
+    apiClient.patch<ApiResponse<Quote>>(`/quotes/accept/${id}`),
 };

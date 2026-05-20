@@ -52,19 +52,29 @@ const quote: QuoteNS = {
 
   offline_note:
     "Virement bancaire ou chèque. Votre mission sera confirmée après validation par notre équipe (1 à 3 jours ouvrés).",
+
   breakdown_title: 'Détail du devis',
-  agent_payout:    '↳ Rémunération agent (virement J+15)',
-  accepted_badge:  '✓ Devis accepté',
+
+  // ── Détail des prestations (par type d'agent) ──────────────────────────────
+  prestations_title:    'Prestations',
+  prestation_hours:     '{{hours}} h',
+  prestation_agents:    '{{count}} agent',
+  prestation_agents_plural: '{{count}} agents',
+  prestation_rate:      '{{rate}} €/h',
+  prestation_subtotal:  'Sous-total',
+
+  // ── Lignes tarifaires visibles client ──────────────────────────────────────
   row_base_ht:   'Base HT',
   row_night:     'Majoration nuit',
   row_weekend:   'Majoration week-end',
   row_urgency:   'Majoration urgence',
   row_subtotal:  'Sous-total HT',
-  row_vat:       'TVA 20%',
+  row_vat:       'TVA {{rate}}%',
   row_total_ttc: 'TOTAL TTC',
-  row_commission:'↳ Commission Provalk',
-  valid_until:   "Valable jusqu'au {{date}}",
-  accept_label:  'Accepter ce devis',
+
+  accepted_badge: '✓ Devis accepté',
+  valid_until:    "Valable jusqu'au {{date}}",
+  accept_label:   'Accepter ce devis',
 };
 
 export default quote;

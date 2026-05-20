@@ -3,7 +3,8 @@
  * Replaces spinner in lists, cards, and screens while data loads.
  */
 import React, { useEffect, useRef } from 'react';
-import { View, Animated, StyleSheet, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
+import { View, Animated, StyleSheet } from 'react-native';
 import { colors, palette } from '@theme/colors';
 import { radius } from '@theme/spacing';
 

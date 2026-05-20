@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import axios from 'axios';
 import { API_BASE_URL, API_TIMEOUT } from '@constants/config';
 import { tokenStorage }  from '@services/tokenStorage';
 import { useAuthStore }  from '@store/authStore';

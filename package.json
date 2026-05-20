@@ -24,7 +24,10 @@
     "@react-navigation/bottom-tabs": "^7.15.8",
     "@react-navigation/native": "^7.2.1",
     "@react-navigation/native-stack": "^7.14.9",
+    "@shopify/flash-list": "^2.3.1",
+    "@storybook/react-native": "^10.4.4",
     "@stripe/stripe-react-native": "^0.40.0",
+    "@tanstack/react-query": "^5.100.11",
     "axios": "^1.7.9",
     "i18next": "^26.0.4",
     "lucide-react-native": "^1.7.0",
@@ -32,6 +35,7 @@
     "react-i18next": "^17.0.3",
     "react-native": "0.84.1",
     "react-native-image-picker": "^8.2.1",
+    "react-native-keychain": "^10.0.0",
     "react-native-maps": "^1.27.2",
     "react-native-permissions": "^5.1.0",
     "react-native-safe-area-context": "^5.5.2",
@@ -90,7 +94,8 @@
       "^@hooks/(.*)$": "<rootDir>/src/hooks/$1",
       "^@utils/(.*)$": "<rootDir>/src/utils/$1",
       "^@theme/(.*)$": "<rootDir>/src/theme/$1",
-      "^@navigation/(.*)$": "<rootDir>/src/navigation/$1"
+      "^@navigation/(.*)$": "<rootDir>/src/navigation/$1",
+      "^@lib/(.*)$": "<rootDir>/src/lib/$1"
     }
   }
 }

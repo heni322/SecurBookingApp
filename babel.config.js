@@ -20,6 +20,7 @@ module.exports = {
           '@navigation': './src/navigation',
           '@assets':     './src/assets',
           '@i18n':       './src/i18n',
+          '@lib':        './src/lib',
         },
       },
     ],

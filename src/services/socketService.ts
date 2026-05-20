@@ -8,7 +8,8 @@
  *  ● All other APIs remain identical.
  */
 
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import { API_BASE_URL } from '../constants/config';
 
 const WS_URL = API_BASE_URL.replace('/api/v1', '');

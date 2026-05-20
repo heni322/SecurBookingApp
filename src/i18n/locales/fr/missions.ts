@@ -38,10 +38,12 @@ const missions: MissionsNS = {
     refreshing:             'Actualisation de la liste',
     retry:                  'Réessayer le chargement',
     new_mission:            'Créer une nouvelle mission',
+    new_mission_hint:       "Ouvre l'assistant de création de mission",
     search:                 'Rechercher des missions',
     filter_bar:             'Filtrer les missions par statut',
     filter_chip:            'Filtrer par {{label}}',
     filter_chip_with_count: 'Filtrer par {{label}}, {{count}} missions',
+    mission_list:           'Liste des missions, {{count}} éléments',
   },
 
   detail: {
@@ -64,7 +66,6 @@ const missions: MissionsNS = {
     duration:         'Durée',
     created_on:       'Créée le',
     cta_get_quote:    'Obtenir un devis',
-    radius:           'Rayon de recherche',
     cta_see_quote:    'Voir le devis',
     cta_pay:          'Voir le devis et payer',
     cta_select:       'Choisir mes agents',
@@ -81,7 +82,6 @@ const missions: MissionsNS = {
     total_ttc:        'Total TTC',
   },
 
-  // Flow: CREATED → PUBLISHED → STAFFING → STAFFED → IN_PROGRESS → COMPLETED
   statuses: {
     created:     'Créée',
     published:   'Publiée',
@@ -141,8 +141,6 @@ const missions: MissionsNS = {
     duration_max:             'Durée maximum : 10 jours',
     end_before_start:         'La fin doit être après le début',
     start_min_future:         'La mission doit commencer au moins 1 heure dans le futur',
-    radius_min:               'Rayon minimum : 5 km',
-    radius_max:               'Rayon maximum : 500 km',
     error_create:             'Erreur lors de la création',
     title_placeholder:        'Ex. Sécurité privée soirée',
     instructions_placeholder: 'Instructions particulières pour les agents…',
@@ -165,8 +163,6 @@ const missions: MissionsNS = {
     urgency_note:             'Majoration urgence applicable',
     title_label:              'Titre (optionnel)',
     notes_label:              'Notes / instructions (optionnel)',
-    radius_label:             'Rayon de recherche (km)',
-    radius_hint:              'Entre 5 et 500 km',
     city_label:               'Ville *',
     city_placeholder:         'Paris',
     zip_label:                'Code postal',
@@ -181,9 +177,9 @@ const missions: MissionsNS = {
     step_two_title:           'Localisation de la mission',
     agent_label:              'Agent {{n}}',
     amplitude_max:            'Mission trop longue : {{h}}h (max 12h par mission).',
-    weekly_cap:                'Plafond hebdomadaire atteint : {{h}}h travaillées (max 48h du lundi au dimanche).',
-    rest_between:              'Repos insuffisant : seulement {{h}}h entre deux missions (min 11h requis).',
-    rest_after_cap:            'Repos de 24h obligatoire après avoir atteint le plafond hebdomadaire de 48h.',
+    weekly_cap:               'Plafond hebdomadaire atteint : {{h}}h travaillées (max 48h du lundi au dimanche).',
+    rest_between:             'Repos insuffisant : seulement {{h}}h entre deux missions (min 11h requis).',
+    rest_after_cap:           'Repos de 24h obligatoire après avoir atteint le plafond hebdomadaire de 48h.',
 
     // ── Multi-slot scheduling ───────────────────────────────────────────────
     slot_mode_single:   'Plage horaire unique',
@@ -215,6 +211,97 @@ const missions: MissionsNS = {
     slot_lines_custom:   'Agents personnalisés : {{count}}',
     slot_lines_reset:    'Revenir aux agents par défaut',
     slot_lines_required: 'Ajoutez au moins un poste pour ce créneau',
+
+    // ── Redesigned 3-step wizard ───────────────────────────────────────────
+    step_where:      'Étape 1 sur 3 · Lieu',
+    step_when:       'Étape 2 sur 3 · Quand',
+    step_review:     'Étape 3 sur 3 · Récapitulatif',
+
+    progress_where:  'Lieu',
+    progress_when:   'Quand',
+    progress_review: 'Récap',
+
+    where_title:     'Où se déroule la mission ?',
+    where_subtitle:  "Renseignez l'adresse exacte de la mission.",
+    when_title:      'Quand a lieu la mission ?',
+    when_subtitle:   'Choisissez une plage rapide ou définissez vos horaires.',
+    review_title:    'Tout est prêt ?',
+    review_subtitle: 'Vérifiez les détails avant de générer votre devis.',
+
+    edit_btn:         'Modifier',
+    summary_when:     'Date & horaires',
+    summary_services: 'Prestations',
+
+    preset_section:   'Plage rapide',
+    preset_tonight:   'Ce soir',
+    preset_tomorrow:  'Demain',
+    preset_weekend:   'Ce week-end',
+    custom_section:   'Horaires personnalisés',
+
+    add_another_slot:      'Ajouter une autre plage horaire',
+    add_another_slot_hint: 'Pour les missions multi-jours ou à horaires variables.',
+    slots_count:           '{{n}} plages horaires',
+
+    optional_section: 'Informations complémentaires (optionnel)',
+
+    // ── Per-slot customization ─────────────────────────────────────────
+    customize_for_slot:        'Personnaliser pour ce créneau',
+    slot_uniform_label:        'Tenue pour ce créneau',
+    slot_line_excluded_note:   'Cette prestation est exclue de ce créneau',
+    slot_total_agents:         '{{count}} agent au total',
+    custom_label:              'Personnalisé',
+    summary_services_default:  'Prestations par défaut',
+
+    // ── Copy-from-slot feature ─────────────────────────────────────────
+    slot_copy_from:    'Copier depuis la plage {{n}}',
+
+    // ── Slot header date summary ───────────────────────────────────────
+    slot_date_summary: '{{start}} → {{end}}',
+    slot_date_pending: 'Horaires non définis',
+
+    // Footer status
+    footer_step_progress: 'Étape {{current}} sur {{total}}',
+    footer_ready:         'Prêt à publier',
+    slots_total_short:    '{{count}} plages · {{hours}}h',
+
+    // ── Review step enrichments ────────────────────────────────────────
+    review_agent_hours:  '{{hours}} heures·agent estimées',
+    review_slot_summary: '{{agents}} agent · {{hours}}h',
+
+    // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
+    draft_restore_title:    'Reprendre votre brouillon ?',
+    draft_restore_subtitle: 'Vous avez une mission en cours de création (sauvegardée {{when}}).',
+    draft_restore_btn:      'Reprendre',
+    draft_discard_btn:      'Recommencer',
+    draft_discard_confirm_title:   'Supprimer le brouillon ?',
+    draft_discard_confirm_message: 'Toutes les informations saisies seront perdues.',
+    draft_discard_confirm_btn:     'Supprimer',
+
+    // ── ENTERPRISE UX: smarter footer ───────────────────────────────────
+    next_to_when:    'Continuer · Quand',
+    next_to_review:  'Continuer · Récap',
+    footer_back:     'Précédent',
+
+    // ── ENTERPRISE UX: cross-slot error banner ──────────────────────────
+    cross_slot_error_title:    'Conflit de plages horaires',
+    cross_slot_error_subtitle: 'Certaines plages se chevauchent ou ne respectent pas les durées légales.',
+    cross_slot_error_jump:     'Voir la plage {{n}}',
+
+    // ── ENTERPRISE UX: multi-slot escape ────────────────────────────────
+    exit_multi_slot:                 'Revenir à une plage unique',
+    exit_multi_slot_confirm_title:   'Revenir à une seule plage ?',
+    exit_multi_slot_confirm_message: 'Les autres plages ainsi que leurs personnalisations seront supprimées.',
+    exit_multi_slot_confirm_btn:     'Revenir à une plage',
+
+    // ── ENTERPRISE UX: review price estimate ────────────────────────────
+    review_estimate_label:  'ESTIMATION INDICATIVE',
+    review_estimate_amount: '≈ {{amount}} HT',
+    review_estimate_note:   'Le prix définitif (avec majorations nuit / week-end / TVA) sera calculé sur l\'écran suivant.',
+
+    // ── ENTERPRISE UX: structured submit error ──────────────────────────
+    submit_error_title:    'Impossible de créer la mission',
+    submit_error_jump_to:  'Modifier',
+    submit_error_network:  'Vérifiez votre connexion et réessayez.',
   },
 };
 

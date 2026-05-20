@@ -1,11 +1,12 @@
-﻿/**
- * ServicePickerScreen — Multi-service selection with per-agent uniform picker.
+/**
+ * ServicePickerScreen — Service & uniform selection.
  *
- * UX:
- *  — Tap a card to select/deselect a service
- *  — +/- stepper adds/removes agent slots (each agent = one uniform chip)
- *  — Each agent has its own tenue (STANDARD, CIVIL, EVENEMENTIEL, SSIAP, CYNOPHILE)
- *  — Sticky bottom bar shows live summary + "Continuer" CTA
+ * UX (redesigned):
+ *  — Tap a service card to add it (default: 1 agent, STANDARD uniform)
+ *  — Stepper +/- adjusts the agent count
+ *  — ONE uniform per service line by default (most common case)
+ *  — Optional "Personnaliser par agent" link → opens inline per-agent picker
+ *  — Sticky bottom CTA shows live summary
  */
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
@@ -17,7 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   Shield, Building2, Flame, Dog, Car, Star,
   UserCheck, Users, Check, Plus, Minus, ArrowRight,
-  ChevronDown, ChevronUp,
+  Settings2,
 } from 'lucide-react-native';
 import { serviceTypesApi }     from '@api/endpoints/serviceTypes';
 import { useApi }              from '@hooks/useApi';
@@ -28,7 +29,7 @@ import { colors, palette }     from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatEuros }         from '@utils/formatters';
-import { useTranslation } from '@i18n';
+import { useTranslation }      from '@i18n';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'ServicePicker'>;
@@ -44,17 +45,21 @@ export const UNIFORM_OPTIONS = [
 ] as const;
 
 export type UniformValue = (typeof UNIFORM_OPTIONS)[number]['value'];
+const DEFAULT_UNIFORM: UniformValue = 'STANDARD';
 
 // -- Data structures -----------------------------------------------------------
-interface AgentSlot { uniform: UniformValue | null }
-
 interface SelectedLine {
-  serviceTypeId: string;
-  name:          string;
-  accent:        string;
-  ratePerHour:   number;
-  agents:        AgentSlot[];   // one slot per agent, each with own uniform
-  expanded:      boolean;       // show/hide per-agent detail
+  serviceTypeId:   string;
+  name:            string;
+  accent:          string;
+  ratePerHour:     number;
+  agentCount:      number;
+  /** Default uniform for all agents (used unless customized). */
+  defaultUniform:  UniformValue;
+  /** Per-agent overrides — only set when user explicitly customizes. */
+  perAgentOverrides: Map<number, UniformValue>;
+  /** Whether the per-agent customization panel is open. */
+  customizing:     boolean;
 }
 
 // -- Icon map ------------------------------------------------------------------
@@ -67,43 +72,54 @@ const SERVICE_ICON_MAP: Array<{ keywords: string[]; Icon: LucideIconComp; accent
   { keywords: ['accueil', 'hôtesse', 'hôtesse', 'réception'], Icon: Users,     accent: palette.gold },
   { keywords: ['equipe', 'chef', 'coord'],                    Icon: Building2, accent: palette.txtBlue },
 ];
+
 function getServiceMeta(name: string): { Icon: LucideIconComp; accent: string } {
   const n = name.toLowerCase();
   return SERVICE_ICON_MAP.find(({ keywords }) => keywords.some(k => n.includes(k)))
     ?? { Icon: Shield, accent: palette.txtBlue };
 }
 
-const defaultSlot = (): AgentSlot => ({ uniform: null });
+/** Expand a SelectedLine into the agentUniforms array expected by the API. */
+function getAgentUniforms(line: SelectedLine): UniformValue[] {
+  return Array.from({ length: line.agentCount }, (_, i) =>
+    line.perAgentOverrides.get(i) ?? line.defaultUniform,
+  );
+}
 
 // -- Screen --------------------------------------------------------------------
 export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
   const { t } = useTranslation('services');
-    const { data: services, loading, execute } = useApi(serviceTypesApi.findAll);
+  const { data: services, loading, execute } = useApi(serviceTypesApi.findAll);
   const [selected, setSelected] = useState<Map<string, SelectedLine>>(new Map());
   const ctaAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => { execute(); }, [execute]);
 
-  // FIX Mobile B1 — when returning from MissionCreate with existingLines,
-  // re-hydrate the selection map so the user does not lose their picks.
+  // Re-hydrate from MissionCreate if returning via "Edit services"
   useFocusEffect(
     useCallback(() => {
       const existing = (route.params as any)?.existingLines as Array<{
         serviceTypeId: string; agentCount: number; name: string;
-        accent: string; agentUniforms: string[];
+        accent: string; agentUniforms: (string | null)[];
       }> | undefined;
       if (!existing?.length) return;
       setSelected(prev => {
         const next = new Map(prev);
         for (const l of existing) {
           if (!next.has(l.serviceTypeId)) {
+            const uniforms = l.agentUniforms.map(u => (u as UniformValue) ?? DEFAULT_UNIFORM);
+            const allSame  = uniforms.every(u => u === uniforms[0]);
+            const overrides = new Map<number, UniformValue>();
+            if (!allSame) uniforms.forEach((u, i) => overrides.set(i, u));
             next.set(l.serviceTypeId, {
               serviceTypeId: l.serviceTypeId,
               name:          l.name,
               accent:        l.accent,
               ratePerHour:   0,
-              expanded:      true,
-              agents:        l.agentUniforms.map(u => ({ uniform: u as UniformValue })),
+              agentCount:    l.agentCount,
+              defaultUniform: allSame ? uniforms[0] : DEFAULT_UNIFORM,
+              perAgentOverrides: overrides,
+              customizing:   !allSame,
             });
           }
         }
@@ -114,7 +130,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const totalLines  = selected.size;
   const totalAgents = useMemo(
-    () => Array.from(selected.values()).reduce((s, l) => s + l.agents.length, 0),
+    () => Array.from(selected.values()).reduce((s, l) => s + l.agentCount, 0),
     [selected],
   );
 
@@ -124,7 +140,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
     }).start();
   }, [totalLines]);
 
-  // Toggle service selection
+  // -- Mutations ---------------------------------------------------------------
   const toggleService = useCallback((item: any) => {
     setSelected(prev => {
       const next = new Map(prev);
@@ -133,70 +149,65 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
       } else {
         const { accent } = getServiceMeta(item.name);
         next.set(item.id, {
-          serviceTypeId: item.id,
-          name:          item.name,
+          serviceTypeId:   item.id,
+          name:            item.name,
           accent,
-          ratePerHour:   item.baseRatePerHour,
-          agents:        [defaultSlot()],
-          expanded:      true,
+          ratePerHour:     item.baseRatePerHour,
+          agentCount:      1,
+          defaultUniform:  DEFAULT_UNIFORM,
+          perAgentOverrides: new Map(),
+          customizing:     false,
         });
       }
       return next;
     });
   }, []);
 
-  // Add one agent slot
-  const addAgent = useCallback((id: string) => {
-    setSelected(prev => {
-      const line = prev.get(id);
-      if (!line || line.agents.length >= 20) return prev;
-      const next = new Map(prev);
-      next.set(id, { ...line, agents: [...line.agents, defaultSlot()], expanded: true });
-      return next;
-    });
-  }, []);
-
-  // Remove last agent slot
-  const removeAgent = useCallback((id: string) => {
-    setSelected(prev => {
-      const line = prev.get(id);
-      if (!line || line.agents.length <= 1) return prev;
-      const next = new Map(prev);
-      next.set(id, { ...line, agents: line.agents.slice(0, -1) });
-      return next;
-    });
-  }, []);
-
-  // Change uniform for a specific agent index
-  const setAgentUniform = useCallback((id: string, agentIdx: number, uniform: UniformValue | null) => {
+  const changeCount = useCallback((id: string, delta: number) => {
     setSelected(prev => {
       const line = prev.get(id);
       if (!line) return prev;
-      const agents = line.agents.map((a, i) => i === agentIdx ? { ...a, uniform } : a);
-      const next   = new Map(prev);
-      next.set(id, { ...line, agents });
+      const newCount = Math.max(1, Math.min(20, line.agentCount + delta));
+      if (newCount === line.agentCount) return prev;
+      // Trim overrides beyond newCount
+      const overrides = new Map(line.perAgentOverrides);
+      Array.from(overrides.keys()).filter(k => k >= newCount).forEach(k => overrides.delete(k));
+      const next = new Map(prev);
+      next.set(id, { ...line, agentCount: newCount, perAgentOverrides: overrides });
       return next;
     });
   }, []);
 
-  // Set ALL agents of a line to same uniform (quick shortcut)
-  const setAllUniforms = useCallback((id: string, uniform: UniformValue | null) => {
+  const setDefaultUniform = useCallback((id: string, uniform: UniformValue) => {
     setSelected(prev => {
       const line = prev.get(id);
       if (!line) return prev;
       const next = new Map(prev);
-      next.set(id, { ...line, agents: line.agents.map(() => ({ uniform })) });
+      // Clearing overrides when picking a new default reduces surprise.
+      next.set(id, { ...line, defaultUniform: uniform, perAgentOverrides: new Map() });
       return next;
     });
   }, []);
 
-  // Toggle expand/collapse per-agent detail
-  const toggleExpand = useCallback((id: string) => {
+  const toggleCustomize = useCallback((id: string) => {
     setSelected(prev => {
       const line = prev.get(id);
       if (!line) return prev;
       const next = new Map(prev);
-      next.set(id, { ...line, expanded: !line.expanded });
+      next.set(id, { ...line, customizing: !line.customizing });
+      return next;
+    });
+  }, []);
+
+  const setPerAgentUniform = useCallback((id: string, agentIdx: number, uniform: UniformValue) => {
+    setSelected(prev => {
+      const line = prev.get(id);
+      if (!line) return prev;
+      const overrides = new Map(line.perAgentOverrides);
+      if (uniform === line.defaultUniform) overrides.delete(agentIdx);
+      else overrides.set(agentIdx, uniform);
+      const next = new Map(prev);
+      next.set(id, { ...line, perAgentOverrides: overrides });
       return next;
     });
   }, []);
@@ -205,10 +216,10 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
     if (totalLines === 0) return;
     const bookingLines = Array.from(selected.values()).map(l => ({
       serviceTypeId: l.serviceTypeId,
-      agentCount:    l.agents.length,
+      agentCount:    l.agentCount,
       name:          l.name,
       accent:        l.accent,
-      agentUniforms: l.agents.map(a => a.uniform),
+      agentUniforms: getAgentUniforms(l),
     }));
     navigation.navigate('MissionCreate', { bookingLines });
   }, [selected, totalLines, navigation]);
@@ -223,7 +234,6 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
         onBack={() => navigation.goBack()}
       />
 
-      {/* Selection summary bar */}
       {totalLines > 0 && (
         <View style={styles.summaryBar}>
           <Text style={styles.summaryText}>
@@ -251,20 +261,17 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
           renderItem={({ item }) => {
             const { Icon, accent } = getServiceMeta(item.name);
             const line             = selected.get(item.id);
-            const isSelected       = !!line;
             return (
               <ServiceCard
                 item={item}
                 Icon={Icon}
                 accent={accent}
-                isSelected={isSelected}
                 line={line ?? null}
                 onToggle={() => toggleService(item)}
-                onAddAgent={() => addAgent(item.id)}
-                onRemoveAgent={() => removeAgent(item.id)}
-                onSetAgentUniform={(idx, u) => setAgentUniform(item.id, idx, u)}
-                onSetAllUniforms={(u) => setAllUniforms(item.id, u)}
-                onToggleExpand={() => toggleExpand(item.id)}
+                onCountDelta={(d) => changeCount(item.id, d)}
+                onSetDefaultUniform={(u) => setDefaultUniform(item.id, u)}
+                onToggleCustomize={() => toggleCustomize(item.id)}
+                onSetPerAgentUniform={(idx, u) => setPerAgentUniform(item.id, idx, u)}
               />
             );
           }}
@@ -283,7 +290,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
             </Text>
             <Text style={styles.ctaSub} numberOfLines={1}>
               {Array.from(selected.values()).map(l =>
-                `${l.agents.length}× ${l.name.split(' ')[0]}`
+                `${l.agentCount}× ${l.name.split(' ')[0]}`
               ).join(' · ')}
             </Text>
           </View>
@@ -299,275 +306,170 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
 
 // -- ServiceCard ---------------------------------------------------------------
 interface CardProps {
-  item:               any;
-  Icon:               LucideIconComp;
-  accent:             string;
-  isSelected:         boolean;
-  line:               SelectedLine | null;
-  onToggle:           () => void;
-  onAddAgent:         () => void;
-  onRemoveAgent:      () => void;
-  onSetAgentUniform:  (agentIdx: number, uniform: UniformValue | null) => void;
-  onSetAllUniforms:   (uniform: UniformValue | null) => void;
-  onToggleExpand:     () => void;
+  item:                 any;
+  Icon:                 LucideIconComp;
+  accent:               string;
+  line:                 SelectedLine | null;
+  onToggle:             () => void;
+  onCountDelta:         (delta: number) => void;
+  onSetDefaultUniform:  (uniform: UniformValue) => void;
+  onToggleCustomize:    () => void;
+  onSetPerAgentUniform: (agentIdx: number, uniform: UniformValue) => void;
 }
 
-const ServiceCard: React.FC<CardProps> = React.memo(({ item, Icon, accent, isSelected, line, onToggle, onAddAgent, onRemoveAgent, onSetAgentUniform, onSetAllUniforms, onToggleExpand }) => {
+const ServiceCard: React.FC<CardProps> = React.memo(({
+  item, Icon, accent, line, onToggle, onCountDelta,
+  onSetDefaultUniform, onToggleCustomize, onSetPerAgentUniform,
+}) => {
   const { t } = useTranslation('services');
+  const isSelected = !!line;
+
   return (
-  <View style={[styles.card, isSelected && { borderColor: accent, borderWidth: 1.5 }]}>
-
-    {/* -- Header row — always visible -------------------------------- */}
-    <TouchableOpacity
-      style={styles.cardHeader}
-      onPress={onToggle}
-      activeOpacity={0.8}
-    >
-      {/* Check badge */}
-      {isSelected && (
-        <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
-          <Check size={10} color="#fff" strokeWidth={3} />
-        </View>
-      )}
-
-      {/* Icon */}
-      <View style={[styles.cardIconWrap, { backgroundColor: accent + '18' }]}>
-        <View style={[styles.cardIcon, { borderColor: accent + '40' }]}>
-          <Icon size={24} color={accent} strokeWidth={1.6} />
-        </View>
-      </View>
-
-      {/* Info */}
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName}>{item.name}</Text>
-        <Text style={styles.cardDesc} numberOfLines={1}>{item.description}</Text>
-        <Text style={[styles.cardRate, { color: accent }]}>{formatEuros(item.baseRatePerHour)}/h · agent</Text>
-      </View>
-
-      {/* Right: add button or agent count badge */}
-      {isSelected ? (
-        <View style={[styles.agentCountBadge, { borderColor: accent + '60', backgroundColor: accent + '12' }]}>
-          <Text style={[styles.agentCountNum, { color: accent }]}>{line!.agents.length}</Text>
-          <Text style={styles.agentCountLabel}>agent{line!.agents.length > 1 ? 's' : ''}</Text>
-        </View>
-      ) : (
-        <View style={[styles.addPill, { backgroundColor: accent + '15', borderColor: accent + '40' }]}>
-          <Plus size={11} color={accent} strokeWidth={2.5} />
-          <Text style={[styles.addPillText, { color: accent }]}>{t('add_btn')}</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-
-    {/* -- Per-agent detail — visible when selected ------------------- */}
-    {isSelected && line && (
-      <View style={[styles.agentsPanel, { borderTopColor: accent + '30' }]}>
-
-        {/* Agent count controls */}
-        <View style={styles.agentCountRow}>
-          <Text style={styles.agentCountTitle}>{t('agents_and_uniforms')}</Text>
-          <View style={styles.agentStepper}>
-            <TouchableOpacity
-              style={[styles.stepBtn, line.agents.length <= 1 && styles.stepBtnDisabled]}
-              onPress={onRemoveAgent}
-              disabled={line.agents.length <= 1}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Minus size={13} color={line.agents.length <= 1 ? colors.textMuted : accent} strokeWidth={2.5} />
-            </TouchableOpacity>
-            <Text style={[styles.stepCount, { color: accent }]}>{line.agents.length}</Text>
-            <TouchableOpacity
-              style={[styles.stepBtn, line.agents.length >= 20 && styles.stepBtnDisabled]}
-              onPress={onAddAgent}
-              disabled={line.agents.length >= 20}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Plus size={13} color={line.agents.length >= 20 ? colors.textMuted : accent} strokeWidth={2.5} />
-            </TouchableOpacity>
+    <View style={[styles.card, isSelected && { borderColor: accent, borderWidth: 1.5 }]}>
+      {/* Header row — tap to add/remove */}
+      <TouchableOpacity style={styles.cardHeader} onPress={onToggle} activeOpacity={0.85}>
+        {isSelected && (
+          <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
+            <Check size={10} color="#fff" strokeWidth={3} />
+          </View>
+        )}
+        <View style={[styles.cardIconWrap, { backgroundColor: accent + '18' }]}>
+          <View style={[styles.cardIcon, { borderColor: accent + '40' }]}>
+            <Icon size={24} color={accent} strokeWidth={1.6} />
           </View>
         </View>
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName}>{item.name}</Text>
+          <Text style={styles.cardDesc} numberOfLines={1}>{item.description}</Text>
+          <Text style={[styles.cardRate, { color: accent }]}>
+            {formatEuros(item.baseRatePerHour)}/h · agent
+          </Text>
+        </View>
+        {isSelected ? (
+          <View style={[styles.agentCountBadge, { borderColor: accent + '60', backgroundColor: accent + '12' }]}>
+            <Text style={[styles.agentCountNum, { color: accent }]}>{line!.agentCount}</Text>
+            <Text style={styles.agentCountLabel}>agent{line!.agentCount > 1 ? 's' : ''}</Text>
+          </View>
+        ) : (
+          <View style={[styles.addPill, { backgroundColor: accent + '15', borderColor: accent + '40' }]}>
+            <Plus size={11} color={accent} strokeWidth={2.5} />
+            <Text style={[styles.addPillText, { color: accent }]}>{t('add_btn')}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
-        {/* Quick "same tenue for all" shortcut */}
-        {line.agents.length > 1 && (
-          <View style={styles.allSameRow}>
-            <Text style={styles.allSameLabel}>{t('same_uniform_label')}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.allSameChips}>
+      {/* Config panel — visible only when selected */}
+      {isSelected && line && (
+        <View style={[styles.configPanel, { borderTopColor: accent + '30' }]}>
+          {/* Row 1: Agent count stepper */}
+          <View style={styles.configRow}>
+            <Text style={styles.configRowLabel}>{t('agents_label')}</Text>
+            <View style={styles.stepperWrap}>
+              <TouchableOpacity
+                style={[styles.stepBtn, line.agentCount <= 1 && styles.stepBtnDisabled]}
+                onPress={() => onCountDelta(-1)}
+                disabled={line.agentCount <= 1}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Minus size={13} color={line.agentCount <= 1 ? colors.textMuted : accent} strokeWidth={2.5} />
+              </TouchableOpacity>
+              <Text style={[styles.stepCount, { color: accent }]}>{line.agentCount}</Text>
+              <TouchableOpacity
+                style={[styles.stepBtn, line.agentCount >= 20 && styles.stepBtnDisabled]}
+                onPress={() => onCountDelta(+1)}
+                disabled={line.agentCount >= 20}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Plus size={13} color={line.agentCount >= 20 ? colors.textMuted : accent} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Row 2: Default uniform picker */}
+          <View style={styles.configBlock}>
+            <Text style={styles.configBlockLabel}>{t('uniform_label')}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.uniformChipsRow}>
               {UNIFORM_OPTIONS.map(opt => {
-                const allSame = line.agents.every(a => a.uniform === opt.value);
+                const active = line.defaultUniform === opt.value;
                 return (
                   <TouchableOpacity
                     key={opt.value}
-                    style={[styles.uniformChip, allSame && { backgroundColor: accent + '20', borderColor: accent }]}
-                    onPress={() => onSetAllUniforms(opt.value as UniformValue)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={[styles.uniformChip, active && { backgroundColor: accent + '20', borderColor: accent }]}
+                    onPress={() => onSetDefaultUniform(opt.value as UniformValue)}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                   >
                     <Text style={styles.uniformEmoji}>{opt.emoji}</Text>
-                    <Text style={[styles.uniformChipText, allSame && { color: accent }]}>{t(`uniforms.${opt.value}.label`)}</Text>
+                    <Text style={[styles.uniformChipText, active && { color: accent, fontFamily: fontFamily.bodySemiBold }]}>
+                      {t(`uniforms.${opt.value}.label`)}
+                    </Text>
+                    {active && (
+                      <View style={[styles.uniformCheck, { backgroundColor: accent }]}>
+                        <Check size={8} color="#fff" strokeWidth={3} />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
           </View>
-        )}
 
-        {/* Expand/collapse per-agent rows */}
-        <TouchableOpacity
-          style={styles.expandToggle}
-          onPress={onToggleExpand}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.expandToggleText, { color: accent }]}>
-            {line.expanded ? t('agent_config.hide_detail') : t('agent_config.configure_agents')}
-          </Text>
-          {line.expanded
-            ? <ChevronUp size={14} color={accent} strokeWidth={2} />
-            : <ChevronDown size={14} color={accent} strokeWidth={2} />
-          }
-        </TouchableOpacity>
-
-        {/* Per-agent rows */}
-        {line.expanded && line.agents.map((agent, idx) => (
-          <AgentRow
-            key={idx}
-            index={idx}
-            agent={agent}
-            accent={accent}
-            onChangeUniform={(u) => onSetAgentUniform(idx, u)}
-          />
-        ))}
-      </View>
-    )}
-  </View>
-);
-});
-
-// -- AgentRow ------------------------------------------------------------------
-const AgentRow: React.FC<{ index: number; agent: AgentSlot; accent: string; onChangeUniform: (u: UniformValue | null) => void; }> = ({ index, agent, accent, onChangeUniform }) => {
-  const { t } = useTranslation('services');
-  return (
-  <View style={agentRowStyles.wrap}>
-    {/* Agent number */}
-    <View style={[agentRowStyles.badge, { backgroundColor: accent + '20', borderColor: accent + '50' }]}>
-      <Text style={[agentRowStyles.badgeNum, { color: accent }]}>{index + 1}</Text>
-    </View>
-
-    {/* Uniform chips — first chip = "None / not specified", rest = UNIFORM_OPTIONS */}
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={agentRowStyles.chipsRow}
-    >
-      {/* -- None chip -- */}
-      <TouchableOpacity
-        style={[agentRowStyles.chip, agent.uniform === null && agentRowStyles.chipNone]}
-        onPress={() => onChangeUniform(null)}
-        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-      >
-        <Text style={agentRowStyles.chipEmoji}>❓</Text>
-        <Text style={[agentRowStyles.chipLabel, agent.uniform === null && agentRowStyles.chipLabelNone]}>
-          {t('uniforms_none')}
-        </Text>
-      </TouchableOpacity>
-
-      {UNIFORM_OPTIONS.map(opt => {
-        const active = agent.uniform === opt.value;
-        return (
-          <TouchableOpacity
-            key={opt.value}
-            style={[
-              agentRowStyles.chip,
-              active && { backgroundColor: accent + '20', borderColor: accent },
-            ]}
-            onPress={() => onChangeUniform(active ? null : opt.value as UniformValue)}
-            hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-          >
-            <Text style={agentRowStyles.chipEmoji}>{opt.emoji}</Text>
-            <View>
-              <Text style={[agentRowStyles.chipLabel, active && { color: accent }]}>{t(`uniforms.${opt.value}.label`)}</Text>
-              {active && (
-                <Text style={[agentRowStyles.chipDesc, { color: accent }]} numberOfLines={1}>
-                  {t(`uniforms.${opt.value}.desc`)}
+          {/* Optional: customize per agent (opt-in) */}
+          {line.agentCount > 1 && (
+            <>
+              <TouchableOpacity
+                style={[styles.customizeToggle, line.customizing && { backgroundColor: accent + '12', borderColor: accent + '60' }]}
+                onPress={onToggleCustomize}
+                activeOpacity={0.75}
+              >
+                <Settings2 size={13} color={line.customizing ? accent : colors.textMuted} strokeWidth={2} />
+                <Text style={[styles.customizeToggleText, line.customizing && { color: accent }]}>
+                  {line.customizing ? t('customize_hide') : t('customize_show')}
                 </Text>
-              )}
-            </View>
-            {active && (
-              <View style={[agentRowStyles.checkDot, { backgroundColor: accent }]}>
-                <Check size={8} color="#fff" strokeWidth={3} />
-              </View>
-            )}
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
-  </View>
-);
-};
+                {line.perAgentOverrides.size > 0 && !line.customizing && (
+                  <View style={[styles.customizeBadge, { backgroundColor: accent }]}>
+                    <Text style={styles.customizeBadgeText}>{line.perAgentOverrides.size}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-const agentRowStyles = StyleSheet.create({
-  wrap: {
-    flexDirection:  'row',
-    alignItems:     'flex-start',
-    gap:            spacing[3],
-    paddingVertical: spacing[2],
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  badge: {
-    width:          26,
-    height:         26,
-    borderRadius:   13,
-    borderWidth:    1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    flexShrink:     0,
-    marginTop:      spacing[1],
-  },
-  badgeNum: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
-  chipsRow: { gap: spacing[2], alignItems: 'center' },
-  chip: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               spacing[1] + 2,
-    paddingHorizontal: spacing[3],
-    paddingVertical:   spacing[2],
-    borderRadius:      radius.xl,
-    borderWidth:       1,
-    borderColor:       colors.border,
-    backgroundColor:   colors.surface,
-    position:          'relative',
-  },
-  chipNone: {
-    borderColor:     colors.textMuted,
-    backgroundColor: colors.surface,
-    opacity:         0.75,
-  },
-  chipLabelNone: {
-    color:      colors.textMuted,
-    fontStyle:  'italic' as const,
-  },
-  chipEmoji: { fontSize: 16 },
-  chipLabel: {
-    fontFamily: fontFamily.bodySemiBold,
-    fontSize:   fontSize.xs,
-    color:      colors.textSecondary,
-  },
-  chipDesc: {
-    fontFamily: fontFamily.body,
-    fontSize:   9,
-    lineHeight: 12,
-    maxWidth:   80,
-  },
-  checkDot: {
-    position:        'absolute',
-    top:             -4,
-    right:           -4,
-    width:           14,
-    height:          14,
-    borderRadius:    7,
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1.5,
-    borderColor:     colors.background,
-  },
+              {line.customizing && (
+                <View style={styles.perAgentList}>
+                  {Array.from({ length: line.agentCount }, (_, idx) => {
+                    const current = line.perAgentOverrides.get(idx) ?? line.defaultUniform;
+                    return (
+                      <View key={idx} style={styles.perAgentRow}>
+                        <View style={[styles.agentNumBadge, { backgroundColor: accent + '20', borderColor: accent + '50' }]}>
+                          <Text style={[styles.agentNumText, { color: accent }]}>{idx + 1}</Text>
+                        </View>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.uniformChipsRow}>
+                          {UNIFORM_OPTIONS.map(opt => {
+                            const active = current === opt.value;
+                            return (
+                              <TouchableOpacity
+                                key={opt.value}
+                                style={[styles.uniformChipSmall, active && { backgroundColor: accent + '20', borderColor: accent }]}
+                                onPress={() => onSetPerAgentUniform(idx, opt.value as UniformValue)}
+                                hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                              >
+                                <Text style={styles.uniformEmojiSmall}>{opt.emoji}</Text>
+                                <Text style={[styles.uniformChipTextSmall, active && { color: accent }]}>
+                                  {t(`uniforms.${opt.value}.label`)}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      )}
+    </View>
+  );
 });
 
 // -- Styles --------------------------------------------------------------------
@@ -624,12 +526,11 @@ const styles = StyleSheet.create({
     elevation:       4,
   },
 
-  // Card header
   cardHeader: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    padding:         spacing[4],
-    gap:             spacing[3],
+    flexDirection: 'row',
+    alignItems:    'center',
+    padding:       spacing[4],
+    gap:           spacing[3],
   },
   cardIconWrap: {
     width:          60,
@@ -676,25 +577,21 @@ const styles = StyleSheet.create({
   },
   addPillText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
 
-  // Agents panel
-  agentsPanel: {
-    borderTopWidth: 1,
+  // Config panel
+  configPanel: {
+    borderTopWidth:    1,
     paddingHorizontal: spacing[4],
-    paddingBottom:  spacing[4],
-    paddingTop:     spacing[3],
-    gap:            spacing[3],
+    paddingTop:        spacing[3],
+    paddingBottom:     spacing[4],
+    gap:               spacing[3],
   },
-  agentCountRow: {
+  configRow: {
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
   },
-  agentCountTitle: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textSecondary },
-  agentStepper: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           spacing[3],
-  },
+  configRowLabel: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textSecondary },
+  stepperWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   stepBtn: {
     width:           32,
     height:          32,
@@ -713,37 +610,96 @@ const styles = StyleSheet.create({
     textAlign:  'center',
   },
 
-  // All-same shortcut
-  allSameRow: { gap: spacing[2] },
-  allSameLabel: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
-  allSameChips: { gap: spacing[2] },
+  configBlock: { gap: spacing[2] },
+  configBlockLabel: {
+    fontFamily:    fontFamily.bodyMedium,
+    fontSize:      10,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color:         colors.textMuted,
+  },
+  uniformChipsRow: { gap: spacing[2], alignItems: 'center' },
   uniformChip: {
     flexDirection:     'row',
     alignItems:        'center',
-    gap:               4,
+    gap:               spacing[1] + 2,
     paddingHorizontal: spacing[3],
+    paddingVertical:   spacing[2],
+    borderRadius:      radius.full,
+    borderWidth:       1,
+    borderColor:       colors.border,
+    backgroundColor:   colors.surface,
+    position:          'relative',
+  },
+  uniformEmoji:    { fontSize: 15 },
+  uniformChipText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textSecondary },
+  uniformCheck: {
+    position:        'absolute',
+    top:             -4,
+    right:           -4,
+    width:           14,
+    height:          14,
+    borderRadius:    7,
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1.5,
+    borderColor:     colors.background,
+  },
+
+  // Per-agent customization
+  customizeToggle: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               spacing[2],
+    paddingVertical:   spacing[2] + 2,
+    paddingHorizontal: spacing[3],
+    borderRadius:      radius.lg,
+    borderWidth:       1,
+    borderColor:       colors.border,
+    backgroundColor:   colors.surface,
+  },
+  customizeToggleText: { flex: 1, fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted },
+  customizeBadge: {
+    minWidth:          18,
+    height:            18,
+    borderRadius:      9,
+    paddingHorizontal: 5,
+    alignItems:        'center',
+    justifyContent:    'center',
+  },
+  customizeBadgeText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.textInverse },
+
+  perAgentList: { gap: spacing[2], paddingTop: spacing[1] },
+  perAgentRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    gap:            spacing[2],
+    paddingVertical: spacing[1] + 2,
+  },
+  agentNumBadge: {
+    width:           26,
+    height:          26,
+    borderRadius:    13,
+    borderWidth:     1,
+    alignItems:      'center',
+    justifyContent:  'center',
+    flexShrink:      0,
+  },
+  agentNumText:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
+
+  uniformChipSmall: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               4,
+    paddingHorizontal: spacing[2] + 2,
     paddingVertical:   spacing[1] + 2,
     borderRadius:      radius.full,
     borderWidth:       1,
     borderColor:       colors.border,
     backgroundColor:   colors.surface,
   },
-  uniformEmoji:    { fontSize: 13 },
-  uniformChipText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted },
-
-  // Expand toggle
-  expandToggle: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            spacing[1] + 2,
-    paddingVertical: spacing[2],
-    borderRadius:   radius.lg,
-    borderWidth:    1,
-    borderColor:    colors.border,
-    backgroundColor: colors.surface,
-  },
-  expandToggleText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs },
+  uniformEmojiSmall:    { fontSize: 12 },
+  uniformChipTextSmall: { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textSecondary },
 
   // Sticky CTA
   ctaWrap: {

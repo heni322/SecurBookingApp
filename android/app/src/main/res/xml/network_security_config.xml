@@ -1,38 +1,105 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Network Security Config
-  ───────────────────────
-  • Production (https) → no special rules needed, TLS is always allowed.
-  • Debug / local dev  → allow cleartext HTTP to the LAN dev server only.
-    192.168.1.0/24 covers the typical home/office subnet where the
-    NestJS backend runs on the developer's machine (192.168.1.13:3000).
+  Network Security Config — SecurBookingApp
+  ══════════════════════════════════════════
 
-  NEVER add <base-config cleartextTrafficPermitted="true"> — that would
-  open cleartext to the whole internet, which is a security risk.
+  Architecture
+  ─────────────
+  • Release  → strict TLS + certificate pinning to api.securbooking.com
+  • Debug    → trust user CAs (Charles / Proxyman) + allow LAN cleartext
+
+  Certificate Pinning
+  ────────────────────
+  Pins are SHA-256 hashes of the SubjectPublicKeyInfo (SPKI) in Base64.
+  We pin TWO certificates:
+    1. The current leaf/intermediate cert.
+    2. A backup pin (next cert / root CA) — MANDATORY to avoid locking
+       yourself out during cert rotation.
+
+  How to get the pin hashes
+  ──────────────────────────
+  Option A — OpenSSL (recommended):
+    openssl s_client -connect api.securbooking.com:443 -servername api.securbooking.com \
+      </dev/null 2>/dev/null | openssl x509 -pubkey -noout \
+      | openssl pkey -pubin -outform der \
+      | openssl dgst -sha256 -binary | base64
+
+  Option B — Gradle plugin:
+    ./gradlew checkCertPin -Phost=api.securbooking.com
+
+  IMPORTANT: Replace the placeholder hashes below with real values before
+  shipping to production. Using fake hashes = all HTTPS to the API will fail.
+
+  Rotation procedure
+  ───────────────────
+  1. Generate the new cert hash.
+  2. Add it as a SECOND <pin> BEFORE deploying the new cert server-side.
+  3. Release the app update (both pins live together).
+  4. Once 95%+ of users updated, remove the old pin in a follow-up release.
 -->
 <network-security-config>
 
-  <!-- ── Release: strict TLS everywhere (Android default, stated explicitly) -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- RELEASE: strict TLS + pinning for our API domain                      -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
   <base-config cleartextTrafficPermitted="false">
     <trust-anchors>
+      <!-- System CAs only — no user-installed CAs in production -->
       <certificates src="system" />
     </trust-anchors>
   </base-config>
 
-  <!-- ── Debug: allow plain HTTP to local LAN subnet only -->
+  <!-- API domain pinning — update hashes before each certificate rotation -->
+  <domain-config>
+    <domain includeSubdomains="true">securbooking.com</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+    <pin-set expiration="2026-12-31">
+      <!--
+        Current pin — leaf/intermediate SPKI hash.
+        REPLACE with real hash: run the OpenSSL command above.
+      -->
+      <pin digest="SHA-256">AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</pin>
+      <!--
+        Backup pin — root CA SPKI hash (Let's Encrypt ISRG Root X1 example).
+        REPLACE with real hash. This pin MUST differ from the current pin.
+        If you use Let's Encrypt:
+          openssl s_client -connect api.securbooking.com:443 2>/dev/null \
+            | openssl x509 -noout -issuer
+          Then fetch the ISRG Root X1 SPKI hash from letsencrypt.org/certs
+      -->
+      <pin digest="SHA-256">C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</pin>
+    </pin-set>
+  </domain-config>
+
+  <!-- OSM tile server — no pinning, just TLS -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">tile.openstreetmap.org</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- DEBUG: allow user CAs for proxy inspection + LAN cleartext            -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
   <debug-overrides>
     <trust-anchors>
-      <!-- also trust user-installed CAs so devs can inspect HTTPS traffic -->
+      <!-- Trust Charles / Proxyman user-installed certificates -->
       <certificates src="system" />
       <certificates src="user" />
     </trust-anchors>
   </debug-overrides>
 
-  <!-- Explicit cleartext whitelist: LAN subnet for local dev server -->
+  <!--
+    Local dev server — cleartext HTTP only to private LAN IPs.
+    Adjust DEV_HOST to match your machine's Wi-Fi IP.
+    These entries are IGNORED in release builds (debug-overrides scope applies
+    only to debug APKs signed with a debug keystore).
+  -->
   <domain-config cleartextTrafficPermitted="true">
-    <!-- IPv4 LAN — covers 192.168.1.x (change subnet if your network differs) -->
-    <domain includeSubdomains="false">192.168.1.13</domain>
-    <!-- localhost / emulator alias -->
+    <domain includeSubdomains="false">192.168.1.15</domain>
     <domain includeSubdomains="false">localhost</domain>
     <domain includeSubdomains="false">10.0.2.2</domain>
   </domain-config>

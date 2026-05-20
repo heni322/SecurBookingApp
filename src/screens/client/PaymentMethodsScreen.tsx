@@ -5,7 +5,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Alert, RefreshControl, ActivityIndicator,
+  StyleSheet, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {

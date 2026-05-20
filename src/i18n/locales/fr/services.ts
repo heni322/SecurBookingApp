@@ -19,6 +19,10 @@ const services: ServicesNS = {
   clear_all: 'Tout effacer',
   uniforms_none: 'Non précisée',
   agents_and_uniforms: 'Agents & tenues',
+  agents_label:     'Agents',
+  uniform_label:    'Tenue',
+  customize_show:   'Personnaliser par agent',
+  customize_hide:   'Masquer la personnalisation',
   summary: '{{lines}} prestation · {{agents}} agent',
 
   uniforms: {

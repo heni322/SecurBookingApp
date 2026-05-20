@@ -1,4 +1,4 @@
-﻿import type { MissionsNS } from '../types';
+import type { MissionsNS } from '../types';
 
 const missions: MissionsNS = {
   title: 'Missions', subtitle_one: '{{count}} mission', subtitle_other: '{{count}} missions',
@@ -29,10 +29,12 @@ const missions: MissionsNS = {
     refreshing:            'Refreshing mission list',
     retry:                 'Retry loading missions',
     new_mission:           'Create a new mission',
+    new_mission_hint:      'Opens the mission creation flow',
     search:                'Search missions',
     filter_bar:            'Filter missions by status',
     filter_chip:           'Filter by {{label}}',
     filter_chip_with_count:'Filter by {{label}}, {{count}} missions',
+    mission_list:          'Mission list, {{count}} items',
   },
 
   detail: {
@@ -42,7 +44,7 @@ const missions: MissionsNS = {
     cancel_title: 'Cancel mission', cancel_body: 'This action is irreversible. Continue?',
     cancel_back: 'Back', cancel_confirm: 'Cancel', cancel_error: 'Unable to cancel',
     duration: 'Duration', created_on: 'Created on',
-    cta_get_quote: 'Get a quote', radius: 'Search radius',
+    cta_get_quote: 'Get a quote',
     cta_see_quote: 'View quote',
     cta_pay: 'View quote & pay',
     cta_select: 'Select agents',
@@ -59,7 +61,6 @@ const missions: MissionsNS = {
     total_ttc: 'Total incl. VAT',
   },
 
-  // Flow: CREATED → PUBLISHED → STAFFING → STAFFED → IN_PROGRESS → COMPLETED
   statuses: {
     created:     'Created',
     published:   'Published',
@@ -111,7 +112,6 @@ const missions: MissionsNS = {
     duration_min: 'Minimum duration: 6 hours (legal requirement)', duration_max: 'Maximum duration: 10 days',
     end_before_start: 'End must be after start',
     start_min_future: 'Mission must start at least 1 hour from now',
-    radius_min: 'Minimum radius: 5 km', radius_max: 'Maximum radius: 500 km',
     error_create: 'Error while creating',
     title_placeholder: 'E.g. Private evening security',
     instructions_placeholder: 'Special instructions for agents...',
@@ -130,8 +130,6 @@ const missions: MissionsNS = {
     urgency_note: 'Urgency surcharge applicable',
     title_label:       'Title (optional)',
     notes_label:       'Notes / instructions (optional)',
-    radius_label:      'Search radius (km)',
-    radius_hint:       'Between 5 and 500 km',
     city_label:        'City *',
     city_placeholder:  'London',
     zip_label:         'Postcode',
@@ -180,6 +178,97 @@ const missions: MissionsNS = {
     slot_lines_custom:   'Custom agents: {{count}}',
     slot_lines_reset:    'Reset to default agents',
     slot_lines_required: 'Add at least one position for this slot',
+
+    // ── Redesigned 3-step wizard ───────────────────────────────────────────
+    step_where:      'Step 1 of 3 · Location',
+    step_when:       'Step 2 of 3 · When',
+    step_review:     'Step 3 of 3 · Review',
+
+    progress_where:  'Location',
+    progress_when:   'When',
+    progress_review: 'Review',
+
+    where_title:     'Where is the mission?',
+    where_subtitle:  'Enter the exact mission address.',
+    when_title:      'When does the mission take place?',
+    when_subtitle:   'Pick a quick preset or set custom hours.',
+    review_title:    'All set?',
+    review_subtitle: 'Review the details before generating your quote.',
+
+    edit_btn:         'Edit',
+    summary_when:     'Date & time',
+    summary_services: 'Services',
+
+    preset_section:   'Quick presets',
+    preset_tonight:   'Tonight',
+    preset_tomorrow:  'Tomorrow',
+    preset_weekend:   'This weekend',
+    custom_section:   'Custom hours',
+
+    add_another_slot:      'Add another time slot',
+    add_another_slot_hint: 'For multi-day missions or variable schedules.',
+    slots_count:           '{{n}} time slots',
+
+    optional_section: 'Additional info (optional)',
+
+    // ── Per-slot customization ─────────────────────────────────────────
+    customize_for_slot:        'Customize for this slot',
+    slot_uniform_label:        'Uniform for this slot',
+    slot_line_excluded_note:   'This service is excluded from this slot',
+    slot_total_agents:         '{{count}} agents total',
+    custom_label:              'Custom',
+    summary_services_default:  'Default services',
+
+    // ── Copy-from-slot feature ─────────────────────────────────────────
+    slot_copy_from:    'Copy from slot {{n}}',
+
+    // ── Slot header date summary ───────────────────────────────────────
+    slot_date_summary: '{{start}} → {{end}}',
+    slot_date_pending: 'No dates set yet',
+
+    // Footer status
+    footer_step_progress: 'Step {{current}} of {{total}}',
+    footer_ready:         'Ready to publish',
+    slots_total_short:    '{{count}} slots · {{hours}}h',
+
+    // ── Review step enrichments ────────────────────────────────────────
+    review_agent_hours:  '{{hours}} estimated agent-hours',
+    review_slot_summary: '{{agents}} agent · {{hours}}h',
+
+    // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
+    draft_restore_title:    'Resume your draft?',
+    draft_restore_subtitle: 'You have an unfinished mission (saved {{when}}).',
+    draft_restore_btn:      'Resume',
+    draft_discard_btn:      'Start over',
+    draft_discard_confirm_title:   'Discard draft?',
+    draft_discard_confirm_message: 'All entered information will be lost.',
+    draft_discard_confirm_btn:     'Discard',
+
+    // ── ENTERPRISE UX: smarter footer ───────────────────────────────────
+    next_to_when:    'Continue · When',
+    next_to_review:  'Continue · Review',
+    footer_back:     'Back',
+
+    // ── ENTERPRISE UX: cross-slot error banner ──────────────────────────
+    cross_slot_error_title:    'Time-slot conflict',
+    cross_slot_error_subtitle: 'Some windows overlap or do not meet legal duration limits.',
+    cross_slot_error_jump:     'Go to slot {{n}}',
+
+    // ── ENTERPRISE UX: multi-slot escape ────────────────────────────────
+    exit_multi_slot:                 'Back to a single window',
+    exit_multi_slot_confirm_title:   'Back to a single time window?',
+    exit_multi_slot_confirm_message: 'Other slots and their customisations will be removed.',
+    exit_multi_slot_confirm_btn:     'Back to single window',
+
+    // ── ENTERPRISE UX: review price estimate ────────────────────────────
+    review_estimate_label:  'INDICATIVE ESTIMATE',
+    review_estimate_amount: '≈ {{amount}} excl. VAT',
+    review_estimate_note:   'The final price (with night / weekend surcharges and VAT) will be computed on the next screen.',
+
+    // ── ENTERPRISE UX: structured submit error ──────────────────────────
+    submit_error_title:    'Unable to create the mission',
+    submit_error_jump_to:  'Edit',
+    submit_error_network:  'Check your connection and try again.',
   },
 };
 

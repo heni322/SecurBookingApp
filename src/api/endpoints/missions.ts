@@ -10,17 +10,17 @@ export const missionsApi = {
 
   /** Détail d'une mission */
   getById: (id: string) =>
-    apiClient.get<ApiResponse<Mission>>(`/missions/${id}`),
+    apiClient.get<ApiResponse<Mission>>(`/missions/get/${id}`),
 
   /** [CLIENT] Créer une mission (DRAFT) */
   create: (payload: CreateMissionPayload) =>
-    apiClient.post<ApiResponse<Mission>>('/missions', payload),
+    apiClient.post<ApiResponse<Mission>>('/missions/create', payload),
 
   /** [CLIENT] Modifier une mission (DRAFT uniquement) */
   update: (id: string, payload: UpdateMissionPayload) =>
-    apiClient.patch<ApiResponse<Mission>>(`/missions/${id}`, payload),
+    apiClient.patch<ApiResponse<Mission>>(`/missions/update/${id}`, payload),
 
   /** Annuler une mission */
   cancel: (id: string) =>
-    apiClient.patch<ApiResponse<Mission>>(`/missions/${id}/cancel`),
+    apiClient.patch<ApiResponse<Mission>>(`/missions/cancel/${id}`),
 };

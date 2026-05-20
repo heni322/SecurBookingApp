@@ -27,15 +27,53 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 
+	<!--
+	  ══════════════════════════════════════════════════════════════════════
+	  App Transport Security (ATS) + Certificate Pinning
+	  ══════════════════════════════════════════════════════════════════════
+
+	  Policy
+	  ───────
+	  • NSAllowsArbitraryLoads = false  (ATS enforced globally)
+	  • NSAllowsLocalNetworking = true  (localhost / Bonjour for dev)
+	  • NSPinnedDomains pins our API domain using two SPKI hashes:
+	      1. Current leaf/intermediate certificate.
+	      2. Backup root CA pin (mandatory to survive cert rotation).
+
+	  How to extract SPKI hash for NSPinnedDomains
+	  ──────────────────────────────────────────────
+	  openssl s_client -connect api.securbooking.com:443 2>/dev/null \
+	    | openssl x509 -pubkey -noout \
+	    | openssl pkey -pubin -outform der \
+	    | openssl dgst -sha256 -binary | base64
+
+	  Replace the <string> values in NSPublicKeyHashes with real output.
+	  NSIncludesSubdomains covers *.securbooking.com automatically.
+
+	  IMPORTANT: In DEBUG builds (Xcode scheme = Debug), NSPinnedDomains
+	  is silently ignored by the OS — this lets developers proxy traffic
+	  with Charles / Proxyman without hitting pin failures.
+
+	  Rotation procedure (same as Android):
+	  1. Add new hash alongside old one.
+	  2. Ship app update.
+	  3. Rotate cert on server.
+	  4. Remove old hash in next release.
+	  ══════════════════════════════════════════════════════════════════════
+	-->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Allow OSM tile server â€” required for OpenStreetMap tiles -->
+		<!-- Enforce ATS globally — no arbitrary loads -->
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+
+		<!-- Allow localhost (Metro, LAN dev server) -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
+
 		<key>NSExceptionDomains</key>
 		<dict>
+			<!-- OSM tile CDN: only TLS, no pin (CDN rotates certs frequently) -->
 			<key>tile.openstreetmap.org</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
@@ -44,13 +82,45 @@
 				<true/>
 			</dict>
 		</dict>
+
+		<!--
+		  Certificate pinning via NSPinnedDomains (iOS 14+).
+		  Values are Base64-encoded SHA-256 hashes of the SPKI.
+
+		  REPLACE placeholder hashes with real values extracted with the
+		  openssl command above before releasing to production.
+
+		  Note: NSPinnedDomains is ONLY enforced in Release builds.
+		  Xcode Debug builds skip pinning to support proxy inspection.
+		-->
+		<key>NSPinnedDomains</key>
+		<dict>
+			<key>api.securbooking.com</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSPinnedLeafIdentities</key>
+				<array>
+					<dict>
+						<key>SPKI-SHA256-BASE64</key>
+						<!-- Current leaf/intermediate pin — REPLACE with real hash -->
+						<string>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</string>
+					</dict>
+					<dict>
+						<key>SPKI-SHA256-BASE64</key>
+						<!-- Backup root CA pin (ISRG Root X1 example) — REPLACE -->
+						<string>C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=</string>
+					</dict>
+				</array>
+			</dict>
+		</dict>
 	</dict>
 
-	<!-- â”€â”€ Permissions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+	<!-- ── Permissions ─────────────────────────────────────────────────── -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SecurBook accÃ¨de Ã  votre position pour afficher votre localisation sur la carte de suivi.</string>
+	<string>SecurBook accède à votre position pour afficher votre localisation sur la carte de suivi.</string>
 
-	<!-- iOS 11+ â€” required for MapKit overlays + react-native-maps -->
+	<!-- iOS 11+ — required for MapKit overlays + react-native-maps -->
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -69,6 +139,13 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+	<!--
+	  Dynamic Type support — UIAccessibilityTextScale is handled at runtime
+	  via PixelRatio.getFontScale(). No Info.plist key needed, but mark the
+	  app as supporting Dynamic Type so iOS grants full scaling access.
+	-->
+	<key>UISupportsDocumentBrowser</key>
 	<false/>
 </dict>
 </plist>

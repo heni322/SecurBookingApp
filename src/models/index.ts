@@ -1,6 +1,7 @@
+﻿import type {
+  UserRole, UserStatus, MissionStatus, BookingStatus, PaymentStatus, ClientType} from '@constants/enums';
 import {
-  UserRole, UserStatus, MissionStatus, BookingStatus,
-  DocumentStatus, PaymentStatus, ClientType,
+  DocumentStatus
 } from '@constants/enums';
 
 // -----------------------------------------------------------------------------
@@ -224,7 +225,6 @@ export interface Mission {
   title?:        string;
   notes?:        string;
   isUrgent:      boolean;
-  radiusKm:      number;
   slots?:        MissionSlotRecord[];
   quote?:        Quote;
   payment?:      Payment;
@@ -265,7 +265,6 @@ export interface CreateMissionPayload {
   title?:    string;
   notes?:    string;
   isUrgent?: boolean;
-  radiusKm?: number;
 }
 
 export type UpdateMissionPayload = Partial<CreateMissionPayload>;
@@ -319,44 +318,8 @@ export interface Application {
   createdAt: string;
 }
 
-export interface SelectAgentPayload {
-  applicationId: string;
-}
 
-/**
- * Payload for POST /bookings/:id/assign-agent — CLIENT direct-pick flow.
- * Lets the client assign an agent without waiting for an application.
- */
-export interface AssignAgentPayload {
-  agentId: string;
-}
 
-/**
- * Returned by GET /bookings/:id/eligible-agents.
- * Combines AgentSummary + per-booking annotations (distance, R1-R4, availability).
- */
-export interface EligibleAgent {
-  id:                       string;
-  fullName:                 string;
-  avatarUrl?:               string;
-  avgRating:                number;
-  completedCount:           number;
-  isValidated:              boolean;
-  city?:                    string;
-  bio?:                     string;
-  profileType:              string;
-  hourlyRateConvention:     number;
-  /** Distance from agent's home to mission site, in km — undefined if no GPS. */
-  distanceKm?:              number;
-  /** Agent in the current client's favorites list. */
-  isFavorite:               boolean;
-  /** At least one declared AgentAvailability covers the slot window. */
-  hasDeclaredAvailability:  boolean;
-  /** R1-R4 conflict messages — empty if assignable. */
-  schedulingConflicts:      string[];
-  /** True iff schedulingConflicts is empty. UI greys others out. */
-  canBeAssigned:            boolean;
-}
 
 /**
  * Mirrors backend AgentAvailability — declared free windows.
@@ -621,8 +584,6 @@ export type MissionStackParamList = {
   MissionDetail:  { missionId: string };
   QuoteDetail:    { missionId: string };
   BookingDetail:  { bookingId: string };
-  SelectCreneau:  { missionId: string };
-  SelectAgent:    { bookingId: string };
   PaymentScreen:  {
     missionId:     string;
     clientSecret:  string;

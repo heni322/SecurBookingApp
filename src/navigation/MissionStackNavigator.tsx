@@ -9,8 +9,6 @@ import { BookingDetailScreen }  from '@screens/client/BookingDetailScreen';
 import { ConversationScreen }   from '@screens/client/ConversationScreen';
 import { MissionSuccessScreen } from '@screens/client/MissionSuccessScreen';
 import { MissionsScreen }       from '@screens/client/MissionsScreen';
-import { SelectAgentScreen }    from '@screens/client/SelectAgentScreen';
-import { SelectCreneauScreen }  from '@screens/client/SelectCreneauScreen';
 import RateAgentScreen          from '@screens/client/RateAgentScreen';
 import LiveTrackingScreen       from '@screens/client/LiveTrackingScreen';
 import { OfflinePaymentScreen } from '@screens/client/OfflinePaymentScreen';
@@ -29,8 +27,6 @@ export const MissionStackNavigator: React.FC = () => (
     <Stack.Screen name="QuoteDetail"    component={QuoteDetailScreen} />
     <Stack.Screen name="PaymentScreen"  component={PaymentScreen} />
     <Stack.Screen name="BookingDetail"  component={BookingDetailScreen} />
-    <Stack.Screen name="SelectCreneau"  component={SelectCreneauScreen} />
-    <Stack.Screen name="SelectAgent"    component={SelectAgentScreen} />
     <Stack.Screen name="Conversation"   component={ConversationScreen} />
     <Stack.Screen name="MissionSuccess" component={MissionSuccessScreen} />
 

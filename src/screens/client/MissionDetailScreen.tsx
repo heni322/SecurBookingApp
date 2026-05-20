@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionDetailScreen — full mission view.
  *
  * FIX: "Obtenir un devis" CTA now calls POST /quotes/calculate inline before
@@ -266,16 +266,9 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       return { label: t('detail.cta_see_quote'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
     if (mission.status === MissionStatus.PUBLISHED)
       return { label: t('detail.cta_waiting'), onPress: () => {}, disabled: true };
-    if (mission.status === MissionStatus.STAFFING) {
-      const openBookings = bookings.filter(b => b.status === 'OPEN');
-      if (openBookings.length > 0) {
-        const target = openBookings.length === 1
-          ? { screen: 'SelectAgent'   as const, params: { bookingId: openBookings[0].id } }
-          : { screen: 'SelectCreneau' as const, params: { missionId } };
-        return { label: t('detail.cta_select'), onPress: () => navigation.navigate(target.screen as any, target.params as any) };
-      }
+    if (mission.status === MissionStatus.STAFFING)
+      // Agents are auto-assigned when they apply — client waits passively.
       return { label: t('detail.cta_assigning'), onPress: () => {}, disabled: true };
-    }
     if (mission.status === MissionStatus.STAFFED)
       return { label: t('detail.cta_pay'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
     if (mission.status === MissionStatus.IN_PROGRESS) {
@@ -387,6 +380,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             missionId={missionId}
             bookingId={approachBooking.id}
             agent={{
+              id:          (approachBooking.agent as any).id,
               fullName:    (approachBooking.agent as any).fullName,
               avatarUrl:   (approachBooking.agent as any).avatarUrl,
               avgRating:   (approachBooking.agent as any).avgRating,
@@ -406,7 +400,6 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll} contentContainerStyle={styles.chipsRow}>
           <InfoChip Icon={Calendar}     label={t('detail.date')}       value={formatMissionRange(mission.startAt, mission.endAt)} />
           <InfoChip Icon={Clock}        label={t('detail.duration')}   value={`${mission.durationHours}h`} />
-          <InfoChip Icon={Activity}     label={t('detail.radius')}     value={`${mission.radiusKm} km`} />
           <InfoChip Icon={CalendarDays} label={t('detail.created_on')} value={formatDate(mission.createdAt)} />
         </ScrollView>
 

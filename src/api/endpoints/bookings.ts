@@ -3,31 +3,26 @@ import type {
   ApiResponse,
   Booking,
   Incident,
-  SelectAgentPayload,
-  AssignAgentPayload,
-  EligibleAgent,
   IncidentReportPayload,
 } from '@models/index';
 
+/**
+ * URLs alignées sur la convention backend :
+ *   /bookings/list/mission/:id   /bookings/get/:id   ...
+ *
+ * Note: selectAgent / assignAgent / getEligibleAgents ont été retirés du
+ * client mobile. L'assignation est automatique : quand un agent postule via
+ * POST /bookings/apply/:id, il est immédiatement assigné (premier arrivé,
+ * premier servi). Le flow "sélection manuelle d'agent" côté CLIENT n'existe
+ * pas dans le backend (PARTNER/ADMIN uniquement).
+ */
 export const bookingsApi = {
   getByMission: (missionId: string) =>
-    apiClient.get<ApiResponse<Booking[]>>(`/bookings/mission/${missionId}`),
+    apiClient.get<ApiResponse<Booking[]>>(`/bookings/list/mission/${missionId}`),
 
   getById: (id: string) =>
-    apiClient.get<ApiResponse<Booking>>(`/bookings/${id}`),
-
-  /** [ADMIN] Picks an agent from existing applications. */
-  selectAgent: (id: string, payload: SelectAgentPayload) =>
-    apiClient.patch<ApiResponse<Booking>>(`/bookings/${id}/select-agent`, payload),
-
-  /** [CLIENT] Assigns an agent directly without waiting for an application. */
-  assignAgent: (id: string, payload: AssignAgentPayload) =>
-    apiClient.post<ApiResponse<Booking>>(`/bookings/${id}/assign-agent`, payload),
-
-  /** [CLIENT] List of eligible agents for this booking, with distance + R1-R4 status. */
-  getEligibleAgents: (id: string) =>
-    apiClient.get<ApiResponse<EligibleAgent[]>>(`/bookings/${id}/eligible-agents`),
+    apiClient.get<ApiResponse<Booking>>(`/bookings/get/${id}`),
 
   reportIncident: (id: string, payload: IncidentReportPayload) =>
-    apiClient.post<ApiResponse<Incident>>(`/bookings/${id}/incident`, payload),
+    apiClient.post<ApiResponse<Incident>>(`/bookings/incident/${id}`, payload),
 };

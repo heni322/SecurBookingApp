@@ -86,8 +86,9 @@ export interface MissionsNS {
     title: string; subtitle: string; retry: string;
   };
   a11y: {
-    loading: string; refreshing: string; retry: string; new_mission: string; search: string;
+    loading: string; refreshing: string; retry: string; new_mission: string; new_mission_hint: string; search: string;
     filter_bar: string; filter_chip: string; filter_chip_with_count: string;
+    mission_list: string;
   };
   detail: {
     status: string; location: string; date: string; agent: string;
@@ -95,7 +96,7 @@ export interface MissionsNS {
     screen_title: string; loading: string; error_load: string; retry: string;
     cancel_title: string; cancel_body: string; cancel_back: string; cancel_confirm: string;
     cancel_error: string; duration: string; created_on: string;
-    cta_get_quote: string; cta_see_quote: string; cta_pay: string; radius: string;
+    cta_get_quote: string; cta_see_quote: string; cta_pay: string;
     cta_select: string; cta_waiting: string; cta_assigning: string; cta_messaging: string;
     badge_live: string; badge_approach: string; badge_urgent: string;
     section_approach: string; section_location: string; section_notes: string; section_bookings: string;
@@ -120,9 +121,8 @@ export interface MissionsNS {
   create: {
     step_one: string; step_two: string; step_three: string;
     service_required_title: string; service_required_body: string;
-    map_position_required: string; start_required: string;
+    map_position_required: string; start_required: string; start_min_future: string;
     duration_min: string; duration_max: string; end_before_start: string;
-    start_min_future: string; radius_min: string; radius_max: string;
     error_create: string;
     title_placeholder: string; instructions_placeholder: string;
     schedule_title: string; start_label: string; start_hint: string;
@@ -132,7 +132,6 @@ export interface MissionsNS {
     uniform_per_agent: string; total_agents: string; add_service: string;
     summary_title: string; recap_section: string; urgency_note: string;
     title_label: string; notes_label: string;
-    radius_label: string; radius_hint: string;
     address_placeholder: string;
     city_label: string; city_placeholder: string;
     zip_label: string; zip_placeholder: string;
@@ -142,59 +141,123 @@ export interface MissionsNS {
     amplitude_max: string; weekly_cap: string; rest_between: string; rest_after_cap: string;
 
     // ── Multi-slot scheduling ─────────────────────────────────────────────
-    /** Toggle label — switch between single-slot and multi-slot mode. */
     slot_mode_single: string;
     slot_mode_multi:  string;
-    /** Informational banner shown when multi-slot mode is active. */
     slot_mode_hint:   string;
-
-    /** Section header above the slots list. */
     slots_section_title: string;
-    /** "Add a time window" button label. */
     slot_add_btn:        string;
-    /** Slot card title — e.g. "Window 1". */
     slot_label:          string;
-    /** Optional notes placeholder inside a slot card. */
     slot_notes_placeholder: string;
-    /** Remove slot button tooltip / a11y label. */
     slot_remove:         string;
-
-    /** Validation: slot start date required. */
     slot_start_required: string;
-    /** Validation: slot end date required. */
     slot_end_required:   string;
-    /** Validation: slot end must be after start. */
     slot_end_before_start: string;
-    /** Validation: each slot must be ≥ 6 h. */
     slot_duration_min:   string;
-    /** Validation: slots cannot overlap. */
     slot_overlap:        string;
-    /** Validation: at least one slot required when in multi-slot mode. */
     slot_required:       string;
-    /** Validation: maximum 30 slots. */
     slot_max:            string;
-
-    /** Duration badge inside a valid slot card — "{{hours}} h". */
     slot_duration_badge: string;
-    /** Total duration footer — e.g. "Total: 36.0 h over 3 windows". */
     slots_total_duration: string;
-
-    /** Summary row label for multi-slot mode — replaces single start/end rows. */
     summary_slots:       string;
-    /** E.g. "{{count}} window" / "{{count}} windows" (singular). */
     summary_slots_one:   string;
-    /** Plural variant. */
     summary_slots_other: string;
 
     // Per-slot booking lines panel
-    /** Accordion label when slot uses same lines as Step 1 — "Default: N agents". */
     slot_lines_default:  string;
-    /** Accordion label when slot has custom lines — "Custom: N agents". */
     slot_lines_custom:   string;
-    /** Link to reset slot lines back to global defaults. */
     slot_lines_reset:    string;
-    /** Validation: slot must have at least one service line. */
     slot_lines_required: string;
+
+    // ── Redesigned 3-step wizard ─────────────────────────────────────────
+    step_where:  string;
+    step_when:   string;
+    step_review: string;
+    progress_where:  string;
+    progress_when:   string;
+    progress_review: string;
+    where_title:    string; where_subtitle:  string;
+    when_title:     string; when_subtitle:   string;
+    review_title:   string; review_subtitle: string;
+    edit_btn:       string;
+    summary_when:     string;
+    summary_services: string;
+    preset_section:  string;
+    preset_tonight:  string;
+    preset_tomorrow: string;
+    preset_weekend:  string;
+    custom_section:  string;
+    add_another_slot:      string;
+    add_another_slot_hint: string;
+    slots_count:           string;
+    optional_section: string;
+
+    // ── Per-slot customization ─────────────────────────────────────────
+    customize_for_slot:        string;
+    slot_uniform_label:        string;
+    slot_line_excluded_note:   string;
+    slot_total_agents:         string;
+    custom_label:              string;
+    summary_services_default:  string;
+
+    // ── Copy-from-slot feature ─────────────────────────────────────────
+    slot_copy_from:     string;
+
+    // ── Slot header date summary ───────────────────────────────────────
+    slot_date_summary:  string;
+    slot_date_pending:  string;
+
+    // Footer status
+    footer_step_progress: string;
+    footer_ready:         string;
+    slots_total_short:    string;
+
+    // ── Review step enrichments ────────────────────────────────────────
+    review_agent_hours:     string;
+    review_slot_summary:    string;
+
+    // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
+    draft_restore_title:    string;
+    draft_restore_subtitle: string;
+    draft_restore_btn:      string;
+    draft_discard_btn:      string;
+    draft_discard_confirm_title:   string;
+    draft_discard_confirm_message: string;
+    draft_discard_confirm_btn:     string;
+
+    // ── ENTERPRISE UX: smarter footer ───────────────────────────────────
+    /** Smart CTA: "Continuer · Quand →" / "Continuer · Récap →". */
+    next_to_when:    string;
+    next_to_review:  string;
+    /** Footer "Précédent" affordance text. */
+    footer_back:     string;
+
+    // ── ENTERPRISE UX: cross-slot error banner ──────────────────────────
+    cross_slot_error_title:   string;
+    cross_slot_error_subtitle:string;
+    cross_slot_error_jump:    string;
+
+    // ── ENTERPRISE UX: multi-slot escape ────────────────────────────────
+    /** "Revenir à une plage unique" — return to single-slot mode. */
+    exit_multi_slot:           string;
+    exit_multi_slot_confirm_title:   string;
+    exit_multi_slot_confirm_message: string;
+    exit_multi_slot_confirm_btn:     string;
+
+    // ── ENTERPRISE UX: review price estimate ────────────────────────────
+    /** "Estimation HT" header above the indicative price. */
+    review_estimate_label:  string;
+    /** "≈ {{amount}} HT" — approximate cost rendered in the review. */
+    review_estimate_amount: string;
+    /** Disclaimer rendered below the estimate. */
+    review_estimate_note:   string;
+
+    // ── ENTERPRISE UX: structured submit error ──────────────────────────
+    /** Banner title shown when /missions/create returns validation errors. */
+    submit_error_title:    string;
+    /** "Modifier" CTA inside the submit-error banner. */
+    submit_error_jump_to:  string;
+    /** Generic submit error subtitle (network / server). */
+    submit_error_network:  string;
   };
 }
 
@@ -245,7 +308,25 @@ export interface QuoteNS {
   accepted_banner: string;
   secure_note: string;
   sepa_note: string;
-  offline_note: string; breakdown_title: string; agent_payout: string; accepted_badge: string; row_base_ht: string; row_night: string; row_weekend: string; row_urgency: string; row_subtotal: string; row_vat: string; row_total_ttc: string; row_commission: string; valid_until: string; accept_label: string; }
+  offline_note: string;
+  breakdown_title: string;
+  prestations_title: string;
+  prestation_hours: string;
+  prestation_agents: string;
+  prestation_agents_plural: string;
+  prestation_rate: string;
+  prestation_subtotal: string;
+  accepted_badge: string;
+  row_base_ht: string;
+  row_night: string;
+  row_weekend: string;
+  row_urgency: string;
+  row_subtotal: string;
+  row_vat: string;
+  row_total_ttc: string;
+  valid_until: string;
+  accept_label: string;
+}
 
 export interface PaymentNS {
   title_card: string; title_sepa: string; secured_by: string;
@@ -341,7 +422,6 @@ export interface BookingNS {
   incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; };
   actions: { rate_agent: string; already_rated: string; open_dispute: string; };
   uniforms: { STANDARD: string; CIVIL: string; EVENEMENTIEL: string; SSIAP: string; CYNOPHILE: string; };
-  /** Status labels for BookingCard badge - mirrors BookingStatus enum values. */
   statuses: { open: string; assigned: string; in_progress: string; completed: string; cancelled: string; abandoned: string; };
   errors: { load: string; generic: string; };
 }
@@ -349,11 +429,11 @@ export interface BookingNS {
 export interface RatingNS {
   screen_title: string;
   steps: { rating: string; nps: string; comment: string; };
-  star_labels: string[]; // 6 entries - index 0 unused, 1-5 = star labels
+  star_labels: string[];
   step_rating: { title: string; subtitle: string; };
   step_nps: { title: string; subtitle: string; detractors: string; passives: string; promoters: string; };
   step_comment: { title: string; subtitle: string; placeholder: string; char_count: string; skip: string; tags: string[]; };
-  nps_scale: string[]; // 11 entries, index 0-10
+  nps_scale: string[];
   nps_categories: { promoter: string; passive: string; detractor: string; };
   done: { title: string; back_btn: string; };
   nav: { back: string; continue: string; submit: string; sending: string; };
@@ -378,9 +458,7 @@ export interface DisputeNS {
 
 export interface TrackingNS {
   screen_title: string; status_offline: string; status_live: string; status_waiting: string;
-  /** Shown when socket is connected but GPS signal hasn't updated in 30 s. */
   status_signal_lost: string;
-  /** Shown in the map WebView loading overlay. */
   map_loading: string;
   in_zone: string; out_of_zone: string;
   follow_agent_btn: string; view_site_btn: string; sync_btn: string;
@@ -397,6 +475,7 @@ export interface ServicesNS {
   summary_agents: string; summary_agents_plural: string;
   empty: { title: string; subtitle: string; };
   agent_config: { hide_detail: string; configure_agents: string; }; available_title: string; same_uniform_label: string; add_btn: string; clear_all: string; uniforms_none: string; agents_and_uniforms: string; summary: string;
+  agents_label: string; uniform_label: string; customize_show: string; customize_hide: string;
   uniforms: {
     STANDARD:     { label: string; desc: string; emoji: string; };
     CIVIL:        { label: string; desc: string; emoji: string; };

@@ -31,7 +31,12 @@ module.exports = {
 
     // ── TypeScript ──────────────────────────────────────────────────────
     '@typescript-eslint/no-explicit-any':               'warn',
-    '@typescript-eslint/no-unused-vars':                ['warn', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-unused-vars':                ['warn', {
+      argsIgnorePattern:             '^_',
+      varsIgnorePattern:             '^_',
+      caughtErrorsIgnorePattern:     '^_',
+      destructuredArrayIgnorePattern:'^_',
+    }],
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/consistent-type-imports':       ['error', { prefer: 'type-imports' }],
 
@@ -44,6 +49,6 @@ module.exports = {
     'no-console':   ['warn', { allow: ['warn', 'error'] }],
     'prefer-const': 'error',
     'no-var':       'error',
-    'eqeqeq':       ['error', 'always'],
+    'eqeqeq':       ['error', 'always', { null: 'ignore' }],
   },
 };

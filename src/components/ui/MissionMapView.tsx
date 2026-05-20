@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionMapView — Leaflet/OSM read-only (or interactive) map.
  *
  * Why WebView instead of react-native-maps?
@@ -26,7 +26,6 @@ import { fontSize, fontFamily } from '@theme/typography';
 interface Props {
   latitude:     number;
   longitude:    number;
-  radiusKm?:    number;
   title?:       string;
   height?:      number;
   interactive?: boolean;
@@ -35,11 +34,10 @@ interface Props {
 function buildHTML(
   lat: number,
   lng: number,
-  radiusM: number,
   title: string,
   interactive: boolean,
 ): string {
-  const zoom = radiusM > 5000 ? 11 : radiusM > 2000 ? 12 : radiusM > 500 ? 13 : 14;
+  const zoom = 14;
   const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
   return `<!DOCTYPE html>
@@ -78,16 +76,6 @@ function buildHTML(
     maxZoom: 19, attribution: ''
   }).addTo(map);
 
-  ${radiusM > 0 ? `
-  L.circle([${lat}, ${lng}], {
-    radius: ${radiusM * 1.06}, color:'#bc933b',
-    weight:1, opacity:0.3, fillOpacity:0,
-  }).addTo(map);
-  L.circle([${lat}, ${lng}], {
-    radius: ${radiusM}, color:'#bc933b',
-    weight:2, opacity:0.9, fillColor:'#bc933b', fillOpacity:0.12,
-  }).addTo(map);
-  ` : ''}
 
   var icon = L.divIcon({
     className:'',
@@ -115,7 +103,6 @@ function buildHTML(
 export const MissionMapView: React.FC<Props> = ({
   latitude,
   longitude,
-  radiusKm    = 0,
   title       = '',
   height      = 220,
   interactive = false,
@@ -126,8 +113,8 @@ export const MissionMapView: React.FC<Props> = ({
 
   // CRITICAL: memoize html — rebuilding causes WebView remount on every render
   const html = useMemo(
-    () => buildHTML(latitude, longitude, radiusKm * 1000, title, interactive),
-    [latitude, longitude, radiusKm, title, interactive],
+    () => buildHTML(latitude, longitude, title, interactive),
+    [latitude, longitude, title, interactive],
   );
 
   const handleMessage = useCallback((event: any) => {
@@ -171,7 +158,6 @@ export const MissionMapView: React.FC<Props> = ({
           {/* Coordinates fallback so info is never lost */}
           <Text style={styles.coordsFallback}>
             {latitude.toFixed(5)}, {longitude.toFixed(5)}
-            {radiusKm > 0 ? `  ·  Rayon ${radiusKm} km` : ''}
           </Text>
         </View>
       )}
@@ -268,4 +254,5 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
 });
+
 

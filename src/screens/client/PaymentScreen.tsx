@@ -100,7 +100,6 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   // -- Saved payment methods ------------------------------------------------
   const [savedMethods, setSavedMethods] = useState<PaymentMethod[]>([]);
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
-  const [showSaved, setShowSaved] = useState(false);
 
   // FIX #1 — isSepa MUST be declared before any usage (TDZ: const is not
   // hoisted). Previously declared after compatibleSaved/usingSaved/canConfirm

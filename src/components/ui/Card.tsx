@@ -3,7 +3,8 @@
  * Senior UI: multi-level depth, glow option, press states.
  */
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { colors } from '@theme/colors';
 import { spacing, radius, shadow } from '@theme/spacing';
 

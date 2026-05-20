@@ -19,6 +19,10 @@ const services: ServicesNS = {
   clear_all: 'Clear all',
   uniforms_none: 'Not specified',
   agents_and_uniforms: 'Agents & uniforms',
+  agents_label:     'Agents',
+  uniform_label:    'Uniform',
+  customize_show:   'Customize per agent',
+  customize_hide:   'Hide customization',
   summary: '{{lines}} service · {{agents}} agent',
 
   uniforms: {

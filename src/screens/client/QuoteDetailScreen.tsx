@@ -23,7 +23,7 @@ import { Button }             from '@components/ui/Button';
 import { colors }             from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import type { MissionStackParamList, Booking } from '@models/index';
+import type { MissionStackParamList, Booking, Mission } from '@models/index';
 import { useTranslation } from '@i18n';
 import { useToast } from '@hooks/useToast';
 
@@ -65,6 +65,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const { missionId }                     = route.params;
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
+  const [mission,       setMission]       = useState<Mission | null>(null);
   const [accepting,     setAccepting]     = useState(false);
   const [paying,        setPaying]        = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -74,6 +75,23 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const load = useCallback(() => execute(missionId), [execute, missionId]);
   useEffect(() => { load(); }, [load]);
+
+  // Charge la mission en parallele pour afficher le detail des prestations.
+  // (groupage par ServiceType avec nb agents, heures, taux pratique).
+  // Best-effort : si l'appel echoue, le composant masque simplement la section.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: res } = await missionsApi.getById(missionId);
+        const m = (res as any)?.data ?? res;
+        if (!cancelled && m) setMission(m as Mission);
+      } catch {
+        /* silencieux : la section Prestations sera masquee */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [missionId]);
 
   useEffect(() => {
     if (countdownRef.current) clearInterval(countdownRef.current);
@@ -121,8 +139,10 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     setRecalculating(true);
     try {
       const { data: missionRes } = await missionsApi.getById(missionId);
-      const mission = (missionRes as any).data ?? missionRes;
-      const bookingLines = buildBookingLines(mission?.bookings ?? []);
+      const freshMission = (missionRes as any).data ?? missionRes;
+      const bookingLines = buildBookingLines(freshMission?.bookings ?? []);
+      // Synchronise aussi l'etat local pour rafraichir la section Prestations
+      if (freshMission) setMission(freshMission as Mission);
 
       if (bookingLines.length === 0) {
         toast.error(tc('unknown_error'), { title: tc('error') });
@@ -257,6 +277,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
           <QuoteBreakdownCard
             quote={quote}
+            mission={mission ?? undefined}
             onAccept={handleAccept}
             loading={accepting}
             readonly={quote.status !== 'PENDING' || Boolean(isExpired)}

@@ -140,7 +140,7 @@ export const AgentApproachBanner: React.FC<Props> = ({
   const fadeAnim  = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const [agentPos,   setAgentPos]   = useState<AgentPosition | null>(null);
+  const [, setAgentPos] = useState<AgentPosition | null>(null);
   const [distLabel,  setDistLabel]  = useState<string | null>(null);
   const [mapVisible, setMapVisible] = useState(false);
 

@@ -55,7 +55,7 @@ export function useApi<TArgs extends unknown[], TData>(
         return null;
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [apiFunc],
   );
 
