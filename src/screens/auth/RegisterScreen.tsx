@@ -18,7 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowLeft, User, Building2, Mail, Phone,
   Lock, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2,
-  Hash, FileText, Check,
+  Hash, Check,
 } from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
 import { useAuthStore } from '@store/authStore';

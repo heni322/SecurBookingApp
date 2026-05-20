@@ -10,7 +10,6 @@
 import { useTranslation } from '@i18n';
 import { MISSION_STATUS_COLOR } from '@utils/statusHelpers';
 import { colors } from '@theme/colors';
-import type { MissionStatus } from '@constants/enums';
 
 const STATUS_KEY_MAP: Record<string, string> = {
   CREATED:     'created',

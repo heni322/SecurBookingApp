@@ -9,7 +9,7 @@ import {
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  User, Mail, Phone, CalendarDays, ShieldCheck,
+  Mail, Phone, CalendarDays, ShieldCheck,
   FileText, Info, LogOut, ChevronRight, CreditCard,
   Bell, Lock, Wallet, Fingerprint, Trash2, Edit3, BarChart2, Globe,
 } from 'lucide-react-native';

@@ -42,6 +42,8 @@ module.exports = {
 
     // ── React ───────────────────────────────────────────────────────────
     'react/react-in-jsx-scope':    'off',
+    // Navigation render props (tabBarIcon, tabBarLabel, etc.) are passed as
+    'react/no-unstable-nested-components': ['warn', { allowAsProps: true }],
     'react-hooks/exhaustive-deps': 'warn',
     'react-hooks/rules-of-hooks':  'error',
 

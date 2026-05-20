@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { colors } from '@theme/colors';
-import { spacing, radius } from '@theme/spacing';
+import { spacing } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
 interface Props {

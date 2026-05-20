@@ -6,7 +6,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { colors } from '@theme/colors';
-import { radius } from '@theme/spacing';
 import { fontFamily, fontSize } from '@theme/typography';
 import { getInitials } from '@utils/formatters';
 

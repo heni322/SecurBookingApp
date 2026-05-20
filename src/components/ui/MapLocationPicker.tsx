@@ -219,7 +219,7 @@ export const MapLocationPicker: React.FC<Props> = ({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
-  }, [mapReady]);
+  }, [mapReady, toast]);
   const html = buildLeafletHTML(latitude, longitude);
 
   return (

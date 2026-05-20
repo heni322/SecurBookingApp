@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, Modal,
-  ScrollView, StyleSheet, Pressable,
+  StyleSheet, Pressable,
 } from 'react-native';
 import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Check, X } from 'lucide-react-native';
 import { colors } from '@theme/colors';
@@ -67,7 +67,7 @@ function firstDayOffset(year: number, month: number): number {
 export const DateTimePicker: React.FC<Props> = ({
   label, value, onChange, minDate, error, hint,
 }) => {
-  const now       = new Date();
+  const now       = useMemo(() => new Date(), []);
   const parsed    = parseISO(value);
   const initDate  = parsed ?? new Date(now.getTime() + 24 * 3_600_000);
 
@@ -85,7 +85,7 @@ export const DateTimePicker: React.FC<Props> = ({
     for (let d = 1; d <= daysInMonth; d++) arr.push(d);
     while (arr.length % 7 !== 0) arr.push(null);
     return arr;
-  }, [viewYear, viewMonth, firstOffset, daysInMonth]);
+  }, [firstOffset, daysInMonth]);
 
   const isDisabled = useCallback((day: number) => {
     if (!minDate) return false;
@@ -107,7 +107,7 @@ export const DateTimePicker: React.FC<Props> = ({
     return now.getFullYear() === viewYear
       && now.getMonth()     === viewMonth
       && now.getDate()      === day;
-  }, [viewYear, viewMonth]);
+  }, [viewYear, viewMonth, now]);
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }

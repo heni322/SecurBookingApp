@@ -6,7 +6,7 @@ import {
   View, TextInput, TouchableOpacity, StyleSheet, Animated,
 } from 'react-native';
 import { Search, X } from 'lucide-react-native';
-import { colors, palette } from '@theme/colors';
+import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
@@ -28,10 +28,15 @@ export const SearchBar: React.FC<Props> = ({
   const [localValue, setLocalValue] = useState(value);
   const clearOpacity = useRef(new Animated.Value(0)).current;
 
+  // Hold the latest onChangeText so the debounce timer is not reset on every
+  // parent re-render (works even if the parent does not memoize the callback).
+  const onChangeRef = useRef(onChangeText);
+  useEffect(() => { onChangeRef.current = onChangeText; }, [onChangeText]);
+
   // Debounce
   useEffect(() => {
-    const t = setTimeout(() => onChangeText(localValue), debounceMs);
-    return () => clearTimeout(t);
+    const id = setTimeout(() => onChangeRef.current(localValue), debounceMs);
+    return () => clearTimeout(id);
   }, [localValue, debounceMs]);
 
   // Sync when parent resets
@@ -44,7 +49,7 @@ export const SearchBar: React.FC<Props> = ({
       duration:        150,
       useNativeDriver: true,
     }).start();
-  }, [localValue]);
+  }, [localValue, clearOpacity]);
 
   const handleClear = () => {
     setLocalValue('');

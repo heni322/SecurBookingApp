@@ -2,12 +2,11 @@
  * useMissions.ts — hook domain missions.
  * Encapsule le chargement, le filtrage et les actions sur les missions.
  */
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback } from 'react';
 import { missionsApi } from '@api/endpoints/missions';
 import { useApi }      from '@hooks/useApi';
 import { isActiveMission } from '@utils/typeGuards';
 import { MissionStatus } from '@constants/enums';
-import type { Mission, CreateMissionPayload } from '@models/index';
 
 export function useMissions() {
   const { data, loading, error, execute } = useApi(missionsApi.getMyMissions);

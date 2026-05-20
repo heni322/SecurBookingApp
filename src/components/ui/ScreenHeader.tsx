@@ -9,7 +9,7 @@ import {
 import { ChevronLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@theme/colors';
-import { spacing, layout, radius } from '@theme/spacing';
+import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
 interface Props {

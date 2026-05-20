@@ -21,7 +21,7 @@ import { useStripe, CardField } from '@stripe/stripe-react-native';
 import type { CardFieldInput } from '@stripe/stripe-react-native';
 import {
   Lock, CheckCircle2, ShieldCheck, CreditCard,
-  AlertCircle, Landmark, Info, ChevronDown, Star,
+  AlertCircle, Landmark, Info, Star,
 } from 'lucide-react-native';
 import { Button }       from '@components/ui/Button';
 import { Card }         from '@components/ui/Card';

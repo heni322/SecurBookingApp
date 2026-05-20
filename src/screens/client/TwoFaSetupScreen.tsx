@@ -52,7 +52,7 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [t, tc]);
+  }, [t, tc, toast]);
 
   const handleEnable = useCallback(async () => {
     if (code.length !== 6) {
@@ -70,7 +70,7 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [code, setUser, t]);
+  }, [code, setUser, t, toast]);
 
   const handleDisable = useCallback(async () => {
     const ok = await confirm({
@@ -101,7 +101,7 @@ export const TwoFaSetupScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
       setDisableCode('');
     }
-  }, [disableCode, setUser, navigation, t]);
+  }, [disableCode, setUser, navigation, t, toast]);
 
   if (loading && step === 'idle') return <LoadingState message={t('two_fa.loading')} />;
 

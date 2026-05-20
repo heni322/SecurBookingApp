@@ -17,7 +17,7 @@ import { Button }       from '@components/ui/Button';
 import { Avatar }       from '@components/ui/Avatar';
 import { ScreenHeader } from '@components/ui/ScreenHeader';
 import { colors }       from '@theme/colors';
-import { spacing, layout, radius } from '@theme/spacing';
+import { spacing, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
@@ -76,7 +76,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setAvatarUploading(false);
     }
-  }, [user, setUser, t, tc]);
+  }, [user, setUser, t, tc, toast]);
 
   const handleSave = useCallback(async () => {
     if (!fullName.trim()) {
@@ -97,7 +97,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [fullName, phone, setUser, navigation, t, tc]);
+  }, [fullName, phone, setUser, navigation, t, tc, toast]);
 
   // Avatar affiché : prévisualisation locale > avatarUrl du store > initiales
   const displayAvatarUri = previewUri ?? user?.avatarUrl ?? undefined;

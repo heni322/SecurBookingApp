@@ -4,7 +4,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Image,
+  View, Text, ScrollView, TouchableOpacity, 
   KeyboardAvoidingView, Platform, StyleSheet, Animated, Easing,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,7 +16,7 @@ import { useAuthStore }      from '@store/authStore';
 import { biometricService }  from '@services/biometricService';
 import { Button }            from '@components/ui/Button';
 import { Input }             from '@components/ui/Input';
-import { colors, palette }   from '@theme/colors';
+import { colors }   from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { AuthStackParamList, AuthTokens, User } from '@models/index';

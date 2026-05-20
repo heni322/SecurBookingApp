@@ -13,7 +13,7 @@ import { HomeScreen }             from '@screens/client/HomeScreen';
 import { NotificationsScreen }    from '@screens/client/NotificationsScreen';
 import { colors, palette }        from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
-import { fontFamily, fontSize }   from '@theme/typography';
+import { fontFamily }   from '@theme/typography';
 import type { MainTabParamList }  from '@models/index';
 import { useTranslation }         from '@i18n';
 
@@ -85,7 +85,7 @@ const TabItem: React.FC<{
       Animated.timing(glowAnim,  { toValue: focused ? 1 : 0, duration: 220, useNativeDriver: false }),
       Animated.timing(labelAnim, { toValue: focused ? 1 : 0, duration: 180, useNativeDriver: false }),
     ]).start();
-  }, [focused]);
+  }, [focused, scaleAnim, glowAnim, labelAnim]);
 
   const iconColor    = focused ? palette.navy : palette.white60;
   const glowOpacity  = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.55] });

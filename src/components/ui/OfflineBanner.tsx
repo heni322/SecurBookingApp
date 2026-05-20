@@ -1,13 +1,13 @@
-﻿/**
+/**
  * OfflineBanner — slide-in strip when device loses connectivity.
  * Uses @react-native-community/netinfo.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Animated, StyleSheet } from 'react-native';
+import { Text, Animated, StyleSheet } from 'react-native';
 import { WifiOff } from 'lucide-react-native';
 import { useTranslation } from '@i18n';
 import { colors } from '@theme/colors';
-import { spacing, radius } from '@theme/spacing';
+import { spacing } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 
 // Soft import — app works even if NetInfo not installed
@@ -35,7 +35,7 @@ export const OfflineBanner: React.FC = () => {
       tension:         80,
       friction:        10,
     }).start();
-  }, [offline]);
+  }, [offline, slideY]);
 
   if (!offline && (slideY as any)._value === -60) return null;
 

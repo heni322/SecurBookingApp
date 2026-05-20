@@ -108,7 +108,7 @@ function FilterChip<T extends string>({ chip, active, onPress }: ChipProps<T>) {
         Animated.spring(scaleAnim,  { toValue: 1,    friction: 5,   useNativeDriver: true }),
       ]).start();
     }
-  }, [active]);
+  }, [active, scaleAnim]);
 
   // ── Dot pulse (only for dotColor chips when active) ─────────────────────
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -128,7 +128,7 @@ function FilterChip<T extends string>({ chip, active, onPress }: ChipProps<T>) {
       pulseAnim.setValue(1);
     }
     return () => pulseLoop.current?.stop();
-  }, [active, chip.dotColor]);
+  }, [active, chip.dotColor, pulseAnim]);
 
   const handlePress = useCallback(() => onPress(chip.key), [chip.key, onPress]);
 

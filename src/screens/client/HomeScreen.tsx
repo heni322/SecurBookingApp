@@ -92,7 +92,7 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setSosSending(false);
     }
-  }, [t]);
+  }, [t, toast]);
 
   return (
     <View style={styles.screenWrapper}>

@@ -5,7 +5,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { ViewStyle } from 'react-native';
 import { View, Animated, StyleSheet } from 'react-native';
-import { colors, palette } from '@theme/colors';
+import { colors } from '@theme/colors';
 import { radius } from '@theme/spacing';
 
 interface SkeletonBoxProps {

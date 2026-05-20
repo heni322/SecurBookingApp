@@ -6,7 +6,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  FlatList, ActivityIndicator, StyleSheet,
+  ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { Search, MapPin, X } from 'lucide-react-native';
 import axios from 'axios';

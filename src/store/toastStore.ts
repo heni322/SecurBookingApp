@@ -60,7 +60,7 @@ let counter = 0;
 const genId = (): string =>
   `t_${Date.now().toString(36)}_${(counter++).toString(36)}`;
 
-export const useToastStore = create<ToastState>((set, get) => ({
+export const useToastStore = create<ToastState>((set, _get) => ({
   toasts: [],
 
   show: (opts) => {

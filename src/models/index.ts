@@ -1,8 +1,5 @@
 ﻿import type {
   UserRole, UserStatus, MissionStatus, BookingStatus, PaymentStatus, ClientType} from '@constants/enums';
-import {
-  DocumentStatus
-} from '@constants/enums';
 
 // -----------------------------------------------------------------------------
 // GENERIC API WRAPPERS

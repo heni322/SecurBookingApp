@@ -16,10 +16,10 @@ import { useApi }             from '@hooks/useApi';
 import { ScreenHeader }       from '@components/ui/ScreenHeader';
 import { EmptyState }         from '@components/ui/EmptyState';
 import { PaymentListSkeleton } from '@components/ui/SkeletonLoader';
-import { colors, palette }    from '@theme/colors';
+import { colors }    from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import { formatEuros, formatDate, formatDateShort } from '@utils/formatters';
+import { formatEuros, formatDateShort } from '@utils/formatters';
 import { PaymentStatus }      from '@constants/enums';
 import type { Payment, ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
@@ -46,13 +46,13 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const { data: payments, loading, execute } = useApi(paymentsApi.getMyPayments);
     const { t } = useTranslation(['payment', 'common']);
     const toast = useToast();
-  const STATUS_META: Record<string, { color: string; Icon: React.FC<any>; label: string }> = {
+  const STATUS_META: Record<string, { color: string; Icon: React.FC<any>; label: string }> = useMemo(() => ({
     [PaymentStatus.PAID]:       { color: colors.success, Icon: CheckCircle, label: t('history.status.paid')        },
     [PaymentStatus.FAILED]:     { color: colors.danger,  Icon: XCircle,     label: t('history.status.failed')      },
     [PaymentStatus.REFUNDED]:   { color: colors.primary, Icon: CreditCard,  label: t('history.status.refunded')    },
     [PaymentStatus.PENDING]:    { color: colors.warning, Icon: Clock,       label: t('history.status.pending')     },
     [PaymentStatus.PROCESSING]: { color: colors.info,    Icon: Clock,       label: t('history.status.processing')  },
-  };
+  }), [t]);
   
   useEffect(() => { execute(); }, [execute]);
 
@@ -81,7 +81,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
     } catch {
       toast.error(t('invoice_open_error'), { title: t('common:error') });
     }
-  }, []);
+  }, [t, toast]);
 
   const renderItem = useCallback(({ item }: { item: Payment }) => {
     const meta   = STATUS_META[item.status] ?? STATUS_META[PaymentStatus.PENDING];
@@ -128,7 +128,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
     );
-  }, [handleDownload]);
+  }, [handleDownload, STATUS_META, t]);
 
   return (
     <View style={styles.screen}>

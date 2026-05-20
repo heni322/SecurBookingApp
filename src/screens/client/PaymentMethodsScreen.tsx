@@ -10,7 +10,6 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   CreditCard, Landmark, Trash2, Plus, ShieldCheck,
-  AlertCircle,
 } from 'lucide-react-native';
 import { paymentsApi }       from '@api/endpoints/payments';
 import { useApi }            from '@hooks/useApi';
@@ -18,7 +17,7 @@ import { ScreenHeader }      from '@components/ui/ScreenHeader';
 import { EmptyState }        from '@components/ui/EmptyState';
 import { Card }              from '@components/ui/Card';
 import { PaymentListSkeleton } from '@components/ui/SkeletonLoader';
-import { colors, palette }   from '@theme/colors';
+import { colors }   from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { PaymentMethod, ProfileStackParamList } from '@models/index';
@@ -80,7 +79,7 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setDeleting(null);
     }
-  }, [execute, confirm, t]);
+  }, [execute, confirm, t, toast]);
 
   const methodList = (methods as any as PaymentMethod[]) ?? [];
 

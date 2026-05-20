@@ -138,7 +138,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
     Animated.spring(ctaAnim, {
       toValue: totalLines > 0 ? 1 : 0, useNativeDriver: true, friction: 8, tension: 60,
     }).start();
-  }, [totalLines]);
+  }, [totalLines, ctaAnim]);
 
   // -- Mutations ---------------------------------------------------------------
   const toggleService = useCallback((item: any) => {

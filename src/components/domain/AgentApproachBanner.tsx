@@ -17,7 +17,7 @@ import React, {
 } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  Animated, ActivityIndicator,
+  Animated, 
 } from 'react-native';
 import { WebView }          from 'react-native-webview';
 import { Navigation2, Star, ShieldCheck, ChevronRight } from 'lucide-react-native';

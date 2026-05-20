@@ -18,7 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Star, ShieldCheck, UserCheck, LogIn, LogOut,
   AlertTriangle, Users, Clock, MapPin, Flag,
-  Camera, ZoomIn, X, CheckCircle, ChevronRight,
+  Camera, ZoomIn, X, CheckCircle, 
 } from 'lucide-react-native';
 import { bookingsApi }  from '@api/endpoints/bookings';
 import { useApi }       from '@hooks/useApi';
@@ -527,12 +527,6 @@ const modal = StyleSheet.create({
     padding:spacing[6], gap:spacing[4],
   },
   title:      { fontFamily:fontFamily.display, fontSize:fontSize.xl, color:colors.textPrimary, letterSpacing:-0.4 },
-  subtitle:   { fontFamily:fontFamily.body, fontSize:fontSize.sm, color:colors.textSecondary, marginTop:-spacing[2] },
-  appRow:     { flexDirection:'row', alignItems:'center', gap:spacing[3], paddingVertical:spacing[3], borderBottomWidth:1, borderBottomColor:colors.border },
-  appInfo:    { flex:1 },
-  appName:    { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.base, color:colors.textPrimary },
-  appMetaRow: { flexDirection:'row', alignItems:'center', gap:4, marginTop:2 },
-  appMeta:    { fontFamily:fontFamily.body, fontSize:fontSize.xs, color:colors.textMuted },
   textInput: {
     backgroundColor:colors.surface, borderRadius:radius.lg,
     borderWidth:1, borderColor:colors.border,

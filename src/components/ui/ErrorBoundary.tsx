@@ -6,7 +6,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
 } from 'react-native';
 import { AlertTriangle, RefreshCw } from 'lucide-react-native';
-import { colors, palette } from '@theme/colors';
+import { colors } from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 

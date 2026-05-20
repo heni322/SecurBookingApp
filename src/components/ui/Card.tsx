@@ -6,7 +6,7 @@ import React from 'react';
 import type { ViewStyle } from 'react-native';
 import { View, StyleSheet } from 'react-native';
 import { colors } from '@theme/colors';
-import { spacing, radius, shadow } from '@theme/spacing';
+import { spacing, radius } from '@theme/spacing';
 
 interface Props {
   children:  React.ReactNode;

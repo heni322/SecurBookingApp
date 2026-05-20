@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
   RefreshControl, Animated,
@@ -48,7 +48,7 @@ const AnimatedBar: React.FC<{ ratio: number; color: string; height: number }> = 
       friction:        6,
       tension:         50,
     }).start();
-  }, [ratio]);
+  }, [ratio, anim]);
 
   const barH = anim.interpolate({ inputRange: [0, 1], outputRange: [2, height] });
 
@@ -71,8 +71,8 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
   const { data: missions, loading: mLoading, execute: loadM } = useApi(missionsApi.getMyMissions);
   const { data: payments, loading: pLoading, execute: loadP } = useApi(paymentsApi.getMyPayments);
 
-  const load = () => { loadM(); loadP(); };
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => { loadM(); loadP(); }, [loadM, loadP]);
+  useEffect(() => { load(); }, [load]);
 
   const loading = mLoading || pLoading;
   const months  = getLast6Months();
