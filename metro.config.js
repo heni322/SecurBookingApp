@@ -23,6 +23,8 @@ const config = {
       '@theme':      path.resolve(__dirname, 'src/theme'),
       '@navigation': path.resolve(__dirname, 'src/navigation'),
       '@assets':     path.resolve(__dirname, 'src/assets'),
+      '@i18n':       path.resolve(__dirname, 'src/i18n'),
+      '@lib':        path.resolve(__dirname, 'src/lib'),
     },
   },
 };
