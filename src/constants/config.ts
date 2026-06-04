@@ -11,7 +11,7 @@
 //
 //  C) Android emulator (no USB):
 //     DEV_HOST = '10.0.2.2'
-const DEV_HOST = '192.168.1.15';
+const DEV_HOST = '192.168.1.13';
 export const API_BASE_URL = __DEV__
   ? `http://${DEV_HOST}:3000/api/v1`
   : 'https://api.securbooking.com/api/v1';

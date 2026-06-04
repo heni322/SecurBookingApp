@@ -46,6 +46,7 @@ const missions: MissionsNS = {
     duration: 'Duration', created_on: 'Created on',
     cta_get_quote: 'Get a quote',
     cta_see_quote: 'View quote',
+    cta_edit: 'Edit mission',
     cta_pay: 'View quote & pay',
     cta_select: 'Select agents',
     cta_waiting: 'Waiting for applications...',
@@ -59,6 +60,13 @@ const missions: MissionsNS = {
     section_notes: 'Notes & instructions',
     section_bookings: 'Positions',
     total_ttc: 'Total incl. VAT',
+  },
+
+  edit: {
+    screen_title: 'Edit mission',
+    loading:      'Loading mission…',
+    save_btn:     'Save',
+    saved_toast:  'Mission updated.',
   },
 
   statuses: {
@@ -266,6 +274,22 @@ const missions: MissionsNS = {
     review_estimate_note:   'The final price (with night / weekend surcharges and VAT) will be computed on the next screen.',
 
     // ── ENTERPRISE UX: structured submit error ──────────────────────────
+    step_where_2:        'Step 1 of 2 - Location',
+    step_staff_2:        'Step 2 of 2 - When & agents',
+    progress_staff:      'When & agents',
+    next_to_staff:       'Continue - Agents',
+    when_staff_title:    'When and with whom?',
+    when_staff_subtitle: 'Set each time slot and the agents assigned to it.',
+    creneau_label:       'Slot {{n}}',
+    add_another_creneau: 'Add a time slot',
+    staff_section:       'SLOT STAFFING',
+    staff_empty:         'No service for this slot',
+    staff_empty_hint:    'Add at least one service below.',
+    staff_add_service:   'Add a service',
+    staff_loading:       'Loading services...',
+    staff_services_empty: 'No service available',
+    staff_all_added:     'All services already added',
+    staff_rate_per_hour: '{{rate}}/h - agent',
     submit_error_title:    'Unable to create the mission',
     submit_error_jump_to:  'Edit',
     submit_error_network:  'Check your connection and try again.',

@@ -44,7 +44,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   // breathing pulse on the glow halo. Runs once on mount, native-driver only.
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const glowPulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -55,19 +54,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         toValue: 1, duration: 800, easing: Easing.out(Easing.back(1.2)), useNativeDriver: true,
       }),
     ]).start();
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowPulse, { toValue: 1, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(glowPulse, { toValue: 0, duration: 2400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [logoOpacity, logoScale, glowPulse]);
-
-  const glowScale   = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-  const glowOpacity = glowPulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0.85] });
+  }, [logoOpacity, logoScale]);
 
   React.useEffect(() => {
     biometricService.isAvailable().then(({ available, biometryType }) => {
@@ -145,36 +132,17 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               - Pointer events disabled on the glow stack so the logo is fully tappable.
           */}
           <View style={styles.logoStage} pointerEvents="none">
-            <Animated.View
-              style={[
-                styles.glowOuter,
-                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.glowMid,
-                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
-              ]}
-            />
-            <Animated.View
-              style={[
-                styles.glowInner,
-                { opacity: glowOpacity, transform: [{ scale: glowScale }] },
-              ]}
-            />
             <Animated.Image
-              source={require('@assets/logo-mark.png')}
+              source={require('@assets/logo-provalk.png')}
               style={[
                 styles.logoImage,
                 { opacity: logoOpacity, transform: [{ scale: logoScale }] },
               ]}
               resizeMode="contain"
-              accessibilityLabel="Provalk"
+              accessibilityLabel="Provalk Security"
             />
           </View>
           <View style={styles.brandBlock}>
-            <Text style={styles.brand}>Provalk</Text>
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.tagline}>{t('login.tagline')}</Text>
@@ -187,7 +155,6 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.formCard}>
           <View style={styles.formHeader}>
             <Text style={styles.formTitle}>{t('login.title')}</Text>
-            <Text style={styles.formSub}>{t('login.subtitle')}</Text>
           </View>
 
           <View style={styles.form}>
@@ -217,6 +184,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
               onRightPress={() => setShowPass(v => !v)}
             />
           </View>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ForgotPassword')}
+            style={styles.forgotRow}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.forgotLink}>{t('login.forgot_link')}</Text>
+          </TouchableOpacity>
 
           <Button
             label={loading ? t('login.submitting') : t('login.submit')}
@@ -280,36 +255,12 @@ const styles = StyleSheet.create({
    * visible banding.
    */
   logoStage: {
-    width: 200, height: 200,
+    width: 260, height: 150,
     alignItems: 'center', justifyContent: 'center',
   },
-  glowOuter: {
-    position: 'absolute',
-    width: 200, height: 200, borderRadius: 100,
-    backgroundColor: 'rgba(188, 147, 59, 0.08)',
-  },
-  glowMid: {
-    position: 'absolute',
-    width: 150, height: 150, borderRadius: 75,
-    backgroundColor: 'rgba(188, 147, 59, 0.12)',
-  },
-  glowInner: {
-    position: 'absolute',
-    width: 110, height: 110, borderRadius: 55,
-    backgroundColor: 'rgba(188, 147, 59, 0.18)',
-    shadowColor:   colors.primary,
-    shadowOffset:  { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius:  30,
-    elevation:     8,
-  },
-  logoImage: { width: 120, height: 120 },
+  logoImage: { width: 240, height: 128 },
 
   brandBlock:  { alignItems: 'center', gap: spacing[2] },
-  brand: {
-    fontFamily: fontFamily.display, fontSize: fontSize['3xl'],
-    color: colors.textPrimary, letterSpacing: -1.5,
-  },
   dividerRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border, maxWidth: 36 },
   tagline: {
@@ -324,14 +275,15 @@ const styles = StyleSheet.create({
     shadowColor: colors.scrim, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35, shadowRadius: 20, elevation: 10,
   },
-  formHeader: { gap: spacing[1] },
+  formHeader: { gap: spacing[1], alignItems: 'center' },
   formTitle: {
     fontFamily: fontFamily.display, fontSize: fontSize.xl,
-    color: colors.textPrimary, letterSpacing: -0.5,
+    color: colors.textPrimary, letterSpacing: -0.5, textAlign: 'center',
   },
-  formSub: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
   form:      { gap: 0 },
   submitBtn: { marginTop: spacing[2] },
+  forgotRow:  { alignSelf: 'flex-end', marginTop: spacing[1] },
+  forgotLink: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.primary },
 
   bioBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

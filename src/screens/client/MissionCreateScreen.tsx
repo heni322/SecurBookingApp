@@ -1,46 +1,55 @@
 /**
- * MissionCreateScreen — Enterprise 3-step mission creation.
+ * MissionCreateScreen — Enterprise 2-step mission creation.
  *
- * Flow:
- *   ServicePicker → MissionCreate (3 steps) → QuoteDetail
+ * Flow (redesigned):
+ *   MissionList / Home → MissionCreate (2 steps) → QuoteDetail
  *
- *     Step 1 · WHERE    Address with auto-fill + map confirmation
- *     Step 2 · WHEN     Quick presets + custom; multi-slot revealed on demand
- *                       Each slot can override services/uniforms (opt-in)
- *     Step 3 · REVIEW   Full summary + price estimate + optional title/notes
+ *     Step 1 · WHERE        Address with auto-fill + map confirmation
+ *     Step 2 · WHEN & WHO   Per-slot scheduling AND staffing, together.
+ *                           Each créneau carries its OWN services / agent
+ *                           counts / uniforms — fully independent per slot.
+ *                           This is the last step: indicative price, optional
+ *                           title/notes and the "Create" CTA are folded in.
  *
- * Enterprise UX features (May 2026):
+ * What changed vs. the old flow
+ *   ─ The standalone ServicePicker screen is gone. Service/agent selection now
+ *     lives inside each time slot on step 2 ("merge fully, per-slot").
+ *   ─ Single-slot vs multi-slot is no longer a mode switch: there is always a
+ *     list of >=1 slots, each with its own staffing. A 1-slot mission submits as
+ *     SINGLE, a many-slot mission submits as MULTI — payloads unchanged.
+ *
+ * Enterprise UX features:
  *   ─ Draft autosave (per-user, 7-day TTL) + restore banner on mount
  *   ─ Smart footer: Back · Continue/Create with step-preview labels
- *   ─ Cross-slot validation summary banner with jump-to-offending-slot
- *   ─ Multi-slot escape hatch (back to single, with confirm)
- *   ─ Indicative price estimate on Review (base rate × hours × agents)
+ *   ─ Cross-slot validation summary banner (overlap / legal duration)
+ *   ─ Per-slot "copy schedule + staffing from slot N" shortcut
+ *   ─ Indicative price estimate folded into the final step
  *   ─ Structured submit-error banner with "Modifier" jump-back per field
- *   ─ Preset selection feedback (active preset highlighted, tap to clear)
  *
  * Backend payload — unchanged:
- *   ─ SINGLE  → { ...base, startAt, endAt, durationHours, bookingLines }
- *   ─ MULTI   → { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
+ *   ─ SINGLE (1 slot)  -> { ...base, startAt, endAt, durationHours, bookingLines }
+ *   ─ MULTI  (n slots) -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, KeyboardAvoidingView,
-  Platform, StyleSheet, TouchableOpacity,
+  Platform, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import type { TFunction } from 'i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   MapPin, CalendarClock, FileText, Pencil, Clock, Zap, Users, Plus, Minus, X,
   Sparkles, Sunrise, Moon, PartyPopper, Calendar, ChevronRight, ChevronLeft, Check,
-  ClipboardList, Settings2, RotateCcw, Copy, AlertTriangle, Save, ArrowLeftRight,
-  Receipt,
+  RotateCcw, Copy, AlertTriangle, Receipt, UserPlus,
 } from 'lucide-react-native';
 import { useTranslation }    from '@i18n';
 import { useToast }          from '@hooks/useToast';
 import { useConfirmDialog }  from '@hooks/useConfirmDialog';
+import { useApi }            from '@hooks/useApi';
 import { useAuthStore }      from '@store/authStore';
 import { missionsApi }       from '@api/endpoints/missions';
 import { quotesApi }         from '@api/endpoints/quotes';
+import { serviceTypesApi }   from '@api/endpoints/serviceTypes';
 import { missionDraftStorage, isDraftMeaningful } from '@services/missionDraftStorage';
 import type { MissionDraftPayload } from '@services/missionDraftStorage';
 import { Button }            from '@components/ui/Button';
@@ -50,46 +59,48 @@ import { AddressSearch }     from '@components/ui/AddressSearch';
 import { MapLocationPicker } from '@components/ui/MapLocationPicker';
 import { DateTimePicker }    from '@components/ui/DateTimePicker';
 import type { NominatimResult } from '@components/ui/AddressSearch';
-import { UNIFORM_OPTIONS }   from './ServicePickerScreen';
-import type { UniformValue } from './ServicePickerScreen';
+import {
+  UNIFORM_OPTIONS, DEFAULT_UNIFORM, UNIFORM_EMOJI, getServiceMeta,
+  allowedUniformsForService, defaultUniformForService,
+} from '@constants/serviceCatalog';
+import type { UniformValue } from '@constants/serviceCatalog';
 import { formatEuros }       from '@utils/formatters';
 import { colors }            from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import type { MissionStackParamList, MissionSlotRecord } from '@models/index';
+import type { MissionStackParamList, MissionSlotRecord, ServiceType } from '@models/index';
 
 type MissionsT = TFunction<'missions'>;
 type Props     = NativeStackScreenProps<MissionStackParamList, 'MissionCreate'>;
-type Step      = 1 | 2 | 3;
+type Step      = 1 | 2;
+
+const TOTAL_STEPS = 2;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Local types
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface BookingLineLocal {
+/** One service-type need within a single slot. Fully self-contained. */
+interface SlotServiceLine {
   serviceTypeId: string;
-  agentCount:    number;
   name:          string;
   accent:        string;
-  agentUniforms: (string | null)[];
-  /** Indicative rate from ServicePicker. NOT sent to the API — used for the price estimate only. */
-  ratePerHour?:  number;
-}
-
-interface SlotLineOverride {
-  serviceTypeId: string;
-  /** 0 means this service is excluded from this slot. */
-  agentCount:    number;
-  slotUniform:   UniformValue;
+  /** Indicative rate from the catalog. NOT sent to the API — estimate only. */
+  ratePerHour:   number;
+  agentCount:    number;     // 1..20
+  uniform:       UniformValue;
+  /** Tenues that match this service's category (default first). */
+  allowedUniforms: UniformValue[];
 }
 
 interface SlotDraft {
   key:        string;
   startAt:    string;
   endAt:      string;
-  customized: boolean;
-  overrides:  SlotLineOverride[];
-  editorOpen: boolean;
+  /** Per-slot staffing — each slot is independent. */
+  lines:      SlotServiceLine[];
+  /** Whether the "add a service" catalog is expanded for this slot. */
+  pickerOpen: boolean;
 }
 
 interface FormData {
@@ -100,14 +111,10 @@ interface FormData {
   zipCode:   string;
   latitude:  number | null;
   longitude: number | null;
-  startAt:   string;
-  endAt:     string;
 }
 
 interface SubmitError {
-  /** Banner heading. */
   title:   string;
-  /** Detail lines (e.g. validation errors from the API). */
   details: string[];
   /** Step to jump to when the user taps "Modifier". null = no jump-back. */
   jumpTo:  Step | null;
@@ -115,7 +122,7 @@ interface SubmitError {
 
 const INITIAL_FORM: FormData = {
   title: '', notes: '', address: '', city: '', zipCode: '',
-  latitude: null, longitude: null, startAt: '', endAt: '',
+  latitude: null, longitude: null,
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -125,11 +132,8 @@ const INITIAL_FORM: FormData = {
 const MIN_FUTURE_HOURS = 1;
 const MIN_DURATION_H   = 6;
 const MAX_DURATION_H   = 240;
-const DEFAULT_UNIFORM: UniformValue = 'STANDARD';
-
-const UNIFORM_EMOJI: Record<string, string> = {
-  STANDARD: '🦺', CIVIL: '👔', EVENEMENTIEL: '🎩', SSIAP: '🚒', CYNOPHILE: '🐕',
-};
+const MAX_SLOTS        = 30;
+const MAX_AGENTS       = 20;
 
 /** Autosave debounce — we don't need keystroke-level persistence. */
 const AUTOSAVE_DEBOUNCE_MS = 700;
@@ -157,12 +161,16 @@ function clampDuration(h: number): number {
   return Math.max(MIN_DURATION_H, Math.round(h * 10) / 10);
 }
 
-function totalSlotHours(drafts: SlotDraft[]): number {
-  return drafts.reduce((sum, s) => sum + durationHours(s.startAt, s.endAt), 0);
+function totalSlotHours(slots: SlotDraft[]): number {
+  return slots.reduce((sum, s) => sum + durationHours(s.startAt, s.endAt), 0);
 }
 
-function totalAgentsInLines(lines: BookingLineLocal[]): number {
-  return lines.reduce((n, l) => n + l.agentCount, 0);
+function slotAgents(slot: SlotDraft): number {
+  return slot.lines.reduce((n, l) => n + l.agentCount, 0);
+}
+
+function allAgents(slots: SlotDraft[]): number {
+  return slots.reduce((n, s) => n + slotAgents(s), 0);
 }
 
 function formatSlotDateShort(startIso: string, endIso: string): string {
@@ -182,45 +190,27 @@ function formatDateShort(iso: string): string {
 /** Human-readable relative time for the draft restore banner. */
 function formatRelativeFromNow(savedAt: number): string {
   const diffMin = Math.max(0, Math.floor((Date.now() - savedAt) / 60_000));
-  if (diffMin < 1)    return 'à l\'instant';
-  if (diffMin < 60)   return `il y a ${diffMin} min`;
+  if (diffMin < 1)  return 'à l\'instant';
+  if (diffMin < 60) return `il y a ${diffMin} min`;
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24)     return `il y a ${diffH} h`;
+  if (diffH < 24)   return `il y a ${diffH} h`;
   const diffD = Math.floor(diffH / 24);
   return `il y a ${diffD} j`;
 }
 
-function buildDefaultOverrides(globalLines: BookingLineLocal[]): SlotLineOverride[] {
-  return globalLines.map(l => ({
-    serviceTypeId: l.serviceTypeId,
-    agentCount:    l.agentCount,
-    slotUniform:   (l.agentUniforms[0] as UniformValue) ?? DEFAULT_UNIFORM,
-  }));
-}
-
-function buildEffectiveSlotLines(slot: SlotDraft, globalLines: BookingLineLocal[]): BookingLineLocal[] {
-  if (!slot.customized) {
-    return globalLines.map(l => ({ ...l, agentUniforms: [...l.agentUniforms] }));
-  }
-  const result: BookingLineLocal[] = [];
-  for (const g of globalLines) {
-    const o = slot.overrides.find(x => x.serviceTypeId === g.serviceTypeId);
-    if (!o || o.agentCount === 0) continue;
-    result.push({
-      ...g,
-      agentCount:    o.agentCount,
-      agentUniforms: Array(o.agentCount).fill(o.slotUniform),
-    });
-  }
-  return result;
-}
-
-function totalAgentsForSlot(slot: SlotDraft, globalLines: BookingLineLocal[]): number {
-  return totalAgentsInLines(buildEffectiveSlotLines(slot, globalLines));
+/** API booking lines for one slot (drops excluded lines, fans uniform out per agent). */
+function slotApiLines(slot: SlotDraft) {
+  return slot.lines
+    .filter(l => l.agentCount > 0)
+    .map(l => ({
+      serviceTypeId: l.serviceTypeId,
+      agentCount:    l.agentCount,
+      agentUniforms: Array(l.agentCount).fill(l.uniform ?? 'STANDARD'),
+    }));
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Schedule presets
+// Schedule presets (applied to the first slot when there's a single slot)
 // ──────────────────────────────────────────────────────────────────────────────
 
 type PresetKey = 'tonight' | 'tomorrow' | 'weekend';
@@ -270,7 +260,6 @@ const SCHEDULE_PRESETS: SchedulePreset[] = [
   { key: 'weekend',  i18n: 'create.preset_weekend',  Icon: PartyPopper, build: makeWeekend  },
 ];
 
-/** Detect which preset (if any) is currently active by comparing dates. */
 function detectActivePreset(startAt: string, endAt: string): PresetKey | null {
   if (!startAt || !endAt) return null;
   for (const p of SCHEDULE_PRESETS) {
@@ -288,80 +277,168 @@ function detectActivePreset(startAt: string, endAt: string): PresetKey | null {
 // ──────────────────────────────────────────────────────────────────────────────
 
 export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { t }     = useTranslation('missions');
-  const toast     = useToast();
-  const confirm   = useConfirmDialog();
-  const userId    = useAuthStore(s => s.user?.id ?? null);
+  const { t }   = useTranslation('missions');
+  const toast   = useToast();
+  const confirm = useConfirmDialog();
+  const userId  = useAuthStore(s => s.user?.id ?? null);
 
-  const initialLines: BookingLineLocal[] = useMemo(
-    () => (route.params.bookingLines ?? []).map((l: any) => ({
+  // Edit mode: when editMissionId is set, the screen edits an existing draft
+  // (brouillon) instead of creating a new mission. Draft autosave/restore is
+  // disabled so a half-finished *new* draft can't clobber the loaded mission.
+  const editMissionId = (route.params as any)?.editMissionId as string | undefined;
+  const isEditMode    = !!editMissionId;
+  const [hydrating, setHydrating] = useState<boolean>(isEditMode);
+
+  // Service catalog — fetched here now that ServicePicker is gone.
+  const { data: services, loading: servicesLoading, execute: loadServices } =
+    useApi(serviceTypesApi.findAll);
+  const serviceTypes = (services as ServiceType[] | null) ?? [];
+
+  useEffect(() => { loadServices(); }, [loadServices]);
+
+  // Optional legacy seed: if something still navigates with bookingLines, fold
+  // them into the first slot so nothing is lost.
+  const seedLines = useMemo<SlotServiceLine[]>(() => {
+    const seed = (route.params as any)?.bookingLines as Array<any> | undefined;
+    if (!seed?.length) return [];
+    return seed.map((l) => ({
       serviceTypeId: l.serviceTypeId,
-      agentCount:    l.agentCount,
       name:          l.name,
-      accent:        l.accent,
-      agentUniforms: l.agentUniforms ?? Array(l.agentCount).fill('STANDARD'),
-      ratePerHour:   typeof l.ratePerHour === 'number' ? l.ratePerHour : undefined,
-    })),
-    [route.params.bookingLines],
-  );
+      accent:        l.accent ?? getServiceMeta(l.name ?? '').accent,
+      ratePerHour:   typeof l.ratePerHour === 'number' ? l.ratePerHour : 0,
+      agentCount:    Math.max(1, l.agentCount ?? 1),
+      uniform:       (l.agentUniforms?.[0] as UniformValue) ?? DEFAULT_UNIFORM,
+      allowedUniforms: [],
+    }));
+  }, [route.params]);
+
+  // Hydration effect (edit mode): load the draft mission and map its slots +
+  // bookings back into the screen's form/slots state. Bookings are grouped by
+  // (slotId, serviceTypeId) -> agentCount, with the first booking's uniform used
+  // for the line (the UI applies one uniform per line, fanned out per agent).
+  useEffect(() => {
+    if (!isEditMode || !editMissionId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: res } = await missionsApi.getById(editMissionId);
+        const mission = (res as any).data;
+        if (cancelled || !mission) return;
+
+        setForm({
+          title:     mission.title ?? '',
+          notes:     mission.notes ?? '',
+          address:   mission.address ?? '',
+          city:      mission.city ?? '',
+          zipCode:   mission.zipCode ?? '',
+          latitude:  typeof mission.latitude === 'number' ? mission.latitude : null,
+          longitude: typeof mission.longitude === 'number' ? mission.longitude : null,
+        });
+
+        const apiSlots: any[] = (mission.slots ?? [])
+          .slice()
+          .sort((a: any, b: any) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+        const bookings: any[] = mission.bookings ?? [];
+
+        const hydratedSlots: SlotDraft[] = apiSlots.map((slot: any) => {
+          // Group this slot's bookings by service type.
+          const byService = new Map<string, { count: number; uniform: UniformValue; svc?: any }>();
+          for (const b of bookings) {
+            if (b.slotId !== slot.id) continue;
+            const stId = b.serviceTypeId ?? b.serviceType?.id;
+            if (!stId) continue;
+            const cur = byService.get(stId);
+            if (cur) {
+              cur.count += 1;
+            } else {
+              byService.set(stId, {
+                count: 1,
+                uniform: (b.uniform as UniformValue) ?? DEFAULT_UNIFORM,
+                svc: b.serviceType,
+              });
+            }
+          }
+          const lines: SlotServiceLine[] = Array.from(byService.entries()).map(([stId, v]) => {
+            const svc = v.svc ?? serviceTypes.find(s => s.id === stId);
+            const name = svc?.name ?? '';
+            return {
+              serviceTypeId:   stId,
+              name,
+              accent:          getServiceMeta(name).accent,
+              ratePerHour:     typeof svc?.baseRatePerHour === 'number' ? svc.baseRatePerHour : 0,
+              agentCount:      Math.max(1, v.count),
+              uniform:         v.uniform ?? DEFAULT_UNIFORM,
+              allowedUniforms: svc ? allowedUniformsForService(svc as any) : [],
+            };
+          });
+          return {
+            key:        nextKey(),
+            startAt:    slot.startAt ? new Date(slot.startAt).toISOString() : '',
+            endAt:      slot.endAt ? new Date(slot.endAt).toISOString() : '',
+            lines,
+            pickerOpen: lines.length === 0,
+          };
+        });
+
+        if (!cancelled && hydratedSlots.length > 0) {
+          setSlots(hydratedSlots);
+        }
+      } catch {
+        if (!cancelled) {
+          toast.error(t('detail.error_load'));
+          navigation.goBack();
+        }
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  // serviceTypes intentionally included so names/rates resolve once the catalog loads.
+  }, [isEditMode, editMissionId, serviceTypes]);
 
   const [step,    setStep]    = useState<Step>(1);
   const [form,    setForm]    = useState<FormData>(INITIAL_FORM);
-  const [lines]               = useState<BookingLineLocal[]>(initialLines);
-  const [slots,   setSlots]   = useState<SlotDraft[]>([]);
+  const [slots,   setSlots]   = useState<SlotDraft[]>(() => ([{
+    key: nextKey(), startAt: '', endAt: '', lines: seedLines, pickerOpen: seedLines.length === 0,
+  }]));
   const [errors,  setErrors]  = useState<Record<string, string | undefined>>({});
   const [loading, setLoading] = useState(false);
   const [mapScrollLocked, setMapScrollLocked] = useState(false);
-
-  // ── Submit error state — surfaced as a banner above the scroll content ───
   const [submitError, setSubmitError] = useState<SubmitError | null>(null);
+
+  const isMultiSlot = slots.length > 1;
+  const agentsTotal = useMemo(() => allAgents(slots), [slots]);
+
+  const setField = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) =>
+    setForm(p => ({ ...p, [k]: v })), []);
+
+  // Active preset only makes sense for a single slot.
+  const activePreset = useMemo(
+    () => slots.length === 1 ? detectActivePreset(slots[0].startAt, slots[0].endAt) : null,
+    [slots],
+  );
 
   // ── Draft restore — null = not checked yet ──────────────────────────────
   const [draftCandidate, setDraftCandidate] = useState<{
     payload: MissionDraftPayload; savedAt: number;
   } | null>(null);
-  /**
-   * Lock autosave during the brief restore window. Without this, the first
-   * render with INITIAL_FORM overwrites the persisted draft before the
-   * restore handler has a chance to run.
-   */
   const autosaveReady = useRef(false);
-
-  const isMultiSlot = slots.length > 0;
-  const setField = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) =>
-    setForm(p => ({ ...p, [k]: v })), []);
-
-  const agentsTotal = useMemo(() => totalAgentsInLines(lines), [lines]);
-
-  // ── Active preset (for visual feedback in StepWhen) ─────────────────────
-  const activePreset = useMemo(
-    () => isMultiSlot ? null : detectActivePreset(form.startAt, form.endAt),
-    [isMultiSlot, form.startAt, form.endAt],
-  );
 
   // ──────────────────────────────────────────────────────────────────────────
   // Draft autosave / restore
   // ──────────────────────────────────────────────────────────────────────────
-
-  // On mount: attempt to load a draft. We do NOT auto-restore — the user must
-  // accept via the banner so they always know their state has been replaced.
   useEffect(() => {
     let cancelled = false;
-    if (!userId) {
-      autosaveReady.current = true;
-      return;
-    }
+    if (isEditMode) { autosaveReady.current = true; return; }
+    if (!userId) { autosaveReady.current = true; return; }
     (async () => {
       const payload = await missionDraftStorage.load(userId);
       if (cancelled) return;
       if (payload && isDraftMeaningful(payload)) {
-        // We persist savedAt in the envelope but load() returns just payload.
-        // Read it once more to grab savedAt for the relative-time label.
-        // Cheaper than re-architecting the storage API for one field.
         const raw = await (async () => {
           try {
             const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-            const key = `@securbook:client:mission_draft:v1:${userId}`;
+            const key = `@securbook:client:mission_draft:v2:${userId}`;
             const stored = await AsyncStorage.getItem(key);
             return stored ? JSON.parse(stored) : null;
           } catch { return null; }
@@ -369,63 +446,57 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         const savedAt: number = raw?.savedAt ?? Date.now();
         if (!cancelled) setDraftCandidate({ payload, savedAt });
       }
-      // autosave only after we've decided whether to show the restore banner
       autosaveReady.current = true;
     })();
     return () => { cancelled = true; };
   }, [userId]);
 
-  // Debounced autosave. Reads the latest form/slots/step at the moment the
-  // timer fires — not when scheduled — so we never persist stale state.
   useEffect(() => {
-    if (!userId || !autosaveReady.current) return;
+    if (isEditMode || !userId || !autosaveReady.current) return;
     const handle = setTimeout(() => {
       const payload: MissionDraftPayload = {
         step,
         form,
         slots: slots.map(s => ({
-          startAt:    s.startAt,
-          endAt:      s.endAt,
-          customized: s.customized,
-          overrides:  s.overrides.map(o => ({
-            serviceTypeId: o.serviceTypeId,
-            agentCount:    o.agentCount,
-            slotUniform:   o.slotUniform,
+          startAt: s.startAt,
+          endAt:   s.endAt,
+          lines:   s.lines.map(l => ({
+            serviceTypeId: l.serviceTypeId,
+            name:          l.name,
+            accent:        l.accent,
+            ratePerHour:   l.ratePerHour,
+            agentCount:    l.agentCount,
+            uniform:       l.uniform,
           })),
         })),
-        bookingLines: lines.map(l => ({
-          serviceTypeId: l.serviceTypeId,
-          agentCount:    l.agentCount,
-          name:          l.name,
-          accent:        l.accent,
-          agentUniforms: l.agentUniforms,
-        })),
       };
-      // No need to write empty drafts — they're indistinguishable from a fresh start.
-      if (isDraftMeaningful(payload)) {
-        missionDraftStorage.save(userId, payload);
-      }
+      if (isDraftMeaningful(payload)) missionDraftStorage.save(userId, payload);
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(handle);
-  }, [userId, step, form, slots, lines]);
+  }, [userId, step, form, slots]);
 
   const handleRestoreDraft = useCallback(() => {
     if (!draftCandidate) return;
     const { payload } = draftCandidate;
     setStep(payload.step);
     setForm(payload.form);
-    setSlots(payload.slots.map(s => ({
-      key:        nextKey(),
-      startAt:    s.startAt,
-      endAt:      s.endAt,
-      customized: s.customized,
-      overrides:  s.overrides.map(o => ({
-        serviceTypeId: o.serviceTypeId,
-        agentCount:    o.agentCount,
-        slotUniform:   o.slotUniform as UniformValue,
-      })),
-      editorOpen: false,
-    })));
+    setSlots(payload.slots.length > 0
+      ? payload.slots.map(s => ({
+          key:        nextKey(),
+          startAt:    s.startAt,
+          endAt:      s.endAt,
+          lines:      s.lines.map(l => ({
+            serviceTypeId: l.serviceTypeId,
+            name:          l.name,
+            accent:        l.accent,
+            ratePerHour:   l.ratePerHour,
+            agentCount:    l.agentCount,
+            uniform:       l.uniform as UniformValue,
+            allowedUniforms: [],
+          })),
+          pickerOpen: s.lines.length === 0,
+        }))
+      : [{ key: nextKey(), startAt: '', endAt: '', lines: [], pickerOpen: true }]);
     setDraftCandidate(null);
   }, [draftCandidate]);
 
@@ -465,163 +536,132 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Schedule presets — with toggle-off (re-tap clears)
+  // Schedule presets (single slot only) — re-tap clears
   // ──────────────────────────────────────────────────────────────────────────
   const applyPreset = useCallback((preset: SchedulePreset) => {
-    const currentActive = detectActivePreset(form.startAt, form.endAt);
-    if (currentActive === preset.key) {
-      // Re-tap clears the preset — gives users a clear way to undo.
-      setForm(p => ({ ...p, startAt: '', endAt: '' }));
-      return;
-    }
-    const { startAt, endAt } = preset.build();
-    setSlots([]);
-    setForm(p => ({ ...p, startAt, endAt }));
-    setErrors(e => ({ ...e, startAt: undefined, endAt: undefined }));
-  }, [form.startAt, form.endAt]);
-
-  // ──────────────────────────────────────────────────────────────────────────
-  // Multi-slot
-  // ──────────────────────────────────────────────────────────────────────────
-  const makeSlot = useCallback((startAt = '', endAt = ''): SlotDraft => ({
-    key: nextKey(), startAt, endAt, customized: false,
-    overrides: buildDefaultOverrides(lines), editorOpen: false,
-  }), [lines]);
-
-  const enterMultiSlot = useCallback(() => {
-    setSlots([
-      makeSlot(form.startAt, form.endAt),
-      makeSlot(),
-    ]);
-    setForm(p => ({ ...p, startAt: '', endAt: '' }));
-  }, [form.startAt, form.endAt, makeSlot]);
-
-  const exitMultiSlot = useCallback(async () => {
-    if (slots.length === 0) return;
-    // Find the slot that will become the single one: the first non-empty,
-    // falling back to the first slot if nothing has dates yet. Less surprising
-    // than dropping everything.
-    const keeper = slots.find(s => s.startAt && s.endAt) ?? slots[0];
-    const ok = await confirm({
-      title:        t('create.exit_multi_slot_confirm_title'),
-      message:      t('create.exit_multi_slot_confirm_message'),
-      confirmLabel: t('create.exit_multi_slot_confirm_btn'),
-    });
-    if (!ok) return;
-    setSlots([]);
-    setForm(p => ({ ...p, startAt: keeper.startAt, endAt: keeper.endAt }));
-  }, [slots, confirm, t]);
-
-  const addSlot = useCallback(() => {
-    setSlots(prev => [...prev, makeSlot()]);
-  }, [makeSlot]);
-
-  const removeSlot = useCallback((key: string) => {
     setSlots(prev => {
-      const next = prev.filter(s => s.key !== key);
-      if (next.length === 1) {
-        setForm(p => ({ ...p, startAt: next[0].startAt, endAt: next[0].endAt }));
-        return [];
+      if (prev.length !== 1) return prev;
+      const cur = prev[0];
+      const active = detectActivePreset(cur.startAt, cur.endAt);
+      if (active === preset.key) {
+        return [{ ...cur, startAt: '', endAt: '' }];
       }
+      const { startAt, endAt } = preset.build();
+      return [{ ...cur, startAt, endAt }];
+    });
+    setErrors(e => {
+      const next = { ...e };
+      Object.keys(next).forEach(k => { if (k.endsWith('_startAt') || k.endsWith('_endAt')) delete next[k]; });
       return next;
     });
   }, []);
 
-  const updateSlot = useCallback((key: string, patch: Partial<Omit<SlotDraft, 'key'>>) => {
-    setSlots(prev => prev.map(s => s.key === key ? { ...s, ...patch } : s));
+  // ──────────────────────────────────────────────────────────────────────────
+  // Slot mutations
+  // ──────────────────────────────────────────────────────────────────────────
+  const clearSlotErrors = useCallback((key: string) => {
     setErrors(prev => {
-      const next: typeof prev = { ...prev };
+      const next = { ...prev };
       Object.keys(next).filter(k => k.startsWith(`slot_${key}_`)).forEach(k => delete next[k]);
       return next;
     });
   }, []);
 
-  const copySlotDates = useCallback((targetKey: string, sourceIdx: number) => {
+  const updateSlotDates = useCallback((key: string, patch: { startAt?: string; endAt?: string }) => {
+    setSlots(prev => prev.map(s => s.key === key ? { ...s, ...patch } : s));
+    clearSlotErrors(key);
+  }, [clearSlotErrors]);
+
+  const addSlot = useCallback(() => {
+    setSlots(prev => {
+      if (prev.length >= MAX_SLOTS) return prev;
+      // Seed the new slot's staffing from the last slot — saves re-entry while
+      // staying fully editable (the core "flexible" win).
+      const last = prev[prev.length - 1];
+      const seeded = last.lines.map(l => ({ ...l }));
+      return [...prev, { key: nextKey(), startAt: '', endAt: '', lines: seeded, pickerOpen: seeded.length === 0 }];
+    });
+  }, []);
+
+  const removeSlot = useCallback((key: string) => {
+    setSlots(prev => (prev.length <= 1 ? prev : prev.filter(s => s.key !== key)));
+    clearSlotErrors(key);
+  }, [clearSlotErrors]);
+
+  const copyFromSlot = useCallback((targetKey: string, sourceIdx: number) => {
     setSlots(prev => {
       const source = prev[sourceIdx];
       if (!source) return prev;
-      return prev.map(s =>
-        s.key !== targetKey ? s : { ...s, startAt: source.startAt, endAt: source.endAt },
-      );
+      return prev.map(s => s.key !== targetKey ? s : {
+        ...s,
+        startAt: source.startAt,
+        endAt:   source.endAt,
+        lines:   source.lines.map(l => ({ ...l })),
+      });
     });
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[`slot_${targetKey}_startAt`];
-      delete next[`slot_${targetKey}_endAt`];
-      return next;
-    });
+    clearSlotErrors(targetKey);
+  }, [clearSlotErrors]);
+
+  const toggleSlotPicker = useCallback((key: string) => {
+    setSlots(prev => prev.map(s => s.key === key ? { ...s, pickerOpen: !s.pickerOpen } : s));
   }, []);
 
-  const customizeSlot = useCallback((key: string) => {
-    setSlots(prev => prev.map(s =>
-      s.key !== key ? s : {
-        ...s, customized: true, editorOpen: true,
-        overrides: s.overrides.length > 0 ? s.overrides : buildDefaultOverrides(lines),
-      },
-    ));
-  }, [lines]);
-
-  const resetSlotCustomization = useCallback((key: string) => {
-    setSlots(prev => prev.map(s =>
-      s.key !== key ? s : {
-        ...s, customized: false, editorOpen: false,
-        overrides: buildDefaultOverrides(lines),
-      },
-    ));
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[`slot_${key}_lines`];
-      return next;
-    });
-  }, [lines]);
-
-  const toggleSlotEditor = useCallback((key: string) => {
-    setSlots(prev => prev.map(s =>
-      s.key !== key ? s : { ...s, editorOpen: !s.editorOpen },
-    ));
-  }, []);
-
-  const changeSlotLineCount = useCallback((slotKey: string, serviceTypeId: string, delta: number) => {
+  const addLineToSlot = useCallback((key: string, svc: ServiceType) => {
     setSlots(prev => prev.map(s => {
-      if (s.key !== slotKey) return s;
+      if (s.key !== key) return s;
+      if (s.lines.some(l => l.serviceTypeId === svc.id)) return s;
+      const { accent } = getServiceMeta(svc.name);
+      const allowedUniforms = allowedUniformsForService(svc);
       return {
         ...s,
-        overrides: s.overrides.map(o =>
-          o.serviceTypeId !== serviceTypeId ? o
-            : { ...o, agentCount: Math.max(0, Math.min(20, o.agentCount + delta)) },
-        ),
+        lines: [...s.lines, {
+          serviceTypeId: svc.id,
+          name:          svc.name,
+          accent,
+          ratePerHour:   svc.baseRatePerHour,
+          agentCount:    1,
+          uniform:       defaultUniformForService(svc),
+          allowedUniforms,
+        }],
       };
     }));
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[`slot_${slotKey}_lines`];
-      return next;
-    });
+    clearSlotErrors(key);
+  }, [clearSlotErrors]);
+
+  const removeLineFromSlot = useCallback((key: string, serviceTypeId: string) => {
+    setSlots(prev => prev.map(s => s.key === key
+      ? { ...s, lines: s.lines.filter(l => l.serviceTypeId !== serviceTypeId) }
+      : s));
   }, []);
 
-  const setSlotLineUniform = useCallback((slotKey: string, serviceTypeId: string, uniform: UniformValue) => {
-    setSlots(prev => prev.map(s => {
-      if (s.key !== slotKey) return s;
-      return {
-        ...s,
-        overrides: s.overrides.map(o =>
-          o.serviceTypeId !== serviceTypeId ? o : { ...o, slotUniform: uniform },
-        ),
-      };
-    }));
+  const changeLineCount = useCallback((key: string, serviceTypeId: string, delta: number) => {
+    setSlots(prev => prev.map(s => s.key === key
+      ? {
+          ...s,
+          lines: s.lines.map(l => l.serviceTypeId === serviceTypeId
+            ? { ...l, agentCount: Math.max(1, Math.min(MAX_AGENTS, l.agentCount + delta)) }
+            : l),
+        }
+      : s));
+    clearSlotErrors(key);
+  }, [clearSlotErrors]);
+
+  const setLineUniform = useCallback((key: string, serviceTypeId: string, uniform: UniformValue) => {
+    setSlots(prev => prev.map(s => s.key === key
+      ? { ...s, lines: s.lines.map(l => l.serviceTypeId === serviceTypeId ? { ...l, uniform } : l) }
+      : s));
   }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Cross-slot error aggregation — driven by the `errors` map.
+  // Cross-slot error aggregation
   // ──────────────────────────────────────────────────────────────────────────
   const crossSlotErrorSlots = useMemo(() => {
     if (!isMultiSlot) return [];
     const offenders: Array<{ idx: number; key: string }> = [];
     slots.forEach((s, idx) => {
-      const startErr = errors[`slot_${s.key}_startAt`];
-      const endErr   = errors[`slot_${s.key}_endAt`];
-      const linesErr = errors[`slot_${s.key}_lines`];
-      if (startErr || endErr || linesErr) offenders.push({ idx, key: s.key });
+      if (errors[`slot_${s.key}_startAt`] || errors[`slot_${s.key}_endAt`] || errors[`slot_${s.key}_lines`]) {
+        offenders.push({ idx, key: s.key });
+      }
     });
     return offenders;
   }, [isMultiSlot, slots, errors]);
@@ -633,10 +673,6 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     const e: Record<string, string | undefined> = {};
 
     if (target >= 1) {
-      if (lines.length === 0) {
-        toast.warning(t('create.service_required_body'), { title: t('create.service_required_title') });
-        return false;
-      }
       if (!form.address.trim()) e.address  = t('create.address_required');
       if (!form.city.trim())    e.city     = t('create.city_required');
       if (form.latitude == null) e.latitude = t('create.map_position_required');
@@ -644,38 +680,24 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
     if (target >= 2) {
       const minStart = new Date(Date.now() + MIN_FUTURE_HOURS * 3_600_000);
-      if (!isMultiSlot) {
-        if (!form.startAt) e.startAt = t('create.start_required');
-        if (!form.endAt)   e.endAt   = t('create.end_required');
-        if (form.startAt && new Date(form.startAt) < minStart) e.startAt = t('create.start_min_future');
-        if (form.startAt && form.endAt) {
-          const d = durationHours(form.startAt, form.endAt);
-          if (new Date(form.endAt) <= new Date(form.startAt)) e.endAt = t('create.end_before_start');
-          else if (d < MIN_DURATION_H)   e.endAt = t('create.duration_min');
-          else if (d > MAX_DURATION_H)   e.endAt = t('create.duration_max');
-        }
-      } else {
-        const valid: Array<{ start: Date; end: Date; key: string }> = [];
-        slots.forEach(s => {
-          if (!s.startAt) { e[`slot_${s.key}_startAt`] = t('create.slot_start_required'); return; }
-          if (!s.endAt)   { e[`slot_${s.key}_endAt`]   = t('create.slot_end_required');   return; }
-          const start = new Date(s.startAt), end = new Date(s.endAt);
-          if (end <= start) { e[`slot_${s.key}_endAt`] = t('create.slot_end_before_start'); return; }
-          if (durationHours(s.startAt, s.endAt) < MIN_DURATION_H) {
-            e[`slot_${s.key}_endAt`] = t('create.slot_duration_min'); return;
-          }
-          if (totalAgentsForSlot(s, lines) === 0) {
-            e[`slot_${s.key}_lines`] = t('create.slot_lines_required'); return;
-          }
-          valid.push({ start, end, key: s.key });
-        });
-        if (valid.length > 0) {
-          const sorted = [...valid].sort((a, b) => a.start.getTime() - b.start.getTime());
-          if (sorted[0].start < minStart) e[`slot_${sorted[0].key}_startAt`] = t('create.start_min_future');
-          for (let i = 0; i < sorted.length - 1; i++) {
-            if (sorted[i].end > sorted[i + 1].start)
-              e[`slot_${sorted[i + 1].key}_startAt`] = t('create.slot_overlap');
-          }
+      const valid: Array<{ start: Date; end: Date; key: string }> = [];
+      slots.forEach(s => {
+        if (!s.startAt) { e[`slot_${s.key}_startAt`] = t('create.slot_start_required'); return; }
+        if (!s.endAt)   { e[`slot_${s.key}_endAt`]   = t('create.slot_end_required');   return; }
+        const start = new Date(s.startAt), end = new Date(s.endAt);
+        if (end <= start) { e[`slot_${s.key}_endAt`] = t('create.slot_end_before_start'); return; }
+        const d = durationHours(s.startAt, s.endAt);
+        if (d < MIN_DURATION_H) { e[`slot_${s.key}_endAt`] = t('create.slot_duration_min'); return; }
+        if (d > MAX_DURATION_H) { e[`slot_${s.key}_endAt`] = t('create.duration_max');      return; }
+        if (slotAgents(s) === 0) { e[`slot_${s.key}_lines`] = t('create.slot_lines_required'); return; }
+        valid.push({ start, end, key: s.key });
+      });
+      if (valid.length > 0) {
+        const sorted = [...valid].sort((a, b) => a.start.getTime() - b.start.getTime());
+        if (sorted[0].start < minStart) e[`slot_${sorted[0].key}_startAt`] = t('create.start_min_future');
+        for (let i = 0; i < sorted.length - 1; i++) {
+          if (sorted[i].end > sorted[i + 1].start)
+            e[`slot_${sorted[i + 1].key}_startAt`] = t('create.slot_overlap');
         }
       }
     }
@@ -686,22 +708,13 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleNext = () => {
     if (!validate(step)) return;
-    if (step < 3) { setStep(s => (s + 1) as Step); return; }
+    if (step < TOTAL_STEPS) { setStep(s => (s + 1) as Step); return; }
     handleSubmit();
   };
 
   const handleBack = () => {
     if (step > 1) { setStep(s => (s - 1) as Step); return; }
     navigation.goBack();
-  };
-
-  const handleEditServices = () => {
-    navigation.navigate('ServicePicker', {
-      existingLines: lines.map(l => ({
-        serviceTypeId: l.serviceTypeId, agentCount: l.agentCount,
-        name: l.name, accent: l.accent, agentUniforms: l.agentUniforms,
-      })),
-    });
   };
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -722,54 +735,61 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         notes:     form.notes.trim() || undefined,
       };
 
-      const globalLinesPayload = lines.map(l => ({
-        serviceTypeId: l.serviceTypeId,
-        agentCount:    l.agentCount,
-        agentUniforms: l.agentUniforms.map(u => u ?? 'STANDARD'),
-      }));
+      const sortedSlots = [...slots].sort(
+        (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+      );
 
       let missionPayload: Parameters<typeof missionsApi.create>[0];
 
-      if (!isMultiSlot) {
+      if (sortedSlots.length === 1) {
+        const only = sortedSlots[0];
         missionPayload = {
           ...base,
-          startAt:       new Date(form.startAt).toISOString(),
-          endAt:         new Date(form.endAt).toISOString(),
-          durationHours: clampDuration(durationHours(form.startAt, form.endAt)),
-          isUrgent:      isToday(form.startAt),
-          bookingLines:  globalLinesPayload,
+          startAt:       new Date(only.startAt).toISOString(),
+          endAt:         new Date(only.endAt).toISOString(),
+          durationHours: clampDuration(durationHours(only.startAt, only.endAt)),
+          isUrgent:      isToday(only.startAt),
+          bookingLines:  slotApiLines(only),
         };
       } else {
-        const sortedDrafts = [...slots].sort(
-          (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-        );
         missionPayload = {
           ...base,
-          isUrgent: isToday(sortedDrafts[0]?.startAt ?? ''),
-          slots: sortedDrafts.map(s => {
-            const effective = buildEffectiveSlotLines(s, lines);
-            return {
-              startAt:       new Date(s.startAt).toISOString(),
-              endAt:         new Date(s.endAt).toISOString(),
-              durationHours: clampDuration(durationHours(s.startAt, s.endAt)),
-              bookingLines:  effective.map(l => ({
-                serviceTypeId: l.serviceTypeId,
-                agentCount:    l.agentCount,
-                agentUniforms: l.agentUniforms.map(u => u ?? 'STANDARD'),
-              })),
-            };
-          }),
+          isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
+          slots: sortedSlots.map(s => ({
+            startAt:       new Date(s.startAt).toISOString(),
+            endAt:         new Date(s.endAt).toISOString(),
+            durationHours: clampDuration(durationHours(s.startAt, s.endAt)),
+            bookingLines:  slotApiLines(s),
+          })),
         };
       }
 
-      const { data: mRes } = await missionsApi.create(missionPayload);
-      let mission = (mRes as any).data;
-      createdMissionId = mission.id;
+      // In edit mode we always send the multi-slot `slots` shape so the backend
+      // performs a full composition replace; single-slot create stays as-is.
+      let mission;
+      if (isEditMode && editMissionId) {
+        const editPayload = {
+          ...base,
+          isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
+          slots: sortedSlots.map(s => ({
+            startAt:       new Date(s.startAt).toISOString(),
+            endAt:         new Date(s.endAt).toISOString(),
+            durationHours: clampDuration(durationHours(s.startAt, s.endAt)),
+            bookingLines:  slotApiLines(s),
+          })),
+        };
+        const { data: mRes } = await missionsApi.update(editMissionId, editPayload as any);
+        mission = (mRes as any).data;
+      } else {
+        const { data: mRes } = await missionsApi.create(missionPayload);
+        mission = (mRes as any).data;
+        createdMissionId = mission.id;
+      }
 
-      if (!isMultiSlot) {
+      if (sortedSlots.length === 1) {
         await quotesApi.calculate({
           missionId:    mission.id,
-          bookingLines: globalLinesPayload,
+          bookingLines: slotApiLines(sortedSlots[0]),
         });
       } else {
         let createdSlots: MissionSlotRecord[] = (mission.slots ?? []).slice();
@@ -781,28 +801,23 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         if (createdSlots.length === 0) {
           throw new Error('Mission créée mais créneaux non récupérés. Ouvrez la mission pour générer le devis.');
         }
-        const sortedSlots  = [...createdSlots].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-        const sortedDrafts = [...slots].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-
+        const apiSorted = [...createdSlots].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
         await quotesApi.calculate({
           missionId: mission.id,
-          slotLines: sortedDrafts.map((draft, idx) => {
-            const effective = buildEffectiveSlotLines(draft, lines);
-            return {
-              slotId:       sortedSlots[idx].id,
-              bookingLines: effective.map(l => ({
-                serviceTypeId: l.serviceTypeId,
-                agentCount:    l.agentCount,
-                agentUniforms: l.agentUniforms.map(u => u ?? 'STANDARD'),
-              })),
-            };
-          }),
+          slotLines: sortedSlots.map((draft, idx) => ({
+            slotId:       apiSorted[idx].id,
+            bookingLines: slotApiLines(draft),
+          })),
         });
       }
 
-      // Submit succeeded — clear the autosaved draft.
-      if (userId) missionDraftStorage.clear(userId);
-      navigation.replace('QuoteDetail', { missionId: mission.id });
+      if (!isEditMode && userId) missionDraftStorage.clear(userId);
+      if (isEditMode) {
+        toast.success(t('edit.saved_toast'));
+        navigation.navigate('QuoteDetail', { missionId: mission.id });
+      } else {
+        navigation.replace('QuoteDetail', { missionId: mission.id });
+      }
     } catch (err: unknown) {
       const status       = (err as any)?.response?.status;
       const apiMsg       = (err as any)?.response?.data?.message;
@@ -814,32 +829,21 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         missionsApi.cancel(createdMissionId).catch(() => {});
       }
 
-      // Build a structured banner instead of a raw toast. The banner offers
-      // a "Modifier" jump-back to the most relevant step based on the message.
       const details = Array.isArray(apiMsg)
         ? apiMsg.map(String)
-        : apiMsg
-          ? [String(apiMsg)]
-          : isNetworkErr
-            ? [t('create.submit_error_network')]
-            : [localMsg ?? t('create.error_create')];
+        : apiMsg ? [String(apiMsg)]
+        : isNetworkErr ? [t('create.submit_error_network')]
+        : [localMsg ?? t('create.error_create')];
 
-      // Heuristic: scan messages for words that hint at a step. Cheap and good
-      // enough — backend validation errors usually reference field names.
       const joined = details.join(' ').toLowerCase();
       const jumpTo: Step | null =
         /(address|city|zipcode|latitude|longitude|adresse|ville)/.test(joined) ? 1
-        : /(start|end|duration|slot|durée|creneau|heure)/.test(joined)         ? 2
+        : /(start|end|duration|slot|durée|creneau|créneau|heure|agent|service|tenue)/.test(joined) ? 2
         : null;
 
-      setSubmitError({
-        title:   t('create.submit_error_title'),
-        details,
-        jumpTo,
-      });
+      setSubmitError({ title: t('create.submit_error_title'), details, jumpTo });
 
       if (createdMissionId && !isServerErr) {
-        // Mission exists but quote calc failed — offer a recovery path.
         toast.info(t('detail.cta_get_quote'), {
           action: {
             label:   t('detail.cta_get_quote'),
@@ -864,23 +868,31 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   // Render
   // ──────────────────────────────────────────────────────────────────────────
   const headerTitles: Record<Step, string> = {
-    1: t('create.step_where'),
-    2: t('create.step_when'),
-    3: t('create.step_review'),
+    1: t('create.step_where_2'),
+    2: t('create.step_staff_2'),
   };
 
-  /** Smart label for the primary CTA — gives the user a preview of where they're going. */
-  const nextLabel =
-    step === 1 ? t('create.next_to_when') :
-    step === 2 ? t('create.next_to_review') :
-                 t('create.create_btn');
+  const nextLabel = step === 1
+    ? t('create.next_to_staff')
+    : isEditMode ? t('edit.save_btn') : t('create.create_btn');
+
+  // While loading an existing draft in edit mode, show a centered spinner so we
+  // never flash empty create-mode fields before hydration completes.
+  if (hydrating) {
+    return (
+      <View style={styles.flex}>
+        <ScreenHeader title={t('edit.screen_title')} onBack={() => navigation.goBack()} />
+        <View style={styles.hydratingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.hydratingText}>{t('edit.loading')}</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScreenHeader
-        title={headerTitles[step]}
-        onBack={handleBack}
-      />
+      <ScreenHeader title={isEditMode ? t('edit.screen_title') : headerTitles[step]} onBack={handleBack} />
 
       <StepProgress current={step} t={t} />
 
@@ -889,10 +901,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
         scrollEnabled={!mapScrollLocked}
         nestedScrollEnabled
       >
-        {/* ── Draft restore banner ───────────────────────────────────── */}
         {draftCandidate && (
           <DraftRestoreBanner
             savedAt={draftCandidate.savedAt}
@@ -902,7 +914,6 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         )}
 
-        {/* ── Submit error banner ────────────────────────────────────── */}
         {submitError && (
           <SubmitErrorBanner
             error={submitError}
@@ -912,20 +923,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         )}
 
-        <ServiceSummary
-          lines={lines}
-          totalAgents={agentsTotal}
-          onEdit={handleEditServices}
-          t={t}
-        />
-
-        {/* ── Cross-slot error banner (only on step 2 in multi-slot mode) */}
         {step === 2 && crossSlotErrorSlots.length > 0 && (
-          <CrossSlotErrorBanner
-            offenders={crossSlotErrorSlots}
-            onJump={(_idx) => { /* no-op — banner already visible alongside slots */ }}
-            t={t}
-          />
+          <CrossSlotErrorBanner offenders={crossSlotErrorSlots} t={t} />
         )}
 
         {step === 1 && (
@@ -941,39 +940,25 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         )}
 
         {step === 2 && (
-          <StepWhen
+          <StepWhenWho
             form={form}
             slots={slots}
             errors={errors}
-            isMultiSlot={isMultiSlot}
             activePreset={activePreset}
-            globalLines={lines}
+            serviceTypes={serviceTypes}
+            servicesLoading={servicesLoading}
+            agentsTotal={agentsTotal}
             onApplyPreset={applyPreset}
             onSetField={setField}
-            onEnterMultiSlot={enterMultiSlot}
-            onExitMultiSlot={exitMultiSlot}
             onAddSlot={addSlot}
             onRemoveSlot={removeSlot}
-            onUpdateSlot={updateSlot}
-            onCopySlotDates={copySlotDates}
-            onCustomizeSlot={customizeSlot}
-            onResetSlotCustomization={resetSlotCustomization}
-            onToggleSlotEditor={toggleSlotEditor}
-            onChangeSlotLineCount={changeSlotLineCount}
-            onSetSlotLineUniform={setSlotLineUniform}
-            t={t}
-          />
-        )}
-
-        {step === 3 && (
-          <StepReview
-            form={form}
-            slots={slots}
-            lines={lines}
-            agentsTotal={agentsTotal}
-            isMultiSlot={isMultiSlot}
-            onSetField={setField}
-            onEditStep={(s) => setStep(s)}
+            onUpdateSlotDates={updateSlotDates}
+            onCopyFromSlot={copyFromSlot}
+            onTogglePicker={toggleSlotPicker}
+            onAddLine={addLineToSlot}
+            onRemoveLine={removeLineFromSlot}
+            onChangeLineCount={changeLineCount}
+            onSetLineUniform={setLineUniform}
             t={t}
           />
         )}
@@ -983,16 +968,11 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       <View style={styles.footer}>
         <View style={styles.footerMeta}>
           <Text style={styles.footerMetaText}>
-            {step < 3
-              ? t('create.footer_step_progress', { current: step, total: 3 })
+            {step < TOTAL_STEPS
+              ? t('create.footer_step_progress', { current: step, total: TOTAL_STEPS })
               : t('create.footer_ready')}
           </Text>
-          {step >= 2 && !isMultiSlot && form.startAt && form.endAt && (
-            <Text style={styles.footerMetaText}>
-              {' · '}{t('create.duration_hours', { hours: durationHours(form.startAt, form.endAt).toFixed(1) })}
-            </Text>
-          )}
-          {step >= 2 && isMultiSlot && totalSlotHours(slots) > 0 && (
+          {step >= 2 && totalSlotHours(slots) > 0 && (
             <Text style={styles.footerMetaText}>
               {' · '}{t('create.slots_total_short', { count: slots.length, hours: totalSlotHours(slots).toFixed(1) })}
             </Text>
@@ -1014,7 +994,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             size="lg"
             style={styles.footerNextBtn}
             rightIcon={
-              step < 3
+              step < TOTAL_STEPS
                 ? <ChevronRight size={16} color={colors.textInverse} strokeWidth={2.4} />
                 : <Check size={16} color={colors.textInverse} strokeWidth={2.4} />
             }
@@ -1037,19 +1017,20 @@ const DraftRestoreBanner: React.FC<{
 }> = ({ savedAt, onRestore, onDiscard, t }) => (
   <View style={draftBannerS.wrap}>
     <View style={draftBannerS.iconBox}>
-      <Save size={16} color={colors.primary} strokeWidth={2} />
+      <FileText size={16} color={colors.primary} strokeWidth={2} />
     </View>
     <View style={draftBannerS.body}>
       <Text style={draftBannerS.title}>{t('create.draft_restore_title')}</Text>
-      <Text style={draftBannerS.subtitle}>
+      <Text style={draftBannerS.subtitle} numberOfLines={2}>
         {t('create.draft_restore_subtitle', { when: formatRelativeFromNow(savedAt) })}
       </Text>
       <View style={draftBannerS.actions}>
-        <TouchableOpacity onPress={onRestore} style={draftBannerS.primaryBtn} activeOpacity={0.78}>
-          <Text style={draftBannerS.primaryBtnText}>{t('create.draft_restore_btn')}</Text>
+        <TouchableOpacity style={draftBannerS.restoreBtn} onPress={onRestore} activeOpacity={0.85}>
+          <RotateCcw size={12} color={colors.textInverse} strokeWidth={2.4} />
+          <Text style={draftBannerS.restoreText}>{t('create.draft_restore_btn')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onDiscard} style={draftBannerS.secondaryBtn} activeOpacity={0.78}>
-          <Text style={draftBannerS.secondaryBtnText}>{t('create.draft_discard_btn')}</Text>
+        <TouchableOpacity style={draftBannerS.discardBtn} onPress={onDiscard} activeOpacity={0.7}>
+          <Text style={draftBannerS.discardText}>{t('create.draft_discard_btn')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1058,16 +1039,9 @@ const DraftRestoreBanner: React.FC<{
 
 const draftBannerS = StyleSheet.create({
   wrap: {
-    flexDirection:     'row',
-    alignItems:        'flex-start',
-    gap:               spacing[3],
-    backgroundColor:   colors.primarySurface,
-    borderWidth:       1,
-    borderColor:       colors.borderPrimary,
-    borderRadius:      radius.xl,
-    paddingHorizontal: spacing[3] + 2,
-    paddingVertical:   spacing[3] + 2,
-    marginBottom:      spacing[3],
+    flexDirection: 'row', gap: spacing[3], alignItems: 'flex-start',
+    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
+    borderRadius: radius.xl, padding: spacing[3] + 2, marginBottom: spacing[4],
   },
   iconBox: {
     width: 36, height: 36, borderRadius: radius.lg,
@@ -1076,23 +1050,20 @@ const draftBannerS = StyleSheet.create({
   },
   body:     { flex: 1, gap: spacing[1] + 2 },
   title:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
-  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  actions:  { flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: spacing[1] + 2 },
-  primaryBtn: {
+  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
+  actions:  { flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginTop: spacing[1] },
+  restoreBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: colors.primary, borderRadius: radius.full,
     paddingHorizontal: spacing[3] + 2, paddingVertical: spacing[2],
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
   },
-  primaryBtnText:   { fontFamily: fontFamily.bodySemiBold, fontSize: 11, color: colors.textInverse },
-  secondaryBtn:     { paddingHorizontal: spacing[2], paddingVertical: spacing[2] },
-  secondaryBtnText: {
-    fontFamily: fontFamily.bodyMedium, fontSize: 11,
-    color: colors.textMuted, textDecorationLine: 'underline',
-  },
+  restoreText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textInverse },
+  discardBtn:  { paddingVertical: spacing[2], paddingHorizontal: spacing[1] },
+  discardText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, textDecorationLine: 'underline' },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SubmitErrorBanner — structured failure surface with jump-back to step
+// SubmitErrorBanner
 // ──────────────────────────────────────────────────────────────────────────────
 
 const SubmitErrorBanner: React.FC<{
@@ -1102,60 +1073,39 @@ const SubmitErrorBanner: React.FC<{
   t:         MissionsT;
 }> = ({ error, onDismiss, onJump, t }) => (
   <View style={submitErrS.wrap}>
-    <View style={submitErrS.iconBox}>
-      <AlertTriangle size={16} color={colors.danger} strokeWidth={2} />
+    <View style={submitErrS.headerRow}>
+      <AlertTriangle size={16} color={colors.danger} strokeWidth={2.2} />
+      <Text style={submitErrS.title}>{error.title}</Text>
+      <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <X size={16} color={colors.textMuted} strokeWidth={2} />
+      </TouchableOpacity>
     </View>
-    <View style={submitErrS.body}>
-      <View style={submitErrS.header}>
-        <Text style={submitErrS.title}>{error.title}</Text>
-        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <X size={14} color={colors.textMuted} strokeWidth={2} />
-        </TouchableOpacity>
-      </View>
-      {error.details.map((line, i) => (
-        <Text key={i} style={submitErrS.detail} numberOfLines={3}>· {line}</Text>
-      ))}
-      {onJump && (
-        <TouchableOpacity onPress={onJump} style={submitErrS.jumpBtn} activeOpacity={0.78}>
-          <Pencil size={11} color={colors.danger} strokeWidth={2.2} />
-          <Text style={submitErrS.jumpBtnText}>{t('create.submit_error_jump_to')}</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    {error.details.slice(0, 4).map((d, i) => (
+      <Text key={i} style={submitErrS.detail}>• {d}</Text>
+    ))}
+    {onJump && (
+      <TouchableOpacity style={submitErrS.jumpBtn} onPress={onJump} activeOpacity={0.8}>
+        <Pencil size={12} color={colors.danger} strokeWidth={2.2} />
+        <Text style={submitErrS.jumpText}>{t('create.submit_error_jump_to')}</Text>
+      </TouchableOpacity>
+    )}
   </View>
 );
 
 const submitErrS = StyleSheet.create({
   wrap: {
-    flexDirection:     'row',
-    alignItems:        'flex-start',
-    gap:               spacing[3],
-    backgroundColor:   colors.dangerSurface,
-    borderWidth:       1,
-    borderColor:       colors.dangerBorder,
-    borderRadius:      radius.xl,
-    paddingHorizontal: spacing[3] + 2,
-    paddingVertical:   spacing[3] + 2,
-    marginBottom:      spacing[3],
+    backgroundColor: 'rgba(225,29,72,0.10)', borderWidth: 1, borderColor: colors.danger,
+    borderRadius: radius.xl, padding: spacing[3] + 2, marginBottom: spacing[4], gap: spacing[1] + 2,
   },
-  iconBox: {
-    width: 32, height: 32, borderRadius: radius.lg,
-    backgroundColor: colors.background, borderWidth: 1, borderColor: colors.dangerBorder,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  body:    { flex: 1, gap: spacing[1] + 2 },
-  header:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:   { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.danger },
-  detail:  { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.danger, lineHeight: fontSize.xs * 1.6 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title:     { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.danger },
+  detail:    { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
   jumpBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    alignSelf: 'flex-start', marginTop: spacing[1] + 2,
-    paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.background,
-    borderWidth: 1, borderColor: colors.dangerBorder,
+    flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start',
+    marginTop: spacing[1], paddingHorizontal: spacing[3], paddingVertical: spacing[2],
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.danger,
   },
-  jumpBtnText: { fontFamily: fontFamily.bodySemiBold, fontSize: 11, color: colors.danger },
+  jumpText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.danger },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1164,84 +1114,52 @@ const submitErrS = StyleSheet.create({
 
 const CrossSlotErrorBanner: React.FC<{
   offenders: Array<{ idx: number; key: string }>;
-  onJump:    (idx: number) => void;
   t:         MissionsT;
-}> = ({ offenders, onJump, t }) => (
+}> = ({ offenders, t }) => (
   <View style={crossSlotErrS.wrap}>
-    <View style={crossSlotErrS.iconBox}>
-      <AlertTriangle size={16} color={colors.warning} strokeWidth={2} />
-    </View>
-    <View style={crossSlotErrS.body}>
+    <View style={crossSlotErrS.headerRow}>
+      <AlertTriangle size={15} color={colors.danger} strokeWidth={2.2} />
       <Text style={crossSlotErrS.title}>{t('create.cross_slot_error_title')}</Text>
-      <Text style={crossSlotErrS.subtitle}>{t('create.cross_slot_error_subtitle')}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={crossSlotErrS.chipsRow}
-      >
-        {offenders.map(o => (
-          <TouchableOpacity
-            key={o.key}
-            onPress={() => onJump(o.idx)}
-            style={crossSlotErrS.chip}
-            activeOpacity={0.78}
-          >
-            <ChevronRight size={10} color={colors.warning} strokeWidth={2.4} />
-            <Text style={crossSlotErrS.chipText}>
-              {t('create.cross_slot_error_jump', { n: o.idx + 1 })}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+    </View>
+    <Text style={crossSlotErrS.subtitle}>{t('create.cross_slot_error_subtitle')}</Text>
+    <View style={crossSlotErrS.chipsRow}>
+      {offenders.map(o => (
+        <View key={o.key} style={crossSlotErrS.chip}>
+          <Text style={crossSlotErrS.chipText}>{t('create.cross_slot_error_jump', { n: o.idx + 1 })}</Text>
+        </View>
+      ))}
     </View>
   </View>
 );
 
 const crossSlotErrS = StyleSheet.create({
   wrap: {
-    flexDirection:     'row',
-    alignItems:        'flex-start',
-    gap:               spacing[3],
-    backgroundColor:   colors.warningSurface,
-    borderWidth:       1,
-    borderColor:       colors.warningBorder,
-    borderRadius:      radius.xl,
-    paddingHorizontal: spacing[3] + 2,
-    paddingVertical:   spacing[3],
-    marginBottom:      spacing[3],
+    backgroundColor: 'rgba(225,29,72,0.08)', borderWidth: 1, borderColor: colors.danger,
+    borderRadius: radius.lg, padding: spacing[3], marginBottom: spacing[3], gap: spacing[1] + 2,
   },
-  iconBox: {
-    width: 32, height: 32, borderRadius: radius.lg,
-    backgroundColor: colors.background, borderWidth: 1, borderColor: colors.warningBorder,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  body:     { flex: 1, gap: spacing[1] + 2 },
-  title:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.warning },
-  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  chipsRow: { gap: spacing[2], marginTop: spacing[1] + 2 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  title:     { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.danger },
+  subtitle:  { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
+  chipsRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginTop: 2 },
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.background,
-    borderWidth: 1, borderColor: colors.warningBorder,
+    paddingHorizontal: spacing[2] + 2, paddingVertical: 3, borderRadius: radius.full,
+    backgroundColor: 'rgba(225,29,72,0.14)', borderWidth: 1, borderColor: colors.danger,
   },
-  chipText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.warning },
+  chipText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.danger },
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// StepProgress
+// StepProgress (2 steps)
 // ──────────────────────────────────────────────────────────────────────────────
 
 const StepProgress: React.FC<{ current: Step; t: MissionsT }> = ({ current, t }) => {
   const labels: Record<Step, string> = {
     1: t('create.progress_where'),
-    2: t('create.progress_when'),
-    3: t('create.progress_review'),
+    2: t('create.progress_staff'),
   };
   return (
     <View style={progressS.wrap}>
-      {([1, 2, 3] as Step[]).map((s) => {
+      {([1, 2] as Step[]).map((s) => {
         const active = current === s;
         const done   = current > s;
         return (
@@ -1252,7 +1170,7 @@ const StepProgress: React.FC<{ current: Step; t: MissionsT }> = ({ current, t })
                 : <Text style={[progressS.dotText, active && progressS.dotTextActive]}>{s}</Text>}
             </View>
             <Text style={[progressS.label, (active || done) && progressS.labelActive]}>{labels[s]}</Text>
-            {s < 3 && <View style={[progressS.line, done && progressS.lineDone]} />}
+            {s < TOTAL_STEPS && <View style={[progressS.line, done && progressS.lineDone]} />}
           </View>
         );
       })}
@@ -1262,14 +1180,9 @@ const StepProgress: React.FC<{ current: Step; t: MissionsT }> = ({ current, t })
 
 const progressS = StyleSheet.create({
   wrap: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: layout.screenPaddingH,
-    paddingVertical:   spacing[3],
-    gap:               spacing[1],
-    backgroundColor:   colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: layout.screenPaddingH, paddingVertical: spacing[3], gap: spacing[1],
+    backgroundColor: colors.background, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   item: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing[1] + 2 },
   dot: {
@@ -1288,63 +1201,54 @@ const progressS = StyleSheet.create({
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// ServiceSummary
+// StepHero / DurationBadge
 // ──────────────────────────────────────────────────────────────────────────────
 
-const ServiceSummary: React.FC<{
-  lines:       BookingLineLocal[];
-  totalAgents: number;
-  onEdit:      () => void;
-  t:           MissionsT;
-}> = ({ lines, totalAgents, onEdit, t }) => (
-  <TouchableOpacity style={summaryS.wrap} onPress={onEdit} activeOpacity={0.85}>
-    <View style={summaryS.iconBox}>
-      <ClipboardList size={16} color={colors.primary} strokeWidth={2} />
+const StepHero: React.FC<{
+  Icon:     React.FC<{ size: number; color: string; strokeWidth: number }>;
+  title:    string;
+  subtitle: string;
+}> = ({ Icon, title, subtitle }) => (
+  <View style={heroS.wrap}>
+    <View style={heroS.iconBox}>
+      <Icon size={20} color={colors.primary} strokeWidth={1.8} />
     </View>
-    <View style={summaryS.body}>
-      <Text style={summaryS.title}>
-        {t('create.total_agents', { count: totalAgents, lines: lines.length })}
-      </Text>
-      <Text style={summaryS.subtitle} numberOfLines={1}>
-        {lines.map(l => `${l.agentCount}× ${l.name.split(' ')[0]}`).join(' · ')}
-      </Text>
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={heroS.title}>{title}</Text>
+      <Text style={heroS.subtitle}>{subtitle}</Text>
     </View>
-    <View style={summaryS.editPill}>
-      <Pencil size={11} color={colors.primary} strokeWidth={2.2} />
-      <Text style={summaryS.editText}>{t('create.edit_btn')}</Text>
-    </View>
-  </TouchableOpacity>
+  </View>
 );
 
-const summaryS = StyleSheet.create({
-  wrap: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               spacing[3],
-    backgroundColor:   colors.primarySurface,
-    borderWidth:       1,
-    borderColor:       colors.borderPrimary,
-    borderRadius:      radius.xl,
-    paddingHorizontal: spacing[3] + 2,
-    paddingVertical:   spacing[3],
-    marginBottom:      spacing[4],
-  },
+const heroS = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], marginBottom: spacing[2] },
   iconBox: {
-    width: 36, height: 36, borderRadius: radius.lg,
-    backgroundColor: colors.background, borderWidth: 1, borderColor: colors.borderPrimary,
+    width: 40, height: 40, borderRadius: radius.lg,
+    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  body:     { flex: 1, gap: 2 },
-  title:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
-  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  editPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full, backgroundColor: colors.background,
-    borderWidth: 1, borderColor: colors.borderPrimary,
-  },
-  editText: { fontFamily: fontFamily.bodySemiBold, fontSize: 11, color: colors.primary },
+  title:    { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.4 },
+  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
 });
+
+const DurationBadge: React.FC<{
+  t: MissionsT; hours: number; urgent: boolean; label?: string;
+}> = ({ t, hours, urgent, label }) => (
+  <View style={styles.durationBadge}>
+    <Clock size={14} color={colors.primary} strokeWidth={2} />
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={styles.durationText}>
+        {label ?? t('create.duration_hours', { hours: hours.toFixed(1) })}
+      </Text>
+      {urgent && (
+        <View style={styles.urgentRow}>
+          <Zap size={11} color={colors.primaryLight} strokeWidth={2} />
+          <Text style={styles.urgentText}>{t('create.urgency_note')}</Text>
+        </View>
+      )}
+    </View>
+  </View>
+);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // StepWhere
@@ -1407,642 +1311,141 @@ const StepWhere: React.FC<StepWhereProps> = ({
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// StepWhen
+// StepWhenWho — merged scheduling + staffing (the last step)
 // ──────────────────────────────────────────────────────────────────────────────
 
-interface StepWhenProps {
-  form:                     FormData;
-  slots:                    SlotDraft[];
-  errors:                   Record<string, string | undefined>;
-  isMultiSlot:              boolean;
-  activePreset:             PresetKey | null;
-  globalLines:              BookingLineLocal[];
-  onApplyPreset:            (p: SchedulePreset) => void;
-  onSetField:               <K extends keyof FormData>(k: K, v: FormData[K]) => void;
-  onEnterMultiSlot:         () => void;
-  onExitMultiSlot:          () => void;
-  onAddSlot:                () => void;
-  onRemoveSlot:             (key: string) => void;
-  onUpdateSlot:             (key: string, patch: Partial<Omit<SlotDraft, 'key'>>) => void;
-  onCopySlotDates:          (targetKey: string, sourceIdx: number) => void;
-  onCustomizeSlot:          (key: string) => void;
-  onResetSlotCustomization: (key: string) => void;
-  onToggleSlotEditor:       (key: string) => void;
-  onChangeSlotLineCount:    (slotKey: string, serviceTypeId: string, delta: number) => void;
-  onSetSlotLineUniform:     (slotKey: string, serviceTypeId: string, uniform: UniformValue) => void;
-  t:                        MissionsT;
+interface StepWhenWhoProps {
+  form:              FormData;
+  slots:             SlotDraft[];
+  errors:            Record<string, string | undefined>;
+  activePreset:      PresetKey | null;
+  serviceTypes:      ServiceType[];
+  servicesLoading:   boolean;
+  agentsTotal:       number;
+  onApplyPreset:     (p: SchedulePreset) => void;
+  onSetField:        <K extends keyof FormData>(k: K, v: FormData[K]) => void;
+  onAddSlot:         () => void;
+  onRemoveSlot:      (key: string) => void;
+  onUpdateSlotDates: (key: string, patch: { startAt?: string; endAt?: string }) => void;
+  onCopyFromSlot:    (targetKey: string, sourceIdx: number) => void;
+  onTogglePicker:    (key: string) => void;
+  onAddLine:         (key: string, svc: ServiceType) => void;
+  onRemoveLine:      (key: string, serviceTypeId: string) => void;
+  onChangeLineCount: (key: string, serviceTypeId: string, delta: number) => void;
+  onSetLineUniform:  (key: string, serviceTypeId: string, uniform: UniformValue) => void;
+  t:                 MissionsT;
 }
 
-const StepWhen: React.FC<StepWhenProps> = ({
-  form, slots, errors, isMultiSlot, activePreset, globalLines,
-  onApplyPreset, onSetField, onEnterMultiSlot, onExitMultiSlot,
-  onAddSlot, onRemoveSlot, onUpdateSlot,
-  onCopySlotDates,
-  onCustomizeSlot, onResetSlotCustomization, onToggleSlotEditor,
-  onChangeSlotLineCount, onSetSlotLineUniform, t,
+const StepWhenWho: React.FC<StepWhenWhoProps> = ({
+  form, slots, errors, activePreset, serviceTypes, servicesLoading, agentsTotal,
+  onApplyPreset, onSetField, onAddSlot, onRemoveSlot, onUpdateSlotDates,
+  onCopyFromSlot, onTogglePicker, onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform, t,
 }) => {
-  const minDate     = new Date(Date.now() + MIN_FUTURE_HOURS * 3_600_000);
-  const singleDurH  = form.startAt && form.endAt ? durationHours(form.startAt, form.endAt) : 0;
-  const multiTotalH = totalSlotHours(slots);
+  const minDate    = new Date(Date.now() + MIN_FUTURE_HOURS * 3_600_000);
+  const totalH     = totalSlotHours(slots);
+  const singleSlot = slots.length === 1;
 
-  return (
-    <View style={styles.stepContent}>
-      <StepHero Icon={CalendarClock} title={t('create.when_title')} subtitle={t('create.when_subtitle')} />
-
-      {!isMultiSlot && (
-        <>
-          <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeader}>
-              <Sparkles size={14} color={colors.textMuted} strokeWidth={2} />
-              <Text style={styles.sectionTitle}>{t('create.preset_section')}</Text>
-            </View>
-            <View style={styles.presetGrid}>
-              {SCHEDULE_PRESETS.map(p => {
-                const { Icon } = p;
-                const isActive = activePreset === p.key;
-                return (
-                  <TouchableOpacity
-                    key={p.key}
-                    style={[styles.presetCard, isActive && styles.presetCardActive]}
-                    onPress={() => onApplyPreset(p)}
-                    activeOpacity={0.78}
-                  >
-                    {isActive && (
-                      <View style={styles.presetActiveDot}>
-                        <Check size={9} color={colors.textInverse} strokeWidth={3} />
-                      </View>
-                    )}
-                    <Icon
-                      size={16}
-                      color={isActive ? colors.textInverse : colors.primary}
-                      strokeWidth={2}
-                    />
-                    <Text style={[styles.presetLabel, isActive && styles.presetLabelActive]}>
-                      {t(p.i18n as any)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeader}>
-              <Calendar size={14} color={colors.textMuted} strokeWidth={2} />
-              <Text style={styles.sectionTitle}>{t('create.custom_section')}</Text>
-            </View>
-            <DateTimePicker
-              label={t('create.start_label')}
-              value={form.startAt}
-              onChange={v => onSetField('startAt', v)}
-              minDate={minDate}
-              error={errors.startAt}
-              hint={t('create.start_hint')}
-            />
-            <DateTimePicker
-              label={t('create.end_label')}
-              value={form.endAt}
-              onChange={v => onSetField('endAt', v)}
-              minDate={form.startAt ? new Date(new Date(form.startAt).getTime() + MIN_DURATION_H * 3_600_000) : minDate}
-              error={errors.endAt}
-              hint={t('create.end_hint')}
-            />
-            {singleDurH >= MIN_DURATION_H && !errors.endAt && (
-              <DurationBadge t={t} hours={singleDurH} urgent={isToday(form.startAt)} />
-            )}
-
-            <TouchableOpacity style={styles.addSlotBtn} onPress={onEnterMultiSlot} activeOpacity={0.78}>
-              <Plus size={14} color={colors.primary} strokeWidth={2.5} />
-              <Text style={styles.addSlotText}>{t('create.add_another_slot')}</Text>
-            </TouchableOpacity>
-            <Text style={styles.addSlotHint}>{t('create.add_another_slot_hint')}</Text>
-          </View>
-        </>
-      )}
-
-      {isMultiSlot && (
-        <View style={styles.sectionBlock}>
-          {/* Multi-slot mode header with escape hatch */}
-          <View style={styles.multiHeader}>
-            <View style={styles.sectionHeader}>
-              <Calendar size={14} color={colors.textMuted} strokeWidth={2} />
-              <Text style={styles.sectionTitle}>
-                {t('create.slots_count', { n: slots.length })}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onExitMultiSlot}
-              style={styles.exitMultiBtn}
-              activeOpacity={0.78}
-            >
-              <ArrowLeftRight size={11} color={colors.textMuted} strokeWidth={2} />
-              <Text style={styles.exitMultiBtnText}>{t('create.exit_multi_slot')}</Text>
-            </TouchableOpacity>
-          </View>
-
-          {slots.map((slot, idx) => (
-            <SlotCard
-              key={slot.key}
-              slot={slot}
-              idx={idx}
-              prevSlot={idx > 0 ? slots[idx - 1] : null}
-              allSlots={slots}
-              minDate={minDate}
-              errors={errors}
-              globalLines={globalLines}
-              canRemove={slots.length > 1}
-              onUpdate={(patch) => onUpdateSlot(slot.key, patch)}
-              onRemove={() => onRemoveSlot(slot.key)}
-              onCopyDates={(sourceIdx) => onCopySlotDates(slot.key, sourceIdx)}
-              onCustomize={() => onCustomizeSlot(slot.key)}
-              onResetCustomization={() => onResetSlotCustomization(slot.key)}
-              onToggleEditor={() => onToggleSlotEditor(slot.key)}
-              onChangeLineCount={(svcId, d) => onChangeSlotLineCount(slot.key, svcId, d)}
-              onSetLineUniform={(svcId, u) => onSetSlotLineUniform(slot.key, svcId, u)}
-              t={t}
-            />
-          ))}
-
-          {slots.length < 30 && (
-            <TouchableOpacity style={styles.addSlotBtn} onPress={onAddSlot} activeOpacity={0.78}>
-              <Plus size={14} color={colors.primary} strokeWidth={2.5} />
-              <Text style={styles.addSlotText}>{t('create.slot_add_btn')}</Text>
-            </TouchableOpacity>
-          )}
-
-          {multiTotalH >= MIN_DURATION_H && (
-            <DurationBadge
-              t={t}
-              hours={multiTotalH}
-              urgent={slots.some(s => isToday(s.startAt))}
-              label={t('create.slots_total_duration', { hours: multiTotalH.toFixed(1), count: slots.length })}
-            />
-          )}
-        </View>
-      )}
-    </View>
-  );
-};
-
-// ──────────────────────────────────────────────────────────────────────────────
-// SlotCard
-// ──────────────────────────────────────────────────────────────────────────────
-
-interface SlotCardProps {
-  slot:                 SlotDraft;
-  idx:                  number;
-  prevSlot:             SlotDraft | null;
-  allSlots:             SlotDraft[];
-  minDate:              Date;
-  errors:               Record<string, string | undefined>;
-  globalLines:          BookingLineLocal[];
-  canRemove:            boolean;
-  onUpdate:             (patch: Partial<Omit<SlotDraft, 'key'>>) => void;
-  onRemove:             () => void;
-  onCopyDates:          (sourceIdx: number) => void;
-  onCustomize:          () => void;
-  onResetCustomization: () => void;
-  onToggleEditor:       () => void;
-  onChangeLineCount:    (serviceTypeId: string, delta: number) => void;
-  onSetLineUniform:     (serviceTypeId: string, uniform: UniformValue) => void;
-  t:                    MissionsT;
-}
-
-const SlotCard: React.FC<SlotCardProps> = ({
-  slot, idx, prevSlot, allSlots, minDate, errors, globalLines, canRemove,
-  onUpdate, onRemove, onCopyDates, onCustomize, onResetCustomization, onToggleEditor,
-  onChangeLineCount, onSetLineUniform, t,
-}) => {
-  const slotDurH  = durationHours(slot.startAt, slot.endAt);
-  const startErr  = errors[`slot_${slot.key}_startAt`];
-  const endErr    = errors[`slot_${slot.key}_endAt`];
-  const linesErr  = errors[`slot_${slot.key}_lines`];
-  const prevEnd   = prevSlot && prevSlot.endAt ? new Date(prevSlot.endAt) : null;
-  const slotMin   = prevEnd && prevEnd > minDate ? prevEnd : minDate;
-  const slotMinEnd = slot.startAt
-    ? new Date(new Date(slot.startAt).getTime() + MIN_DURATION_H * 3_600_000)
-    : slotMin;
-
-  const effective = useMemo(
-    () => buildEffectiveSlotLines(slot, globalLines),
-    [slot, globalLines],
-  );
-  const slotAgents = totalAgentsInLines(effective);
-
-  const copySourceSlots = useMemo(
-    () => allSlots
-      .map((s, i) => ({ s, i }))
-      .filter(({ s, i }) => i !== idx && s.startAt && s.endAt),
-    [allSlots, idx],
-  );
-
-  const hasValidDates = slot.startAt && slot.endAt && !startErr && !endErr && slotDurH > 0;
-
-  return (
-    <View style={[styles.slotCard, slot.customized && styles.slotCardCustomized]}>
-      <View style={styles.slotCardHeader}>
-        <View style={styles.slotIdxBadge}>
-          <Text style={styles.slotIdxText}>{idx + 1}</Text>
-        </View>
-        <View style={styles.slotCardTitleBlock}>
-          <Text style={styles.slotCardTitle}>{t('create.slot_label', { n: idx + 1 })}</Text>
-          {hasValidDates ? (
-            <Text style={styles.slotCardDateSummary} numberOfLines={1}>
-              {formatSlotDateShort(slot.startAt, slot.endAt)}
-            </Text>
-          ) : (
-            <Text style={styles.slotCardDatePending}>{t('create.slot_date_pending')}</Text>
-          )}
-        </View>
-        {slotDurH >= MIN_DURATION_H && !endErr && !startErr && (
-          <View style={styles.slotDurPill}>
-            <Clock size={9} color={colors.primary} strokeWidth={2.5} />
-            <Text style={styles.slotDurPillText}>{slotDurH.toFixed(1)} h</Text>
-          </View>
-        )}
-        {canRemove && (
-          <TouchableOpacity
-            onPress={onRemove}
-            style={styles.slotRemoveBtn}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <X size={14} color={colors.danger} strokeWidth={2} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {copySourceSlots.length > 0 && (!slot.startAt || !slot.endAt) && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.copyChipsRow}
-        >
-          {copySourceSlots.map(({ s, i }) => (
-            <TouchableOpacity
-              key={s.key}
-              style={styles.copyChip}
-              onPress={() => onCopyDates(i)}
-              activeOpacity={0.78}
-            >
-              <Copy size={10} color={colors.primary} strokeWidth={2.2} />
-              <Text style={styles.copyChipText}>{t('create.slot_copy_from', { n: i + 1 })}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
-
-      <DateTimePicker
-        label={t('create.start_label')}
-        value={slot.startAt}
-        onChange={v => onUpdate({ startAt: v, endAt: '' })}
-        minDate={slotMin}
-        error={startErr}
-      />
-      <DateTimePicker
-        label={t('create.end_label')}
-        value={slot.endAt}
-        onChange={v => onUpdate({ endAt: v })}
-        minDate={slotMinEnd}
-        error={endErr}
-      />
-
-      <View style={styles.slotServicesDivider} />
-
-      {!slot.customized ? (
-        <View style={styles.slotServicesDefault}>
-          <View style={styles.slotServicesBadge}>
-            <Users size={11} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.slotServicesBadgeText}>
-              {t('create.slot_lines_default', { count: slotAgents })}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={onCustomize}
-            style={styles.customizeSlotBtn}
-            activeOpacity={0.78}
-          >
-            <Settings2 size={12} color={colors.primary} strokeWidth={2.2} />
-            <Text style={styles.customizeSlotBtnText}>{t('create.customize_for_slot')}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.customizedWrap}>
-          <TouchableOpacity
-            style={styles.customizedHeader}
-            onPress={onToggleEditor}
-            activeOpacity={0.78}
-          >
-            <View style={styles.customizedHeaderLeft}>
-              <View style={styles.customizedDot} />
-              <Text style={styles.customizedTitle}>
-                {t('create.slot_lines_custom', { count: slotAgents })}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={onResetCustomization}
-              style={styles.resetCustomBtn}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            >
-              <RotateCcw size={11} color={colors.textMuted} strokeWidth={2} />
-              <Text style={styles.resetCustomBtnText}>{t('create.slot_lines_reset')}</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-
-          {!slot.editorOpen && (
-            <TouchableOpacity onPress={onToggleEditor} activeOpacity={0.8}>
-              <View style={styles.customPreviewRow}>
-                {effective.length === 0 ? (
-                  <Text style={styles.customPreviewEmpty}>{t('create.slot_lines_required')}</Text>
-                ) : (
-                  effective.map(l => (
-                    <View
-                      key={l.serviceTypeId}
-                      style={[styles.customPreviewChip, { borderColor: l.accent + '60', backgroundColor: l.accent + '14' }]}
-                    >
-                      <Text style={[styles.customPreviewChipText, { color: l.accent }]}>
-                        {l.agentCount}× {l.name.split(' ')[0]}
-                        {' '}{UNIFORM_EMOJI[l.agentUniforms[0] ?? 'STANDARD']}
-                      </Text>
-                    </View>
-                  ))
-                )}
-                <Text style={styles.customPreviewExpand}>↓</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-
-          {slot.editorOpen && (
-            <View style={styles.editorList}>
-              {globalLines.map(g => {
-                const o = slot.overrides.find(x => x.serviceTypeId === g.serviceTypeId);
-                if (!o) return null;
-                const excluded = o.agentCount === 0;
-                return (
-                  <View
-                    key={g.serviceTypeId}
-                    style={[
-                      styles.editorRow,
-                      { borderColor: g.accent + (excluded ? '30' : '60') },
-                      excluded && styles.editorRowExcluded,
-                    ]}
-                  >
-                    <View style={styles.editorRowHeader}>
-                      <View style={[styles.editorRowDot, { backgroundColor: g.accent }]} />
-                      <Text style={[styles.editorRowName, excluded && styles.editorRowNameExcluded]} numberOfLines={1}>
-                        {g.name}
-                      </Text>
-                      <View style={styles.editorStepper}>
-                        <TouchableOpacity
-                          style={[styles.editorStepBtn, o.agentCount <= 0 && styles.editorStepBtnDisabled]}
-                          onPress={() => onChangeLineCount(g.serviceTypeId, -1)}
-                          disabled={o.agentCount <= 0}
-                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                        >
-                          <Minus size={11} color={o.agentCount <= 0 ? colors.textMuted : g.accent} strokeWidth={2.5} />
-                        </TouchableOpacity>
-                        <Text style={[styles.editorStepCount, { color: excluded ? colors.textMuted : g.accent }]}>
-                          {o.agentCount}
-                        </Text>
-                        <TouchableOpacity
-                          style={[styles.editorStepBtn, o.agentCount >= 20 && styles.editorStepBtnDisabled]}
-                          onPress={() => onChangeLineCount(g.serviceTypeId, +1)}
-                          disabled={o.agentCount >= 20}
-                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                        >
-                          <Plus size={11} color={o.agentCount >= 20 ? colors.textMuted : g.accent} strokeWidth={2.5} />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {!excluded && (
-                      <>
-                        <Text style={styles.editorUniformLabel}>{t('create.slot_uniform_label')}</Text>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.editorChipsRow}>
-                          {UNIFORM_OPTIONS.map(opt => {
-                            const active = o.slotUniform === opt.value;
-                            return (
-                              <TouchableOpacity
-                                key={opt.value}
-                                style={[
-                                  styles.editorUniformChip,
-                                  active && { backgroundColor: g.accent + '20', borderColor: g.accent },
-                                ]}
-                                onPress={() => onSetLineUniform(g.serviceTypeId, opt.value as UniformValue)}
-                                hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
-                              >
-                                <Text style={styles.editorUniformEmoji}>{opt.emoji}</Text>
-                                <Text style={[styles.editorUniformText, active && { color: g.accent, fontFamily: fontFamily.bodySemiBold }]}>
-                                  {opt.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                      </>
-                    )}
-                    {excluded && (
-                      <Text style={styles.editorExcludedNote}>{t('create.slot_line_excluded_note')}</Text>
-                    )}
-                  </View>
-                );
-              })}
-
-              <View style={styles.editorTotal}>
-                <Users size={12} color={colors.textMuted} strokeWidth={2} />
-                <Text style={styles.editorTotalText}>
-                  {t('create.slot_total_agents', { count: slotAgents })}
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      )}
-
-      {linesErr && (
-        <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{linesErr}</Text></View>
-      )}
-    </View>
-  );
-};
-
-// ──────────────────────────────────────────────────────────────────────────────
-// StepReview — with indicative price estimate
-// ──────────────────────────────────────────────────────────────────────────────
-
-interface StepReviewProps {
-  form:        FormData;
-  slots:       SlotDraft[];
-  lines:       BookingLineLocal[];
-  agentsTotal: number;
-  isMultiSlot: boolean;
-  onSetField:  <K extends keyof FormData>(k: K, v: FormData[K]) => void;
-  onEditStep:  (step: Step) => void;
-  t:           MissionsT;
-}
-
-const StepReview: React.FC<StepReviewProps> = ({
-  form, slots, lines, agentsTotal, isMultiSlot, onSetField, onEditStep, t,
-}) => {
-  const singleDurH  = form.startAt && form.endAt ? durationHours(form.startAt, form.endAt) : 0;
-  const multiTotalH = totalSlotHours(slots);
-
-  // ── Agent-hours (operational metric, accurate) ──────────────────────────
-  const estimatedAgentHours = useMemo(() => {
-    if (!isMultiSlot) {
-      return agentsTotal * singleDurH;
-    }
-    return slots.reduce((sum, s) => {
-      const effective = buildEffectiveSlotLines(s, lines);
-      return sum + totalAgentsInLines(effective) * durationHours(s.startAt, s.endAt);
-    }, 0);
-  }, [isMultiSlot, agentsTotal, singleDurH, slots, lines]);
-
-  // ── Price estimate (indicative, not authoritative) ──────────────────────
-  // Strategy: for each effective booking line we have a rate (from the picker)
-  // and a count and an hours value. The real quote applies surcharges + VAT
-  // — we deliberately don't try to match them here.
-  const indicativePrice = useMemo(() => {
-    const rateFor = (id: string): number => {
-      const found = lines.find(l => l.serviceTypeId === id);
-      return found?.ratePerHour ?? 0;
-    };
-    if (!isMultiSlot) {
-      return lines.reduce(
-        (sum, l) => sum + l.agentCount * singleDurH * (l.ratePerHour ?? 0),
-        0,
-      );
-    }
-    return slots.reduce((sum, s) => {
-      const effective = buildEffectiveSlotLines(s, lines);
+  const indicativePrice = useMemo(() =>
+    slots.reduce((sum, s) => {
       const h = durationHours(s.startAt, s.endAt);
-      return sum + effective.reduce(
-        (lsum, l) => lsum + l.agentCount * h * rateFor(l.serviceTypeId),
-        0,
-      );
-    }, 0);
-  }, [isMultiSlot, lines, singleDurH, slots]);
+      return sum + s.lines.reduce((ls, l) => ls + l.agentCount * h * (l.ratePerHour ?? 0), 0);
+    }, 0),
+  [slots]);
 
-  const showPriceEstimate = indicativePrice > 0 && lines.some(l => (l.ratePerHour ?? 0) > 0);
+  const estimatedAgentHours = useMemo(() =>
+    slots.reduce((sum, s) => sum + slotAgents(s) * durationHours(s.startAt, s.endAt), 0),
+  [slots]);
 
-  const sortedSlots = useMemo(
-    () => [...slots].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()),
-    [slots],
-  );
-  const anyCustomized = slots.some(s => s.customized);
+  const showPrice = indicativePrice > 0 && slots.some(s => s.lines.some(l => (l.ratePerHour ?? 0) > 0));
 
   return (
     <View style={styles.stepContent}>
-      <StepHero Icon={Sparkles} title={t('create.review_title')} subtitle={t('create.review_subtitle')} />
+      <StepHero Icon={CalendarClock} title={t('create.when_staff_title')} subtitle={t('create.when_staff_subtitle')} />
 
-      {/* Where recap */}
-      <ReviewRow
-        Icon={MapPin}
-        label={t('create.summary_location')}
-        value={`${form.address}, ${form.city}${form.zipCode ? ' · ' + form.zipCode : ''}`}
-        onEdit={() => onEditStep(1)}
-        t={t}
-      />
-
-      {/* When recap */}
-      {!isMultiSlot ? (
-        <ReviewRow
-          Icon={CalendarClock}
-          label={t('create.summary_when')}
-          value={`${formatDateShort(form.startAt)} → ${formatDateShort(form.endAt)}`}
-          meta={t('create.duration_hours', { hours: singleDurH.toFixed(1) })}
-          onEdit={() => onEditStep(2)}
-          t={t}
-        />
-      ) : (
-        <View style={reviewS.multiWrap}>
-          <View style={reviewS.headerRow}>
-            <View style={reviewS.iconBox}>
-              <CalendarClock size={16} color={colors.primary} strokeWidth={2} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={reviewS.label}>{t('create.summary_slots')}</Text>
-              <Text style={reviewS.meta}>{t('create.slots_total_duration', { hours: multiTotalH.toFixed(1), count: sortedSlots.length })}</Text>
-            </View>
-            <TouchableOpacity onPress={() => onEditStep(2)} style={reviewS.editBtn}>
-              <Pencil size={12} color={colors.primary} strokeWidth={2.2} />
-            </TouchableOpacity>
+      {singleSlot && (
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeader}>
+            <Sparkles size={14} color={colors.textMuted} strokeWidth={2} />
+            <Text style={styles.sectionTitle}>{t('create.preset_section')}</Text>
           </View>
-          {sortedSlots.map((s, i) => {
-            const effective = buildEffectiveSlotLines(s, lines);
-            const slotAg    = totalAgentsInLines(effective);
-            const slotDur   = durationHours(s.startAt, s.endAt);
-            return (
-              <View key={s.key} style={reviewS.slotBlock}>
-                <View style={reviewS.slotLineHeader}>
-                  <Text style={reviewS.slotIdx}>{i + 1}.</Text>
-                  <Text style={reviewS.slotText}>
-                    {formatDateShort(s.startAt)} → {formatDateShort(s.endAt)}
-                  </Text>
-                  <Text style={reviewS.slotDur}>{slotDur.toFixed(1)}h</Text>
-                </View>
-                <View style={reviewS.slotSummaryRow}>
-                  {s.customized && (
-                    <View style={reviewS.slotCustomBadge}>
-                      <Settings2 size={9} color={colors.primary} strokeWidth={2.5} />
-                      <Text style={reviewS.slotCustomBadgeText}>{t('create.custom_label')}</Text>
+          <View style={styles.presetGrid}>
+            {SCHEDULE_PRESETS.map(p => {
+              const { Icon } = p;
+              const isActive = activePreset === p.key;
+              return (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.presetCard, isActive && styles.presetCardActive]}
+                  onPress={() => onApplyPreset(p)}
+                  activeOpacity={0.78}
+                >
+                  {isActive && (
+                    <View style={styles.presetActiveDot}>
+                      <Check size={9} color={colors.textInverse} strokeWidth={3} />
                     </View>
                   )}
-                  <Text style={reviewS.slotAgents}>
-                    {t('create.review_slot_summary', { agents: slotAg, hours: slotDur.toFixed(1) })}
-                    {(s.customized || anyCustomized) && effective.length > 0
-                      ? ' · ' + effective.map(l =>
-                          `${l.agentCount}× ${l.name.split(' ')[0]} ${UNIFORM_EMOJI[l.agentUniforms[0] ?? 'STANDARD']}`
-                        ).join(' · ')
-                      : ''}
+                  <Icon size={16} color={isActive ? colors.textInverse : colors.primary} strokeWidth={2} />
+                  <Text style={[styles.presetLabel, isActive && styles.presetLabelActive]}>
+                    {t(p.i18n as any)}
                   </Text>
-                </View>
-              </View>
-            );
-          })}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       )}
 
-      {/* Services recap */}
-      <View style={reviewS.servicesWrap}>
-        <View style={reviewS.headerRow}>
-          <View style={reviewS.iconBox}>
-            <Users size={16} color={colors.primary} strokeWidth={2} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={reviewS.label}>
-              {anyCustomized ? t('create.summary_services_default') : t('create.summary_services')}
-            </Text>
-            <Text style={reviewS.meta}>
-              {t('create.total_agents', { count: agentsTotal, lines: lines.length })}
-            </Text>
-          </View>
-          <ChevronRight size={14} color={colors.textMuted} strokeWidth={2} />
-        </View>
-        {lines.map(l => (
-          <View key={l.serviceTypeId} style={reviewS.serviceLine}>
-            <View style={[reviewS.serviceDot, { backgroundColor: l.accent }]} />
-            <View style={{ flex: 1 }}>
-              <Text style={reviewS.serviceName}>{l.name}</Text>
-              <Text style={reviewS.serviceMeta}>
-                {l.agentUniforms.map(u => u ? UNIFORM_EMOJI[u] : '—').join(' ')}
-              </Text>
-            </View>
-            <Text style={[reviewS.serviceCount, { color: l.accent }]}>×{l.agentCount}</Text>
-          </View>
-        ))}
-
-        {estimatedAgentHours > 0 && (
-          <View style={reviewS.agentHoursRow}>
-            <Clock size={12} color={colors.primary} strokeWidth={2} />
-            <Text style={reviewS.agentHoursText}>
-              {t('create.review_agent_hours', { hours: estimatedAgentHours.toFixed(1) })}
-            </Text>
-          </View>
-        )}
+      <View style={styles.sectionHeader}>
+        <Calendar size={14} color={colors.textMuted} strokeWidth={2} />
+        <Text style={styles.sectionTitle}>
+          {singleSlot ? t('create.custom_section') : t('create.slots_count', { n: slots.length })}
+        </Text>
       </View>
 
-      {/* ── Indicative price estimate ────────────────────────────────── */}
-      {showPriceEstimate && (
+      {slots.map((slot, idx) => (
+        <SlotCard
+          key={slot.key}
+          slot={slot}
+          idx={idx}
+          prevSlot={idx > 0 ? slots[idx - 1] : null}
+          allSlots={slots}
+          minDate={minDate}
+          errors={errors}
+          serviceTypes={serviceTypes}
+          servicesLoading={servicesLoading}
+          canRemove={slots.length > 1}
+          onUpdateDates={(patch) => onUpdateSlotDates(slot.key, patch)}
+          onRemove={() => onRemoveSlot(slot.key)}
+          onCopyFrom={(sourceIdx) => onCopyFromSlot(slot.key, sourceIdx)}
+          onTogglePicker={() => onTogglePicker(slot.key)}
+          onAddLine={(svc) => onAddLine(slot.key, svc)}
+          onRemoveLine={(svcId) => onRemoveLine(slot.key, svcId)}
+          onChangeLineCount={(svcId, d) => onChangeLineCount(slot.key, svcId, d)}
+          onSetLineUniform={(svcId, u) => onSetLineUniform(slot.key, svcId, u)}
+          t={t}
+        />
+      ))}
+
+      {slots.length < MAX_SLOTS && (
+        <TouchableOpacity style={styles.addSlotBtn} onPress={onAddSlot} activeOpacity={0.78}>
+          <Plus size={14} color={colors.primary} strokeWidth={2.5} />
+          <Text style={styles.addSlotText}>{t('create.add_another_creneau')}</Text>
+        </TouchableOpacity>
+      )}
+      {singleSlot && <Text style={styles.addSlotHint}>{t('create.add_another_slot_hint')}</Text>}
+
+      {totalH >= MIN_DURATION_H && (
+        <DurationBadge
+          t={t}
+          hours={totalH}
+          urgent={slots.some(s => isToday(s.startAt))}
+          label={singleSlot
+            ? t('create.duration_hours', { hours: totalH.toFixed(1) })
+            : t('create.slots_total_duration', { hours: totalH.toFixed(1), count: slots.length })}
+        />
+      )}
+
+      {showPrice && (
         <View style={priceS.wrap}>
           <View style={priceS.headerRow}>
             <View style={priceS.iconBox}>
@@ -2055,11 +1458,20 @@ const StepReview: React.FC<StepReviewProps> = ({
               </Text>
             </View>
           </View>
+          {estimatedAgentHours > 0 && (
+            <View style={priceS.agentHoursRow}>
+              <Clock size={12} color={colors.primary} strokeWidth={2} />
+              <Text style={priceS.agentHoursText}>
+                {t('create.review_agent_hours', { hours: estimatedAgentHours.toFixed(1) })}
+                {'  ·  '}
+                {t('create.total_agents', { count: agentsTotal, lines: slots.length })}
+              </Text>
+            </View>
+          )}
           <Text style={priceS.note}>{t('create.review_estimate_note')}</Text>
         </View>
       )}
 
-      {/* Optional title / notes */}
       <View style={styles.sectionBlock}>
         <View style={styles.sectionHeader}>
           <FileText size={14} color={colors.textMuted} strokeWidth={2} />
@@ -2090,13 +1502,9 @@ const StepReview: React.FC<StepReviewProps> = ({
 
 const priceS = StyleSheet.create({
   wrap: {
-    gap:               spacing[2],
-    backgroundColor:   colors.backgroundElevated,
-    borderWidth:       1,
-    borderColor:       colors.borderPrimary,
-    borderRadius:      radius.xl,
-    paddingHorizontal: spacing[3] + 2,
-    paddingVertical:   spacing[3] + 2,
+    gap: spacing[2], backgroundColor: colors.backgroundElevated,
+    borderWidth: 1, borderColor: colors.borderPrimary, borderRadius: radius.xl,
+    paddingHorizontal: spacing[3] + 2, paddingVertical: spacing[3] + 2, marginTop: spacing[2],
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   iconBox: {
@@ -2104,158 +1512,257 @@ const priceS = StyleSheet.create({
     backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  label:   { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
-  amount:  { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.primary, letterSpacing: -0.4, marginTop: 2 },
-  note: {
-    fontFamily: fontFamily.body, fontSize: 11, color: colors.textSecondary,
-    lineHeight: 16, fontStyle: 'italic',
-  },
-});
-
-// ──────────────────────────────────────────────────────────────────────────────
-// Small bits
-// ──────────────────────────────────────────────────────────────────────────────
-
-const StepHero: React.FC<{
-  Icon:     React.FC<{ size: number; color: string; strokeWidth: number }>;
-  title:    string;
-  subtitle: string;
-}> = ({ Icon, title, subtitle }) => (
-  <View style={heroS.wrap}>
-    <View style={heroS.iconBox}>
-      <Icon size={20} color={colors.primary} strokeWidth={1.8} />
-    </View>
-    <View style={{ flex: 1, gap: 2 }}>
-      <Text style={heroS.title}>{title}</Text>
-      <Text style={heroS.subtitle}>{subtitle}</Text>
-    </View>
-  </View>
-);
-
-const heroS = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing[3], marginBottom: spacing[2],
-  },
-  iconBox: {
-    width: 40, height: 40, borderRadius: radius.lg,
-    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  title:    { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.4 },
-  subtitle: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
-});
-
-const DurationBadge: React.FC<{
-  t: MissionsT; hours: number; urgent: boolean; label?: string;
-}> = ({ t, hours, urgent, label }) => (
-  <View style={styles.durationBadge}>
-    <Clock size={14} color={colors.primary} strokeWidth={2} />
-    <View style={{ flex: 1, gap: 2 }}>
-      <Text style={styles.durationText}>
-        {label ?? t('create.duration_hours', { hours: hours.toFixed(1) })}
-      </Text>
-      {urgent && (
-        <View style={styles.urgentRow}>
-          <Zap size={11} color={colors.primaryLight} strokeWidth={2} />
-          <Text style={styles.urgentText}>{t('create.urgency_note')}</Text>
-        </View>
-      )}
-    </View>
-  </View>
-);
-
-const ReviewRow: React.FC<{
-  Icon:   React.FC<{ size: number; color: string; strokeWidth: number }>;
-  label:  string;
-  value:  string;
-  meta?:  string;
-  onEdit: () => void;
-  t:      MissionsT;
-}> = ({ Icon, label, value, meta, onEdit }) => (
-  <View style={reviewS.row}>
-    <View style={reviewS.iconBox}>
-      <Icon size={16} color={colors.primary} strokeWidth={2} />
-    </View>
-    <View style={{ flex: 1, gap: 2 }}>
-      <Text style={reviewS.label}>{label}</Text>
-      <Text style={reviewS.value} numberOfLines={2}>{value}</Text>
-      {meta && <Text style={reviewS.meta}>{meta}</Text>}
-    </View>
-    <TouchableOpacity onPress={onEdit} style={reviewS.editBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-      <Pencil size={12} color={colors.primary} strokeWidth={2.2} />
-    </TouchableOpacity>
-  </View>
-);
-
-const reviewS = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.backgroundElevated,
-    borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.xl, padding: spacing[3] + 2,
-  },
-  iconBox: {
-    width: 36, height: 36, borderRadius: radius.lg,
-    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  label: { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
-  value: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
-  meta:  { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  editBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  multiWrap: {
-    backgroundColor: colors.backgroundElevated,
-    borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.xl, padding: spacing[3] + 2, gap: spacing[2],
-  },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
-  slotBlock: {
-    backgroundColor: colors.surface, borderRadius: radius.md,
-    paddingVertical: spacing[2], paddingHorizontal: spacing[2] + 2,
-    gap: spacing[1] + 2,
-  },
-  slotLineHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  slotIdx:  { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary, minWidth: 18 },
-  slotText: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary },
-  slotDur:  { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary },
-  slotSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], flexWrap: 'wrap' },
-  slotCustomBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: spacing[2], paddingVertical: 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
-  },
-  slotCustomBadgeText: { fontFamily: fontFamily.bodySemiBold, fontSize: 9, color: colors.primary, letterSpacing: 0.5, textTransform: 'uppercase' },
-  slotAgents: { flex: 1, fontFamily: fontFamily.body, fontSize: 11, color: colors.textMuted, lineHeight: 16 },
-
-  servicesWrap: {
-    backgroundColor: colors.backgroundElevated,
-    borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.xl, padding: spacing[3] + 2, gap: spacing[2],
-  },
-  serviceLine: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[2] + 2,
-    paddingVertical: spacing[2], paddingHorizontal: spacing[2],
-    backgroundColor: colors.surface, borderRadius: radius.md,
-  },
-  serviceDot:   { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
-  serviceName:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textPrimary },
-  serviceMeta:  { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, marginTop: 1 },
-  serviceCount: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, flexShrink: 0 },
+  label:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, letterSpacing: 0.8, textTransform: 'uppercase' },
+  amount: { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.primary, letterSpacing: -0.4, marginTop: 2 },
   agentHoursRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    paddingTop: spacing[2], marginTop: spacing[1],
-    borderTopWidth: 1, borderTopColor: colors.border,
+    paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border,
   },
-  agentHoursText: {
-    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs,
-    color: colors.primary, letterSpacing: 0.2,
-  },
+  agentHoursText: { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary, letterSpacing: 0.2 },
+  note: { fontFamily: fontFamily.body, fontSize: 11, color: colors.textSecondary, lineHeight: 16, fontStyle: 'italic' },
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SlotCard — one créneau: schedule + its own staffing
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface SlotCardProps {
+  slot:              SlotDraft;
+  idx:               number;
+  prevSlot:          SlotDraft | null;
+  allSlots:          SlotDraft[];
+  minDate:           Date;
+  errors:            Record<string, string | undefined>;
+  serviceTypes:      ServiceType[];
+  servicesLoading:   boolean;
+  canRemove:         boolean;
+  onUpdateDates:     (patch: { startAt?: string; endAt?: string }) => void;
+  onRemove:          () => void;
+  onCopyFrom:        (sourceIdx: number) => void;
+  onTogglePicker:    () => void;
+  onAddLine:         (svc: ServiceType) => void;
+  onRemoveLine:      (serviceTypeId: string) => void;
+  onChangeLineCount: (serviceTypeId: string, delta: number) => void;
+  onSetLineUniform:  (serviceTypeId: string, uniform: UniformValue) => void;
+  t:                 MissionsT;
+}
+
+const SlotCard: React.FC<SlotCardProps> = ({
+  slot, idx, prevSlot, allSlots, minDate, errors, serviceTypes, servicesLoading, canRemove,
+  onUpdateDates, onRemove, onCopyFrom, onTogglePicker,
+  onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform, t,
+}) => {
+  const slotDurH = durationHours(slot.startAt, slot.endAt);
+  const startErr = errors[`slot_${slot.key}_startAt`];
+  const endErr   = errors[`slot_${slot.key}_endAt`];
+  const linesErr = errors[`slot_${slot.key}_lines`];
+  const prevEnd  = prevSlot && prevSlot.endAt ? new Date(prevSlot.endAt) : null;
+  const slotMin  = prevEnd && prevEnd > minDate ? prevEnd : minDate;
+  const slotMinEnd = slot.startAt
+    ? new Date(new Date(slot.startAt).getTime() + MIN_DURATION_H * 3_600_000)
+    : slotMin;
+
+  const agents = slotAgents(slot);
+  const hasValidDates = slot.startAt && slot.endAt && !startErr && !endErr && slotDurH > 0;
+
+  const copySources = useMemo(
+    () => allSlots.map((s, i) => ({ s, i })).filter(({ s, i }) => i !== idx && s.startAt && s.endAt),
+    [allSlots, idx],
+  );
+
+  const available = useMemo(
+    () => serviceTypes.filter(st => !slot.lines.some(l => l.serviceTypeId === st.id)),
+    [serviceTypes, slot.lines],
+  );
+
+  return (
+    <View style={[styles.slotCard, agents > 0 && styles.slotCardStaffed]}>
+      {/* Header */}
+      <View style={styles.slotCardHeader}>
+        <View style={styles.slotIdxBadge}><Text style={styles.slotIdxText}>{idx + 1}</Text></View>
+        <View style={styles.slotCardTitleBlock}>
+          <Text style={styles.slotCardTitle}>{t('create.creneau_label', { n: idx + 1 })}</Text>
+          {hasValidDates ? (
+            <Text style={styles.slotCardDateSummary} numberOfLines={1}>
+              {formatSlotDateShort(slot.startAt, slot.endAt)}
+            </Text>
+          ) : (
+            <Text style={styles.slotCardDatePending}>{t('create.slot_date_pending')}</Text>
+          )}
+        </View>
+        {slotDurH >= MIN_DURATION_H && !endErr && !startErr && (
+          <View style={styles.slotDurPill}>
+            <Clock size={9} color={colors.primary} strokeWidth={2.5} />
+            <Text style={styles.slotDurPillText}>{slotDurH.toFixed(1)} h</Text>
+          </View>
+        )}
+        {canRemove && (
+          <TouchableOpacity onPress={onRemove} style={styles.slotRemoveBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={14} color={colors.danger} strokeWidth={2} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {copySources.length > 0 && (!slot.startAt || !slot.endAt) && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.copyChipsRow}>
+          {copySources.map(({ s, i }) => (
+            <TouchableOpacity key={s.key} style={styles.copyChip} onPress={() => onCopyFrom(i)} activeOpacity={0.78}>
+              <Copy size={10} color={colors.primary} strokeWidth={2.2} />
+              <Text style={styles.copyChipText}>{t('create.slot_copy_from', { n: i + 1 })}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      <DateTimePicker
+        label={t('create.start_label')}
+        value={slot.startAt}
+        onChange={v => onUpdateDates({ startAt: v, endAt: '' })}
+        minDate={slotMin}
+        error={startErr}
+      />
+      <DateTimePicker
+        label={t('create.end_label')}
+        value={slot.endAt}
+        onChange={v => onUpdateDates({ endAt: v })}
+        minDate={slotMinEnd}
+        error={endErr}
+      />
+
+      <View style={styles.slotServicesDivider} />
+
+      {/* Staffing — this slot's own services / agents / uniforms */}
+      <View style={styles.staffHeader}>
+        <View style={styles.sectionHeader}>
+          <Users size={13} color={colors.textMuted} strokeWidth={2} />
+          <Text style={styles.sectionTitle}>{t('create.staff_section')}</Text>
+        </View>
+        {agents > 0 && (
+          <View style={styles.staffCountPill}>
+            <Text style={styles.staffCountText}>{t('create.slot_total_agents', { count: agents })}</Text>
+          </View>
+        )}
+      </View>
+
+      {slot.lines.length === 0 && !slot.pickerOpen && (
+        <View style={styles.staffEmpty}>
+          <Text style={styles.staffEmptyTitle}>{t('create.staff_empty')}</Text>
+          <Text style={styles.staffEmptyHint}>{t('create.staff_empty_hint')}</Text>
+        </View>
+      )}
+
+      {slot.lines.map(line => (
+        <View key={line.serviceTypeId} style={[styles.lineRow, { borderColor: line.accent + '55' }]}>
+          <View style={styles.lineRowHeader}>
+            <View style={[styles.lineDot, { backgroundColor: line.accent }]} />
+            <Text style={styles.lineName} numberOfLines={1}>{line.name}</Text>
+            <View style={styles.lineStepper}>
+              <TouchableOpacity
+                style={[styles.lineStepBtn, line.agentCount <= 1 && styles.lineStepBtnDisabled]}
+                onPress={() => onChangeLineCount(line.serviceTypeId, -1)}
+                disabled={line.agentCount <= 1}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Minus size={11} color={line.agentCount <= 1 ? colors.textMuted : line.accent} strokeWidth={2.5} />
+              </TouchableOpacity>
+              <Text style={[styles.lineStepCount, { color: line.accent }]}>{line.agentCount}</Text>
+              <TouchableOpacity
+                style={[styles.lineStepBtn, line.agentCount >= MAX_AGENTS && styles.lineStepBtnDisabled]}
+                onPress={() => onChangeLineCount(line.serviceTypeId, +1)}
+                disabled={line.agentCount >= MAX_AGENTS}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Plus size={11} color={line.agentCount >= MAX_AGENTS ? colors.textMuted : line.accent} strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => onRemoveLine(line.serviceTypeId)} style={styles.lineRemoveBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <X size={13} color={colors.textMuted} strokeWidth={2} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.lineUniformLabel}>{t('create.slot_uniform_label')}</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.lineChipsRow}>
+            {UNIFORM_OPTIONS.filter(opt => !line.allowedUniforms || line.allowedUniforms.length === 0 || line.allowedUniforms.includes(opt.value as UniformValue)).map(opt => {
+              const active = line.uniform === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.lineUniformChip, active && { backgroundColor: line.accent + '20', borderColor: line.accent }]}
+                  onPress={() => onSetLineUniform(line.serviceTypeId, opt.value as UniformValue)}
+                  hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                >
+                  <Text style={styles.lineUniformEmoji}>{opt.emoji}</Text>
+                  <Text style={[styles.lineUniformText, active && { color: line.accent, fontFamily: fontFamily.bodySemiBold }]}>
+                    {t(`uniforms.${opt.value}.label`, { ns: 'services', defaultValue: opt.label })}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ))}
+
+      {/* Add-a-service toggle + catalog picker */}
+      <TouchableOpacity
+        style={[styles.addServiceBtn, slot.pickerOpen && styles.addServiceBtnActive]}
+        onPress={onTogglePicker}
+        activeOpacity={0.78}
+      >
+        <UserPlus size={13} color={colors.primary} strokeWidth={2.2} />
+        <Text style={styles.addServiceText}>{t('create.staff_add_service')}</Text>
+        <ChevronRight
+          size={14}
+          color={colors.primary}
+          strokeWidth={2.2}
+          style={{ transform: [{ rotate: slot.pickerOpen ? '90deg' : '0deg' }] }}
+        />
+      </TouchableOpacity>
+
+      {slot.pickerOpen && (
+        <View style={styles.pickerWrap}>
+          {servicesLoading ? (
+            <View style={styles.pickerLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.pickerLoadingText}>{t('create.staff_loading')}</Text>
+            </View>
+          ) : available.length === 0 ? (
+            <Text style={styles.pickerEmpty}>
+              {serviceTypes.length === 0 ? t('create.staff_services_empty') : t('create.staff_all_added')}
+            </Text>
+          ) : (
+            available.map(svc => {
+              const { Icon, accent } = getServiceMeta(svc.name);
+              return (
+                <TouchableOpacity
+                  key={svc.id}
+                  style={styles.pickerRow}
+                  onPress={() => onAddLine(svc)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.pickerIconWrap, { backgroundColor: accent + '18', borderColor: accent + '40' }]}>
+                    <Icon size={16} color={accent} strokeWidth={1.8} />
+                  </View>
+                  <View style={styles.pickerInfo}>
+                    <Text style={styles.pickerName} numberOfLines={1}>{svc.name}</Text>
+                    <Text style={[styles.pickerRate, { color: accent }]}>
+                      {t('create.staff_rate_per_hour', { rate: formatEuros(svc.baseRatePerHour) })}
+                    </Text>
+                  </View>
+                  <View style={[styles.pickerAddPill, { backgroundColor: accent + '15', borderColor: accent + '45' }]}>
+                    <Plus size={12} color={accent} strokeWidth={2.6} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
+        </View>
+      )}
+
+      {linesErr && (
+        <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{linesErr}</Text></View>
+      )}
+    </View>
+  );
+};
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Shared styles
@@ -2263,11 +1770,13 @@ const reviewS = StyleSheet.create({
 
 const styles = StyleSheet.create({
   flex:        { flex: 1, backgroundColor: colors.background },
-  scroll:      { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[8] },
+  hydratingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] },
+  hydratingText: { fontFamily: fontFamily.bodyMedium, fontSize: 13, color: colors.textMuted },
+  scroll:      { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[12] },
   stepContent: { gap: spacing[3] },
   row:         { flexDirection: 'row', gap: spacing[3] },
   half:        { flex: 1 },
-  textArea:    { height: 90, textAlignVertical: 'top', paddingTop: spacing[3] },
+  textArea:    { minHeight: 104, textAlignVertical: 'top', paddingTop: spacing[3], marginBottom: spacing[2] },
 
   sectionBlock:  { gap: spacing[2], marginTop: spacing[2] },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
@@ -2276,49 +1785,21 @@ const styles = StyleSheet.create({
     letterSpacing: 1.0, textTransform: 'uppercase',
   },
 
-  // Multi-slot header (with exit affordance)
-  multiHeader: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    gap:            spacing[2],
-  },
-  exitMultiBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  exitMultiBtnText: {
-    fontFamily: fontFamily.bodyMedium, fontSize: 10,
-    color: colors.textMuted,
-  },
-
   // Presets
   presetGrid: { flexDirection: 'row', gap: spacing[2] },
   presetCard: {
     flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[1] + 2,
     paddingVertical: spacing[4], paddingHorizontal: spacing[2],
     borderRadius: radius.xl, borderWidth: 1, borderColor: colors.borderPrimary,
-    backgroundColor: colors.primarySurface,
-    position: 'relative',
+    backgroundColor: colors.primarySurface, position: 'relative',
   },
-  presetCardActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
+  presetCardActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   presetActiveDot: {
-    position: 'absolute', top: 6, right: 6,
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: colors.background,
-    borderWidth: 1, borderColor: colors.primary,
+    position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8,
+    backgroundColor: colors.background, borderWidth: 1, borderColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
-  presetLabel: {
-    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs,
-    color: colors.primary, textAlign: 'center',
-  },
+  presetLabel:       { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary, textAlign: 'center' },
   presetLabelActive: { color: colors.textInverse },
 
   // Slot card
@@ -2327,23 +1808,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border,
     padding: spacing[3] + 2, gap: spacing[2] + 2,
   },
-  slotCardCustomized: { borderColor: colors.borderPrimary },
+  slotCardStaffed: { borderColor: colors.borderPrimary },
   slotCardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   slotIdxBadge: {
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  slotIdxText:        { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary },
-  slotCardTitleBlock: { flex: 1, gap: 2, minWidth: 0 },
-  slotCardTitle:      { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
-  slotCardDateSummary:{ fontFamily: fontFamily.body, fontSize: 10, color: colors.textSecondary },
-  slotCardDatePending:{ fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, fontStyle: 'italic' },
+  slotIdxText:         { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary },
+  slotCardTitleBlock:  { flex: 1, gap: 2, minWidth: 0 },
+  slotCardTitle:       { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
+  slotCardDateSummary: { fontFamily: fontFamily.body, fontSize: 10, color: colors.textSecondary },
+  slotCardDatePending: { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, fontStyle: 'italic' },
   slotDurPill: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: colors.primarySurface, borderRadius: radius.lg,
-    paddingHorizontal: spacing[2], paddingVertical: 2,
-    borderWidth: 1, borderColor: colors.borderPrimary,
+    paddingHorizontal: spacing[2], paddingVertical: 2, borderWidth: 1, borderColor: colors.borderPrimary,
   },
   slotDurPillText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.primary },
   slotRemoveBtn:   { padding: spacing[1] },
@@ -2353,136 +1833,107 @@ const styles = StyleSheet.create({
   copyChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.primarySurface,
+    borderRadius: radius.full, backgroundColor: colors.primarySurface,
     borderWidth: 1, borderColor: colors.borderPrimary,
   },
   copyChipText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.primary },
 
-  // Per-slot services
+  // Staffing
   slotServicesDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing[1] },
-  slotServicesDefault: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: spacing[2],
+  staffHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[2] },
+  staffCountPill: {
+    paddingHorizontal: spacing[2] + 2, paddingVertical: 3, borderRadius: radius.full,
+    backgroundColor: colors.primarySurface, borderWidth: 1, borderColor: colors.borderPrimary,
   },
-  slotServicesBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
-    paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full, backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border,
-  },
-  slotServicesBadgeText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.textSecondary },
-  customizeSlotBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full,
-    backgroundColor: colors.primarySurface,
-    borderWidth: 1, borderColor: colors.borderPrimary,
-  },
-  customizeSlotBtnText: { fontFamily: fontFamily.bodySemiBold, fontSize: 11, color: colors.primary },
+  staffCountText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.primary },
 
-  // Customized
-  customizedWrap: {
-    gap: spacing[2],
-    backgroundColor: colors.primarySurface + '40',
-    borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.borderPrimary,
-    padding: spacing[3],
+  staffEmpty: {
+    alignItems: 'center', gap: 2, paddingVertical: spacing[3],
+    borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed' as any, borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  customizedHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-  },
-  customizedHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  customizedDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  customizedTitle: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
-  resetCustomBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    paddingHorizontal: spacing[2], paddingVertical: spacing[1],
-  },
-  resetCustomBtnText: { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textDecorationLine: 'underline' },
+  staffEmptyTitle: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textSecondary },
+  staffEmptyHint:  { fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted, fontStyle: 'italic' },
 
-  customPreviewRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
-    flexWrap: 'wrap',
-  },
-  customPreviewChip: {
-    paddingHorizontal: spacing[2] + 2, paddingVertical: 3,
-    borderRadius: radius.full, borderWidth: 1,
-  },
-  customPreviewChipText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10 },
-  customPreviewEmpty: {
-    fontFamily: fontFamily.body, fontSize: 11, color: colors.danger, fontStyle: 'italic',
-  },
-  customPreviewExpand: {
-    fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.primary,
-    marginLeft: 'auto',
-  },
-
-  // Per-line editor
-  editorList: { gap: spacing[2], marginTop: spacing[1] },
-  editorRow: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg, borderWidth: 1,
+  // Service line row
+  lineRow: {
+    backgroundColor: colors.background, borderRadius: radius.lg, borderWidth: 1,
     padding: spacing[2] + 2, gap: spacing[2],
   },
-  editorRowExcluded: { opacity: 0.55 },
-  editorRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
-  editorRowDot: { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
-  editorRowName: { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textPrimary },
-  editorRowNameExcluded: { textDecorationLine: 'line-through', color: colors.textMuted },
-  editorStepper: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2 },
-  editorStepBtn: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border,
+  lineRowHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  lineDot:  { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
+  lineName: { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textPrimary },
+  lineStepper: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2 },
+  lineStepBtn: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
-  editorStepBtnDisabled: { opacity: 0.35 },
-  editorStepCount: { fontFamily: fontFamily.display, fontSize: fontSize.base, minWidth: 18, textAlign: 'center' },
-  editorUniformLabel: {
-    fontFamily: fontFamily.bodyMedium, fontSize: 9,
-    color: colors.textMuted, letterSpacing: 0.6, textTransform: 'uppercase',
+  lineStepBtnDisabled: { opacity: 0.35 },
+  lineStepCount: { fontFamily: fontFamily.display, fontSize: fontSize.base, minWidth: 18, textAlign: 'center' },
+  lineRemoveBtn: { padding: 2, marginLeft: spacing[1] },
+  lineUniformLabel: {
+    fontFamily: fontFamily.bodyMedium, fontSize: 9, color: colors.textMuted,
+    letterSpacing: 0.6, textTransform: 'uppercase',
   },
-  editorChipsRow: { gap: spacing[1] + 2, alignItems: 'center' },
-  editorUniformChip: {
+  lineChipsRow: { gap: spacing[1] + 2, alignItems: 'center' },
+  lineUniformChip: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     paddingHorizontal: spacing[2] + 2, paddingVertical: spacing[1] + 2,
-    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderRadius: radius.full, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
   },
-  editorUniformEmoji: { fontSize: 12 },
-  editorUniformText:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textSecondary },
-  editorExcludedNote: {
-    fontFamily: fontFamily.body, fontSize: 10, color: colors.textMuted,
-    fontStyle: 'italic', textAlign: 'center',
+  lineUniformEmoji: { fontSize: 12 },
+  lineUniformText:  { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textSecondary },
+
+  // Add service + picker
+  addServiceBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    paddingHorizontal: spacing[3], paddingVertical: spacing[2] + 2,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.borderPrimary,
+    backgroundColor: colors.primarySurface,
   },
-  editorTotal: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
-    paddingTop: spacing[2],
-    borderTopWidth: 1, borderTopColor: colors.border,
+  addServiceBtnActive: { backgroundColor: colors.primarySurface, borderColor: colors.primary },
+  addServiceText: { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary },
+
+  pickerWrap: { gap: spacing[2], marginTop: spacing[1] },
+  pickerLoading: { flexDirection: 'row', alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3], justifyContent: 'center' },
+  pickerLoadingText: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
+  pickerEmpty: {
+    fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted,
+    fontStyle: 'italic', textAlign: 'center', paddingVertical: spacing[3],
   },
-  editorTotalText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textSecondary },
+  pickerRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[3],
+    padding: spacing[2] + 2, borderRadius: radius.lg,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+  },
+  pickerIconWrap: {
+    width: 38, height: 38, borderRadius: radius.lg, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  pickerInfo: { flex: 1, gap: 1 },
+  pickerName: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
+  pickerRate: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
+  pickerAddPill: {
+    width: 28, height: 28, borderRadius: 14, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
 
   // Add slot
   addSlotBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: spacing[2], paddingVertical: spacing[3],
     borderRadius: radius.xl, borderWidth: 1, borderStyle: 'dashed' as any,
-    borderColor: colors.borderPrimary, backgroundColor: colors.primarySurface,
-    marginTop: spacing[2],
+    borderColor: colors.borderPrimary, backgroundColor: colors.primarySurface, marginTop: spacing[2],
   },
   addSlotText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
-  addSlotHint: {
-    fontFamily: fontFamily.body, fontSize: 11, color: colors.textMuted,
-    textAlign: 'center', fontStyle: 'italic',
-  },
+  addSlotHint: { fontFamily: fontFamily.body, fontSize: 11, color: colors.textMuted, textAlign: 'center', fontStyle: 'italic' },
 
   // Duration badge
   durationBadge: {
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] + 2,
     backgroundColor: colors.primarySurface, borderRadius: radius.lg,
-    padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary,
-    marginTop: spacing[2],
+    padding: spacing[3], borderWidth: 1, borderColor: colors.borderPrimary, marginTop: spacing[2],
   },
   durationText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
   urgentRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -2490,39 +1941,19 @@ const styles = StyleSheet.create({
 
   // Errors
   errorBanner: {
-    backgroundColor: 'rgba(225,29,72,0.12)',
-    borderRadius: radius.lg, padding: spacing[3],
+    backgroundColor: 'rgba(225,29,72,0.12)', borderRadius: radius.lg, padding: spacing[3],
     borderWidth: 1, borderColor: colors.danger,
   },
   errorBannerText: { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.danger },
 
-  // Footer — Back + Continue row
+  // Footer
   footer: {
-    paddingHorizontal: layout.screenPaddingH,
-    paddingTop:        spacing[3],
-    paddingBottom:     spacing[4],
-    backgroundColor:   colors.background,
-    borderTopWidth:    1,
-    borderTopColor:    colors.border,
-    gap:               spacing[2],
+    paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[3], paddingBottom: spacing[4],
+    backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing[2],
   },
-  footerMeta: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            spacing[1],
-  },
-  footerMetaText: {
-    fontFamily:    fontFamily.bodyMedium,
-    fontSize:      11,
-    color:         colors.textMuted,
-    letterSpacing: 0.3,
-  },
-  footerBtnRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           spacing[2] + 2,
-  },
-  footerBackBtn: { flexShrink: 0, paddingHorizontal: spacing[4] },
-  footerNextBtn: { flex: 1 },
+  footerMeta:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] },
+  footerMetaText: { fontFamily: fontFamily.bodyMedium, fontSize: 11, color: colors.textMuted, letterSpacing: 0.3 },
+  footerBtnRow:   { flexDirection: 'row', alignItems: 'center', gap: spacing[2] + 2 },
+  footerBackBtn:  { flexShrink: 0, paddingHorizontal: spacing[4] },
+  footerNextBtn:  { flex: 1 },
 });

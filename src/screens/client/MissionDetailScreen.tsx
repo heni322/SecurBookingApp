@@ -1,5 +1,5 @@
 /**
- * MissionDetailScreen — full mission view.
+ * MissionDetailScreen ï¿½ full mission view.
  *
  * FIX: "Obtenir un devis" CTA now calls POST /quotes/calculate inline before
  * navigating so QuoteDetailScreen always opens with a fresh quote rather than
@@ -14,7 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Calendar, Clock, MapPin, Radio, Banknote,
   CalendarDays, MessageSquare, FileText, Zap, 
-  Check, Hourglass, Users, PlayCircle, CheckCheck, XCircle,
+  Check, Hourglass, Users, PlayCircle, CheckCheck, XCircle, Pencil,
 } from 'lucide-react-native';
 import { missionsApi }          from '@api/endpoints/missions';
 import { quotesApi }            from '@api/endpoints/quotes';
@@ -40,7 +40,7 @@ import { useConfirmDialogStore } from '@store/confirmDialogStore';
 import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionDetail'>;
-// Button.variant is 'filled'|'outline'|'ghost'|'danger' — no 'primary'
+// Button.variant is 'filled'|'outline'|'ghost'|'danger' ï¿½ no 'primary'
 type Cta = { label: string; isLive?: boolean; disabled?: boolean; loading?: boolean; onPress: () => void };
 
 const STATUS_I18N_KEY: Record<MissionStatus, keyof MissionsNS['statuses']> = {
@@ -75,11 +75,11 @@ function startsInLabel(startAt: string | Date | undefined): string | null {
   const ms = new Date(startAt).getTime() - Date.now();
   if (ms <= 0 || ms > 1000 * 60 * 60 * 24 * 7) return null;
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `Démarre dans ${minutes} min`;
+  if (minutes < 60) return `Dï¿½marre dans ${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `Démarre dans ${hours}h${minutes % 60 ? ` ${minutes % 60}min` : ''}`;
+  if (hours < 24) return `Dï¿½marre dans ${hours}h${minutes % 60 ? ` ${minutes % 60}min` : ''}`;
   const days = Math.floor(hours / 24);
-  return `Démarre dans ${days} jour${days > 1 ? 's' : ''}`;
+  return `Dï¿½marre dans ${days} jour${days > 1 ? 's' : ''}`;
 }
 
 /**
@@ -122,7 +122,7 @@ const JourneyStepper: React.FC<{ status: MissionStatus }> = ({ status }) => {
     return (
       <View style={stepStyles.cancelledRow}>
         <XCircle size={16} color={colors.danger} strokeWidth={1.8} />
-        <Text style={stepStyles.cancelledText}>Mission annulée</Text>
+        <Text style={stepStyles.cancelledText}>Mission annulï¿½e</Text>
       </View>
     );
   }
@@ -215,8 +215,8 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
    * FIX: "Obtenir un devis" CTA handler.
    *
    * Previously the CTA called navigation.navigate('QuoteDetail') directly.
-   * QuoteDetailScreen immediately fetched GET /quotes/mission/:id — which
-   * returned 404 because no quote existed yet — showing a dead-end EmptyState.
+   * QuoteDetailScreen immediately fetched GET /quotes/mission/:id ï¿½ which
+   * returned 404 because no quote existed yet ï¿½ showing a dead-end EmptyState.
    *
    * Fix: call POST /quotes/calculate here first (building bookingLines from the
    * already-loaded mission.bookings), then navigate only on success.
@@ -242,6 +242,8 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const statusLabel    = useMemo(() => mission ? t(`statuses.${STATUS_I18N_KEY[mission.status as MissionStatus]}`) : '', [mission, t]);
   const statusColor    = useMemo(() => mission ? (MISSION_STATUS_COLOR[mission.status] ?? colors.textMuted) : colors.textMuted, [mission]);
   const canCancel      = useMemo(() => mission ? isCancellableMission(mission) : false, [mission]);
+  // A brouillon (CREATED) mission can be fully edited by its client.
+  const canEdit        = useMemo(() => mission?.status === MissionStatus.CREATED, [mission]);
   const hasQuote       = useMemo(() => Boolean(mission?.quote), [mission]);
   const bookings       = useMemo(() => mission?.bookings ?? [], [mission]);
   const displayTitle   = useMemo(() => mission?.title?.trim() || t('card_fallback_title', { city: mission?.city }), [mission, t]);
@@ -267,7 +269,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (mission.status === MissionStatus.PUBLISHED)
       return { label: t('detail.cta_waiting'), onPress: () => {}, disabled: true };
     if (mission.status === MissionStatus.STAFFING)
-      // Agents are auto-assigned when they apply — client waits passively.
+      // Agents are auto-assigned when they apply ï¿½ client waits passively.
       return { label: t('detail.cta_assigning'), onPress: () => {}, disabled: true };
     if (mission.status === MissionStatus.STAFFED)
       return { label: t('detail.cta_pay'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
@@ -408,7 +410,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.locationAddress}>{fullAddress}</Text>
           {hasCoords && (
             <View style={styles.mapWrap}>
-              {/* FIX: MissionMapView has no `address` prop — pass as `title` */}
+              {/* FIX: MissionMapView has no `address` prop ï¿½ pass as `title` */}
               <MissionMapView latitude={mission.latitude} longitude={mission.longitude} title={mission.address} />
             </View>
           )}
@@ -436,7 +438,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {cta && (
         <View style={styles.footer}>
           {/*
-            FIX: Button variant 'primary' does not exist — use 'filled'.
+            FIX: Button variant 'primary' does not exist ï¿½ use 'filled'.
             valid values: 'filled' | 'outline' | 'ghost' | 'danger'
           */}
           <Button
@@ -448,9 +450,19 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             size="lg"
             variant={cta.isLive ? 'danger' : 'filled'}
           />
+          {canEdit && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('MissionCreate', { editMissionId: missionId })}
+              style={styles.editLink}
+              activeOpacity={0.7}
+            >
+              <Pencil size={15} color={colors.primary} strokeWidth={2} />
+              <Text style={styles.editLinkText}>{t('detail.cta_edit')}</Text>
+            </TouchableOpacity>
+          )}
           {canCancel && (
             <TouchableOpacity onPress={handleCancel} style={styles.cancelLink} activeOpacity={0.7}>
-              {/* FIX: 'detail.cancel_link' doesn't exist in MissionsNS — use 'detail.cancel' */}
+              {/* FIX: 'detail.cancel_link' doesn't exist in MissionsNS ï¿½ use 'detail.cancel' */}
               <Text style={styles.cancelLinkText}>{t('detail.cancel')}</Text>
             </TouchableOpacity>
           )}
@@ -495,6 +507,8 @@ const styles = StyleSheet.create({
   notesText:         { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 22 },
   bookingsSection:   { gap: spacing[3] },
   footer:            { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[8], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background, gap: spacing[3] },
+  editLink:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] + 2, paddingVertical: spacing[2] },
+  editLinkText:      { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
   cancelLink:        { alignItems: 'center', paddingVertical: spacing[1] },
   cancelLinkText:    { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
 });

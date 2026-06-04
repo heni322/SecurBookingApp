@@ -20,6 +20,11 @@
  * with the wrong version are deleted to avoid feeding the screen partial/stale
  * shapes. This is much safer than runtime migrations for a free-form draft.
  *
+ *   v2 — Per-slot staffing. The mission-creation flow merged service/agent
+ *        selection into each time slot, so a draft now carries `slots[].lines`
+ *        (services + agent count + uniform, per slot) instead of a global
+ *        `bookingLines` array + per-slot overrides. v1 drafts are discarded.
+ *
  * TTL
  * ───
  * Drafts are valid for 7 days. Stale drafts are dropped silently on read — the
@@ -36,12 +41,22 @@ try {
 }
 
 /** Bump when MissionDraftPayload shape changes. Old drafts are discarded. */
-const DRAFT_VERSION = 1;
+const DRAFT_VERSION = 2;
 /** Drafts older than this are dropped on read. 7 days. */
 const DRAFT_TTL_MS = 7 * 24 * 3_600_000;
 
 const keyFor = (userId: string): string =>
   `@securbook:client:mission_draft:v${DRAFT_VERSION}:${userId}`;
+
+/** One persisted service line within a slot draft. UI-only metadata included. */
+export interface MissionDraftSlotLine {
+  serviceTypeId: string;
+  name:          string;
+  accent:        string;
+  ratePerHour:   number;
+  agentCount:    number;
+  uniform:       string;
+}
 
 /**
  * Shape of what we persist. Intentionally a subset of the screen's local state —
@@ -49,7 +64,7 @@ const keyFor = (userId: string): string =>
  * scroll positions, or transient validation errors. We save what the user typed.
  */
 export interface MissionDraftPayload {
-  step:        1 | 2 | 3;
+  step: 1 | 2;
   form: {
     title:     string;
     notes:     string;
@@ -58,49 +73,33 @@ export interface MissionDraftPayload {
     zipCode:   string;
     latitude:  number | null;
     longitude: number | null;
-    startAt:   string;
-    endAt:     string;
   };
-  /** Empty array means single-slot mode. */
+  /** Always at least one slot. Each slot owns its own staffing (`lines`). */
   slots: Array<{
-    startAt:    string;
-    endAt:      string;
-    customized: boolean;
-    overrides:  Array<{
-      serviceTypeId: string;
-      agentCount:    number;
-      slotUniform:   string;
-    }>;
-  }>;
-  /** Persisted so we can show "Reprendre" only when services still match. */
-  bookingLines: Array<{
-    serviceTypeId: string;
-    agentCount:    number;
-    name:          string;
-    accent:        string;
-    agentUniforms: (string | null)[];
+    startAt: string;
+    endAt:   string;
+    lines:   MissionDraftSlotLine[];
   }>;
 }
 
 interface StoredEnvelope {
-  version:   number;
-  savedAt:   number; // epoch ms
-  payload:   MissionDraftPayload;
+  version: number;
+  savedAt: number; // epoch ms
+  payload: MissionDraftPayload;
 }
 
 /**
  * Returns true if `payload` carries any user-supplied content worth restoring.
- * Empty form + no slots + step 1 means the user opened the screen and closed it
- * — restoring would just nag them.
+ * Empty form + empty slots means the user opened the screen and closed it —
+ * restoring would just nag them.
  */
 export function isDraftMeaningful(payload: MissionDraftPayload | null): boolean {
   if (!payload) return false;
   const { form, slots } = payload;
   const hasFormContent =
     Boolean(form.address.trim() || form.city.trim() || form.title.trim() ||
-            form.notes.trim()  || form.startAt || form.endAt ||
-            form.latitude != null);
-  const hasSlots = slots.length > 0 && slots.some(s => s.startAt || s.endAt);
+            form.notes.trim()  || form.latitude != null);
+  const hasSlots = slots.some(s => s.startAt || s.endAt || s.lines.length > 0);
   return hasFormContent || hasSlots;
 }
 

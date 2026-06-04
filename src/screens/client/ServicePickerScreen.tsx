@@ -17,7 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   Shield, Building2, Flame, Dog, Car, Star,
-  UserCheck, Users, Check, Plus, Minus, ArrowRight,
+  UserCheck, Check, Plus, Minus, ArrowRight,
   Settings2,
 } from 'lucide-react-native';
 import { serviceTypesApi }     from '@api/endpoints/serviceTypes';
@@ -69,7 +69,6 @@ const SERVICE_ICON_MAP: Array<{ keywords: string[]; Icon: LucideIconComp; accent
   { keywords: ['incendie', 'ssiap', 'feu'],                   Icon: Flame,     accent: palette.txtRed },
   { keywords: ['rondier', 'mobile', 'voiture'],               Icon: Car,       accent: palette.txtBlue },
   { keywords: ['corps', 'apr', 'garde'],                      Icon: UserCheck, accent: palette.txtPurple },
-  { keywords: ['accueil', 'hôtesse', 'hôtesse', 'réception'], Icon: Users,     accent: palette.gold },
   { keywords: ['equipe', 'chef', 'coord'],                    Icon: Building2, accent: palette.txtBlue },
 ];
 

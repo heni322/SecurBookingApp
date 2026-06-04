@@ -1,4 +1,4 @@
-﻿import type { AuthNS } from '../types';
+import type { AuthNS } from '../types';
 
 const auth: AuthNS = {
   login: {
@@ -7,7 +7,7 @@ const auth: AuthNS = {
     password_label: 'Password', password_placeholder: '••••••••',
     submit: 'Sign in', submitting: 'Signing in…',
     secure_text: 'TLS encrypted connection · GDPR compliant',
-    no_account: 'No account yet?', create_link: 'Create account', biometrics: 'Biometrics',
+    no_account: 'No account yet?', create_link: 'Create account', biometrics: 'Biometrics', forgot_link: 'Forgot password?',
     errors: { email_required: 'Email is required', email_invalid: 'Invalid email address', password_required: 'Password is required', invalid_creds: 'Incorrect email or password.', generic: 'Sign-in failed' },
     alert: { title: 'Unable to sign in' },
   },
@@ -49,6 +49,29 @@ const auth: AuthNS = {
     verify: 'Verify', incomplete_title: 'Incomplete code', incomplete_body: 'Enter all 6 digits.',
     invalid_title: 'Invalid code', invalid_body: 'The code is incorrect or expired.',
     resend: 'Resend code', resent_title: 'Code resent', resent_body: 'A new code has been sent.', resend_error: 'Unable to resend code.',
+  },
+  forgot_password: {
+    header: 'Forgot password', title: 'Reset your password',
+    subtitle: 'Enter the email address linked to your account. We will send you a secure link to set a new password.',
+    email_label: 'Email address', email_placeholder: 'you@example.com',
+    submit: 'Send reset link', submitting: 'Sending…', back_to_login: 'Back to sign in',
+    sent_title: 'Check your inbox', sent_body: 'If an account exists for this address, a reset link valid for 1 hour has just been sent. Remember to check your spam folder.',
+    resend: 'Resend link', open_mail: 'Open mail app', enter_code: 'Enter the code',
+    errors: { email_required: 'Email is required', email_invalid: 'Invalid email address', generic: 'Could not send. Please try again shortly.' },
+  },
+  reset_password: {
+    header: 'New password', title: 'Set a new password',
+    subtitle: 'Paste the link you received by email (or just the code it contains), then choose a new password.',
+    token_label: 'Reset code', token_placeholder: 'Paste the link or code from your email',
+    token_hint: 'Tip: you can paste the full link, the code is extracted automatically.',
+    password_label: 'New password', password_placeholder: '8 characters minimum',
+    confirm_label: 'Confirm password', confirm_placeholder: 'Re-enter the password',
+    submit: 'Reset password', submitting: 'Resetting…', back_to_login: 'Back to sign in',
+    requirements: { length: 'At least 8 characters', uppercase: 'One uppercase letter', digit: 'One digit' },
+    strength: { weak: 'Weak', fair: 'Fair', good: 'Good', strong: 'Strong' },
+    success_title: 'Password reset', success_body: 'Your password has been changed and all active sessions have been signed out. You can now sign in.',
+    go_to_login: 'Sign in',
+    errors: { token_required: 'Code is required', password_length: '8 characters minimum', password_complexity: 'Must contain an uppercase letter and a digit', mismatch: 'Passwords do not match', invalid_token: 'Invalid or expired link. Request a new one.', generic: 'Could not reset password. Please try again.' },
   },
 };
 

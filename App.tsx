@@ -6,8 +6,10 @@ import './src/i18n/types'; // TypeScript augmentation (no runtime cost)
 import React, { useEffect } from 'react';
 import { StatusBar, LogBox, View } from 'react-native';
 import { SafeAreaProvider }        from 'react-native-safe-area-context';
+import { QueryClientProvider }     from '@tanstack/react-query';
 import { StripeProvider }          from '@stripe/stripe-react-native';
 import { RootNavigator }           from '@navigation/RootNavigator';
+import { queryClient }             from '@lib/queryClient';
 import { useAuthStore }            from '@store/authStore';
 import { useNotificationsStore }   from '@store/notificationsStore';
 import { tokenStorage }            from '@services/tokenStorage';
@@ -70,17 +72,19 @@ function App(): React.JSX.Element {
 
   return (
     <ErrorBoundary>
-      <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
-        <SafeAreaProvider>
-          <StatusBar barStyle="light-content" backgroundColor="#05172b" />
-          <View style={{ flex: 1 }}>
-            <OfflineBanner />
-            <RootNavigator />
-            <ToastHost />
-            <ConfirmDialogHost />
-          </View>
-        </SafeAreaProvider>
-      </StripeProvider>
+      <QueryClientProvider client={queryClient}>
+        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+          <SafeAreaProvider>
+            <StatusBar barStyle="light-content" backgroundColor="#05172b" />
+            <View style={{ flex: 1 }}>
+              <OfflineBanner />
+              <RootNavigator />
+              <ToastHost />
+              <ConfirmDialogHost />
+            </View>
+          </SafeAreaProvider>
+        </StripeProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 }

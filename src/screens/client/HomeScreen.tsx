@@ -12,7 +12,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Shield, CheckCircle, RefreshCw, Plus, ChevronRight,
-  Zap, ArrowUpRight, AlertOctagon, X,
+  Zap, ArrowUpRight, AlertOctagon, X, ChevronDown, ChevronUp,
 } from 'lucide-react-native';
 import { missionsApi }           from '@api/endpoints/missions';
 import { notificationsApi }      from '@api/endpoints/notifications';
@@ -27,7 +27,7 @@ import { colors, palette }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }  from '@theme/typography';
 import { MissionStatus }         from '@constants/enums';
-import { isActiveMission }       from '@utils/typeGuards';
+import { isOngoingMission, isUpcomingMission, missionWindow } from '@utils/typeGuards';
 import type { Mission, MainTabParamList, MissionStackParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
 import { useToast } from '@hooks/useToast';
@@ -50,6 +50,7 @@ export const HomeScreen: React.FC = () => {
   const { data: missions, loading, execute } = useApi(missionsApi.getMyMissions);
   const [sosVisible, setSosVisible] = useState(false);
   const [sosSending, setSosSending] = useState(false);
+  const [cancelledOpen, setCancelledOpen] = useState(false);
 
   const load = useCallback(async () => {
     await execute();
@@ -62,9 +63,39 @@ export const HomeScreen: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const allMissions     = missions ?? [];
-  const activeMissions  = allMissions.filter(isActiveMission);
-  const recentMissions  = allMissions.slice(0, 4);
-  const totalMissions   = allMissions.length;
+  // Cancelled missions are excluded from the total count and the recent list:
+  // they're not what the client is actively tracking, only noise in the overview.
+  const nonCancelledMissions = allMissions.filter(m => m.status !== MissionStatus.CANCELLED);
+  const recentMissions  = [...nonCancelledMissions]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 4);
+
+  // Cancelled missions live in their own collapsible section below the recents
+  // (and are never counted in the total above).
+  const cancelledMissions = [...allMissions]
+    .filter(m => m.status === MissionStatus.CANCELLED)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  // Featured mission for the hero card. A mission that only STARTS in a few
+  // days must not be shown as "in progress": prefer a genuinely ongoing
+  // mission, otherwise surface the soonest upcoming one (labelled differently).
+  const ongoingMissions = allMissions.filter(m => isOngoingMission(m));
+  const upcomingMissions = allMissions
+    .filter(m => isUpcomingMission(m))
+    .sort((a, b) => missionWindow(a).start - missionWindow(b).start);
+  const featuredMission = ongoingMissions[0] ?? upcomingMissions[0] ?? null;
+  const featuredIsOngoing = ongoingMissions.length > 0;
+
+  // Short, locale-aware start label for the upcoming-mission card.
+  const formatStartShort = (m: typeof allMissions[number]): string => {
+    const { start } = missionWindow(m);
+    if (!start) return '';
+    return new Date(start).toLocaleString(undefined, {
+      weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+    });
+  };
+
+  const totalMissions   = nonCancelledMissions.length;
   const completedCount  = allMissions.filter(m => m.status === MissionStatus.COMPLETED).length;
   const inProgressCount = allMissions.filter(m =>
     m.status === MissionStatus.PUBLISHED  ||
@@ -77,7 +108,7 @@ export const HomeScreen: React.FC = () => {
   const hour      = new Date().getHours();
   const greeting  = hour < 18 ? t('greeting.morning') : t('greeting.evening');
 
-  const goToServicePicker = () => navigation.navigate('Missions', { screen: 'ServicePicker' } as any);
+  const goToServicePicker = () => navigation.navigate('Missions', { screen: 'MissionCreate' } as any);
   const goToMissionDetail = (id: string) => navigation.navigate('Missions', { screen: 'MissionDetail', params: { missionId: id } } as any);
   const goToMissionList   = () => navigation.navigate('Missions', { screen: 'MissionList' } as any);
 
@@ -131,7 +162,7 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* ── CTA Banner ── */}
-        {activeMissions.length === 0 && !loading && (
+        {!featuredMission && !loading && (
           <TouchableOpacity style={styles.ctaBanner} activeOpacity={0.85} onPress={goToServicePicker}>
             <View style={styles.ctaDots} pointerEvents="none">
               {[0,1,2,3,4,5].map(i => <View key={i} style={[styles.ctaDot, { opacity: 0.08 + i * 0.04 }]} />)}
@@ -152,19 +183,27 @@ export const HomeScreen: React.FC = () => {
         )}
 
         {/* ── Active mission card ── */}
-        {activeMissions.length > 0 && (
+        {featuredMission && (
           <TouchableOpacity
             style={styles.activeMissionCard}
             activeOpacity={0.85}
-            onPress={() => goToMissionDetail(activeMissions[0].id)}
+            onPress={() => goToMissionDetail(featuredMission.id)}
           >
-            <View style={styles.activeLiveDot} />
+            {featuredIsOngoing
+              ? <View style={styles.activeLiveDot} />
+              : <View style={styles.upcomingDot} />}
             <View style={styles.activeMissionContent}>
-              <Text style={styles.activeMissionLabel}>{t('active_mission.label')}</Text>
-              <Text style={styles.activeMissionTitle} numberOfLines={1}>
-                {activeMissions[0].title ?? activeMissions[0].city}
+              <Text style={styles.activeMissionLabel}>
+                {featuredIsOngoing ? t('active_mission.label') : t('upcoming_mission.label')}
               </Text>
-              <Text style={styles.activeMissionSub}>{activeMissions[0].city}</Text>
+              <Text style={styles.activeMissionTitle} numberOfLines={1}>
+                {featuredMission.title ?? featuredMission.city}
+              </Text>
+              <Text style={styles.activeMissionSub}>
+                {featuredIsOngoing
+                  ? featuredMission.city
+                  : t('upcoming_mission.starts', { when: formatStartShort(featuredMission) })}
+              </Text>
             </View>
             <ChevronRight size={18} color={colors.primary} strokeWidth={2} />
           </TouchableOpacity>
@@ -201,6 +240,27 @@ export const HomeScreen: React.FC = () => {
             ))
           )}
         </View>
+
+        {/* Cancelled missions — separated from recents, never counted in the total */}
+        {cancelledMissions.length > 0 && (
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.sectionHeader} activeOpacity={0.7} onPress={() => setCancelledOpen(o => !o)}>
+              <View style={styles.sectionTitleRow}>
+                <View style={[styles.sectionAccent, styles.sectionAccentMuted]} />
+                <Text style={styles.sectionTitle}>{t('cancelled.title')}</Text>
+                <View style={styles.cancelledBadge}>
+                  <Text style={styles.cancelledBadgeText}>{cancelledMissions.length}</Text>
+                </View>
+              </View>
+              {cancelledOpen
+                ? <ChevronUp size={18} color={colors.textMuted} strokeWidth={2} />
+                : <ChevronDown size={18} color={colors.textMuted} strokeWidth={2} />}
+            </TouchableOpacity>
+            {cancelledOpen && cancelledMissions.map((m: Mission) => (
+              <MissionCard key={m.id} mission={m} onPress={() => goToMissionDetail(m.id)} compact />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* ── SOS floating button ── */}
@@ -313,6 +373,7 @@ const styles = StyleSheet.create({
   ctaArrow:             { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' },
   activeMissionCard:    { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.backgroundElevated, borderRadius: radius.xl, borderWidth: 1.5, borderColor: colors.primary + '55', padding: spacing[4], marginBottom: spacing[5], gap: spacing[3] },
   activeLiveDot:        { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success, shadowColor: colors.success, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 4, elevation: 2 },
+  upcomingDot:          { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   activeMissionContent: { flex: 1, gap: 2 },
   activeMissionLabel:   { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.primary, letterSpacing: 0.8 },
   activeMissionTitle:   { fontFamily: fontFamily.display, fontSize: fontSize.base, color: colors.textPrimary, letterSpacing: -0.2 },
@@ -321,6 +382,9 @@ const styles = StyleSheet.create({
   sectionHeader:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[4] },
   sectionTitleRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   sectionAccent:        { width: 3, height: 18, borderRadius: 2, backgroundColor: colors.primary },
+  sectionAccentMuted:   { backgroundColor: colors.textMuted },
+  cancelledBadge:       { minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginLeft: spacing[1] },
+  cancelledBadgeText:   { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted },
   sectionTitle:         { fontFamily: fontFamily.display, fontSize: fontSize.lg, color: colors.textPrimary, letterSpacing: -0.3 },
   seeAllBtn:            { flexDirection: 'row', alignItems: 'center', gap: 2 },
   sectionLink:          { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.primary },

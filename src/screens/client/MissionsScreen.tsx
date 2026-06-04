@@ -174,7 +174,7 @@ export const MissionsScreen: React.FC<Props> = ({ navigation }) => {
 
   // ── Handlers ────────────────────────────────────────────────────────────
   const handleRefresh      = useCallback(() => { refetch(); }, [refetch]);
-  const handleNewMission   = useCallback(() => navigation.navigate('ServicePicker', {}), [navigation]);
+  const handleNewMission   = useCallback(() => navigation.navigate('MissionCreate', undefined), [navigation]);
   const handleMissionPress = useCallback(
     (id: string) => navigation.navigate('MissionDetail', { missionId: id }),
     [navigation],

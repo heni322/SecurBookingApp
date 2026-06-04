@@ -1,6 +1,5 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { ServicePickerScreen }  from '@screens/client/ServicePickerScreen';
 import { MissionCreateScreen }  from '@screens/client/MissionCreateScreen';
 import { MissionDetailScreen }  from '@screens/client/MissionDetailScreen';
 import { QuoteDetailScreen }    from '@screens/client/QuoteDetailScreen';
@@ -21,7 +20,6 @@ export const MissionStackNavigator: React.FC = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     {/* ── Core flow ─────────────────────────────────────────────── */}
     <Stack.Screen name="MissionList"    component={MissionsScreen} />
-    <Stack.Screen name="ServicePicker"  component={ServicePickerScreen} />
     <Stack.Screen name="MissionCreate"  component={MissionCreateScreen} />
     <Stack.Screen name="MissionDetail"  component={MissionDetailScreen} />
     <Stack.Screen name="QuoteDetail"    component={QuoteDetailScreen} />

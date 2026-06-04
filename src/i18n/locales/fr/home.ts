@@ -17,9 +17,16 @@ const home: HomeNS = {
   active_mission: {
     label: 'MISSION EN COURS',
   },
+  upcoming_mission: {
+    label:  'PROCHAINE MISSION',
+    starts: 'Débute {{when}}',
+  },
   recent: {
     title:   'Missions récentes',
     see_all: 'Voir tout',
+  },
+  cancelled: {
+    title: 'Missions annulées',
   },
   empty: {
     title:    'Aucune mission',

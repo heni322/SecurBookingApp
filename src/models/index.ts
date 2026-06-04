@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   UserRole, UserStatus, MissionStatus, BookingStatus, PaymentStatus, ClientType} from '@constants/enums';
 
 // -----------------------------------------------------------------------------
@@ -86,6 +86,11 @@ export interface DeleteAccountPayload {
 // -----------------------------------------------------------------------------
 // SERVICE TYPES
 // -----------------------------------------------------------------------------
+export interface MatchingUniform {
+  value:     string;
+  isDefault: boolean;
+}
+
 export interface ServiceType {
   id:              string;
   name:            string;
@@ -94,6 +99,10 @@ export interface ServiceType {
   baseRatePerHour: number;
   isActive:        boolean;
   createdAt:       string;
+  /** Tenues matching this service category (from the API; default flagged). */
+  matchingUniforms?: MatchingUniform[];
+  /** Most appropriate tenue for this service (from the API). */
+  defaultUniform?:   string;
 }
 
 // -----------------------------------------------------------------------------
@@ -538,6 +547,11 @@ export type AuthStackParamList = {
   Login:    undefined;
   Register: undefined;
   TwoFa:    { tempToken: string };
+  ForgotPassword: undefined;
+  // `token` is populated when arriving via the email deep-link
+  // (securbook://auth/reset-password?token=…). Undefined when the user
+  // opens the screen manually and pastes the token by hand.
+  ResetPassword:  { token?: string } | undefined;
 };
 
 export type MainTabParamList = {
@@ -560,15 +574,18 @@ export type ProfileStackParamList = {
 
 export type MissionStackParamList = {
   MissionList:    undefined;
+  /** All params optional - flow starts here now (ServicePicker removed). */
   MissionCreate:  {
-    bookingLines: Array<{
+    bookingLines?: Array<{
       serviceTypeId: string;
       agentCount:    number;
       name:          string;
       accent:        string;
       agentUniforms: (string | null)[];
     }>;
-  };
+    /** When set, the screen runs in EDIT mode for this draft (brouillon) mission. */
+    editMissionId?: string;
+  } | undefined;
   ServicePicker:  {
     existingLines?: Array<{
       serviceTypeId: string;

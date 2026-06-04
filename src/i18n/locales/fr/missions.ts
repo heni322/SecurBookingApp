@@ -67,6 +67,7 @@ const missions: MissionsNS = {
     created_on:       'Créée le',
     cta_get_quote:    'Obtenir un devis',
     cta_see_quote:    'Voir le devis',
+    cta_edit:         'Modifier la mission',
     cta_pay:          'Voir le devis et payer',
     cta_select:       'Choisir mes agents',
     cta_waiting:      'En attente de candidatures…',
@@ -80,6 +81,13 @@ const missions: MissionsNS = {
     section_notes:    'Notes & instructions',
     section_bookings: 'Postes',
     total_ttc:        'Total TTC',
+  },
+
+  edit: {
+    screen_title: 'Modifier la mission',
+    loading:      'Chargement de la mission…',
+    save_btn:     'Enregistrer',
+    saved_toast:  'Mission mise à jour.',
   },
 
   statuses: {
@@ -299,6 +307,23 @@ const missions: MissionsNS = {
     review_estimate_note:   'Le prix définitif (avec majorations nuit / week-end / TVA) sera calculé sur l\'écran suivant.',
 
     // ── ENTERPRISE UX: structured submit error ──────────────────────────
+    // ── Merged 2-step flow (WHERE + WHEN & WHO) ──────────────────────────
+    step_where_2:        'Étape 1 sur 2 · Lieu',
+    step_staff_2:        'Étape 2 sur 2 · Quand & agents',
+    progress_staff:      'Quand & agents',
+    next_to_staff:       'Continuer · Agents',
+    when_staff_title:    'Quand et avec qui ?',
+    when_staff_subtitle: 'Définissez chaque créneau et les agents qui lui sont affectés.',
+    creneau_label:       'Créneau {{n}}',
+    add_another_creneau: 'Ajouter un créneau',
+    staff_section:       'AGENTS DU CRÉNEAU',
+    staff_empty:         'Aucun service pour ce créneau',
+    staff_empty_hint:    'Ajoutez au moins un service ci-dessous.',
+    staff_add_service:   'Ajouter un service',
+    staff_loading:       'Chargement des services…',
+    staff_services_empty: 'Aucun service disponible',
+    staff_all_added:     'Tous les services sont déjà ajoutés',
+    staff_rate_per_hour: '{{rate}}/h · agent',
     submit_error_title:    'Impossible de créer la mission',
     submit_error_jump_to:  'Modifier',
     submit_error_network:  'Vérifiez votre connexion et réessayez.',

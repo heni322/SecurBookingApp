@@ -24,7 +24,7 @@ export interface AuthNS {
     email_label: string; email_placeholder: string;
     password_label: string; password_placeholder: string;
     submit: string; submitting: string; secure_text: string;
-    no_account: string; create_link: string; biometrics: string;
+    no_account: string; create_link: string; biometrics: string; forgot_link: string;
     errors: { email_required: string; email_invalid: string; password_required: string; invalid_creds: string; generic: string; };
     alert: { title: string; };
   };
@@ -59,6 +59,24 @@ export interface AuthNS {
     invalid_title: string; invalid_body: string;
     resend: string; resent_title: string; resent_body: string; resend_error: string;
   };
+  forgot_password: {
+    header: string; title: string; subtitle: string;
+    email_label: string; email_placeholder: string;
+    submit: string; submitting: string; back_to_login: string;
+    sent_title: string; sent_body: string; resend: string; open_mail: string; enter_code: string;
+    errors: { email_required: string; email_invalid: string; generic: string; };
+  };
+  reset_password: {
+    header: string; title: string; subtitle: string;
+    token_label: string; token_placeholder: string; token_hint: string;
+    password_label: string; password_placeholder: string;
+    confirm_label: string; confirm_placeholder: string;
+    submit: string; submitting: string; back_to_login: string;
+    requirements: { length: string; uppercase: string; digit: string; };
+    strength: { weak: string; fair: string; good: string; strong: string; };
+    success_title: string; success_body: string; go_to_login: string;
+    errors: { token_required: string; password_length: string; password_complexity: string; mismatch: string; invalid_token: string; generic: string; };
+  };
 }
 
 export interface HomeNS {
@@ -66,7 +84,9 @@ export interface HomeNS {
   stats: { total: string; completed: string; in_progress: string; };
   cta: { title: string; subtitle: string; };
   active_mission: { label: string; };
+  upcoming_mission: { label: string; starts: string; };
   recent: { title: string; see_all: string; };
+  cancelled: { title: string; };
   empty: { title: string; subtitle: string; action: string; };
   sos: {
     title: string; body: string; send: string; cancel: string;
@@ -96,12 +116,13 @@ export interface MissionsNS {
     screen_title: string; loading: string; error_load: string; retry: string;
     cancel_title: string; cancel_body: string; cancel_back: string; cancel_confirm: string;
     cancel_error: string; duration: string; created_on: string;
-    cta_get_quote: string; cta_see_quote: string; cta_pay: string;
+    cta_get_quote: string; cta_see_quote: string; cta_pay: string; cta_edit: string;
     cta_select: string; cta_waiting: string; cta_assigning: string; cta_messaging: string;
     badge_live: string; badge_approach: string; badge_urgent: string;
     section_approach: string; section_location: string; section_notes: string; section_bookings: string;
     total_ttc: string;
   };
+  edit: { screen_title: string; loading: string; save_btn: string; saved_toast: string; };
   statuses: { created: string; published: string; staffing: string; staffed: string; in_progress: string; completed: string; cancelled: string; };
   success: {
     title: string; subtitle: string; timeline_title: string;
@@ -253,6 +274,22 @@ export interface MissionsNS {
 
     // ── ENTERPRISE UX: structured submit error ──────────────────────────
     /** Banner title shown when /missions/create returns validation errors. */
+    step_where_2:        string;
+    step_staff_2:        string;
+    progress_staff:      string;
+    next_to_staff:       string;
+    when_staff_title:    string;
+    when_staff_subtitle: string;
+    creneau_label:       string;
+    add_another_creneau: string;
+    staff_section:       string;
+    staff_empty:         string;
+    staff_empty_hint:    string;
+    staff_add_service:   string;
+    staff_loading:       string;
+    staff_services_empty: string;
+    staff_all_added:     string;
+    staff_rate_per_hour: string;
     submit_error_title:    string;
     /** "Modifier" CTA inside the submit-error banner. */
     submit_error_jump_to:  string;

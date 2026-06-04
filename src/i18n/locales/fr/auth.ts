@@ -1,4 +1,4 @@
-﻿import type { AuthNS } from '../types';
+import type { AuthNS } from '../types';
 
 const auth: AuthNS = {
   login: {
@@ -7,7 +7,7 @@ const auth: AuthNS = {
     password_label: 'Mot de passe', password_placeholder: '••••••••',
     submit: 'Se connecter', submitting: 'Connexion…',
     secure_text: 'Connexion chiffrée TLS · Conforme RGPD',
-    no_account: 'Pas encore de compte ?', create_link: 'Créer un compte', biometrics: 'Biométrie',
+    no_account: 'Pas encore de compte ?', create_link: 'Créer un compte', biometrics: 'Biométrie', forgot_link: 'Mot de passe oublié ?',
     errors: { email_required: 'Email requis', email_invalid: 'Email invalide', password_required: 'Mot de passe requis', invalid_creds: 'Email ou mot de passe incorrect.', generic: 'Connexion échouée' },
     alert: { title: 'Connexion impossible' },
   },
@@ -49,6 +49,29 @@ const auth: AuthNS = {
     verify: 'Vérifier', incomplete_title: 'Code incomplet', incomplete_body: 'Entrez les 6 chiffres.',
     invalid_title: 'Code invalide', invalid_body: 'Le code est incorrect ou expiré.',
     resend: 'Renvoyer le code', resent_title: 'Code renvoyé', resent_body: 'Un nouveau code a été envoyé.', resend_error: 'Impossible de renvoyer le code.',
+  },
+  forgot_password: {
+    header: 'Mot de passe oublié', title: 'Réinitialiser le mot de passe',
+    subtitle: 'Saisissez l\'adresse email associée à votre compte. Nous vous enverrons un lien sécurisé pour définir un nouveau mot de passe.',
+    email_label: 'Adresse email', email_placeholder: 'vous@exemple.com',
+    submit: 'Envoyer le lien', submitting: 'Envoi…', back_to_login: 'Retour à la connexion',
+    sent_title: 'Vérifiez votre boîte mail', sent_body: 'Si un compte existe pour cette adresse, un lien de réinitialisation valable 1 heure vient d\'être envoyé. Pensez à vérifier vos spams.',
+    resend: 'Renvoyer le lien', open_mail: 'Ouvrir ma messagerie', enter_code: 'Saisir le code reçu',
+    errors: { email_required: 'Email requis', email_invalid: 'Email invalide', generic: 'Envoi impossible. Réessayez dans un instant.' },
+  },
+  reset_password: {
+    header: 'Nouveau mot de passe', title: 'Définir un nouveau mot de passe',
+    subtitle: 'Collez le lien reçu par email (ou seulement le code qu\'il contient), puis choisissez un nouveau mot de passe.',
+    token_label: 'Code de réinitialisation', token_placeholder: 'Collez le lien ou le code reçu par email',
+    token_hint: 'Astuce : vous pouvez coller le lien complet, le code est extrait automatiquement.',
+    password_label: 'Nouveau mot de passe', password_placeholder: '8 caractères minimum',
+    confirm_label: 'Confirmer le mot de passe', confirm_placeholder: 'Ressaisissez le mot de passe',
+    submit: 'Réinitialiser', submitting: 'Réinitialisation…', back_to_login: 'Retour à la connexion',
+    requirements: { length: 'Au moins 8 caractères', uppercase: 'Une lettre majuscule', digit: 'Un chiffre' },
+    strength: { weak: 'Faible', fair: 'Moyen', good: 'Bon', strong: 'Excellent' },
+    success_title: 'Mot de passe réinitialisé', success_body: 'Votre mot de passe a été modifié et toutes vos sessions actives ont été déconnectées. Vous pouvez maintenant vous connecter.',
+    go_to_login: 'Se connecter',
+    errors: { token_required: 'Code requis', password_length: '8 caractères minimum', password_complexity: 'Doit contenir une majuscule et un chiffre', mismatch: 'Les mots de passe ne correspondent pas', invalid_token: 'Lien invalide ou expiré. Demandez-en un nouveau.', generic: 'Réinitialisation impossible. Réessayez.' },
   },
 };
 
