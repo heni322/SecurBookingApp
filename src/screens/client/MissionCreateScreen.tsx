@@ -1,4 +1,4 @@
-/**
+﻿/**
  * MissionCreateScreen — Enterprise 2-step mission creation.
  *
  * Flow (redesigned):
@@ -26,9 +26,9 @@
  *   ─ Indicative price estimate folded into the final step
  *   ─ Structured submit-error banner with "Modifier" jump-back per field
  *
- * Backend payload — unchanged:
- *   ─ SINGLE (1 slot)  -> { ...base, startAt, endAt, durationHours, bookingLines }
- *   ─ MULTI  (n slots) -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
+ * Backend payload (unified slots[]):
+ *   ─ ALL missions     -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
+ *   ─ Single-slot      -> same shape, 1 entry in slots array
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
@@ -68,7 +68,7 @@ import { formatEuros }       from '@utils/formatters';
 import { colors }            from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import type { MissionStackParamList, MissionSlotRecord, ServiceType } from '@models/index';
+import type { MissionStackParamList, ServiceType } from '@models/index';
 
 type MissionsT = TFunction<'missions'>;
 type Props     = NativeStackScreenProps<MissionStackParamList, 'MissionCreate'>;
@@ -131,7 +131,7 @@ const INITIAL_FORM: FormData = {
 
 const MIN_FUTURE_HOURS = 1;
 const MIN_DURATION_H   = 6;
-const MAX_DURATION_H   = 240;
+const MAX_DURATION_H   = 12;   // Must match backend SLOT_MAX_HOURS (legal R2: max 12h/slot)
 const MAX_SLOTS        = 30;
 const MAX_AGENTS       = 20;
 
@@ -720,7 +720,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   // ──────────────────────────────────────────────────────────────────────────
   // Submit
   // ──────────────────────────────────────────────────────────────────────────
+  const submittingRef = useRef(false);
   const handleSubmit = async () => {
+    if (submittingRef.current) return; // guard double-tap
+    submittingRef.current = true;
     setLoading(true);
     setSubmitError(null);
     let createdMissionId: string | null = null;
@@ -729,8 +732,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         address:   form.address.trim(),
         city:      form.city.trim(),
         zipCode:   form.zipCode.trim() || undefined,
-        latitude:  form.latitude  ?? 0,
-        longitude: form.longitude ?? 0,
+        latitude:  form.latitude!,  // validated non-null in step 1
+        longitude: form.longitude!, // validated non-null in step 1
         title:     form.title.trim() || undefined,
         notes:     form.notes.trim() || undefined,
       };
@@ -739,46 +742,23 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
       );
 
-      let missionPayload: Parameters<typeof missionsApi.create>[0];
+      // ALWAYS send the slots[] format - the backend DTO only accepts slots[],
+      // not flat startAt/endAt/bookingLines. Single-slot = slots with 1 entry.
+      const missionPayload: Parameters<typeof missionsApi.create>[0] = {
+        ...base,
+        isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
+        slots: sortedSlots.map(s => ({
+          startAt:       new Date(s.startAt).toISOString(),
+          endAt:         new Date(s.endAt).toISOString(),
+          durationHours: durationHours(s.startAt, s.endAt),
+          bookingLines:  slotApiLines(s),
+        })),
+      };
 
-      if (sortedSlots.length === 1) {
-        const only = sortedSlots[0];
-        missionPayload = {
-          ...base,
-          startAt:       new Date(only.startAt).toISOString(),
-          endAt:         new Date(only.endAt).toISOString(),
-          durationHours: clampDuration(durationHours(only.startAt, only.endAt)),
-          isUrgent:      isToday(only.startAt),
-          bookingLines:  slotApiLines(only),
-        };
-      } else {
-        missionPayload = {
-          ...base,
-          isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
-          slots: sortedSlots.map(s => ({
-            startAt:       new Date(s.startAt).toISOString(),
-            endAt:         new Date(s.endAt).toISOString(),
-            durationHours: clampDuration(durationHours(s.startAt, s.endAt)),
-            bookingLines:  slotApiLines(s),
-          })),
-        };
-      }
-
-      // In edit mode we always send the multi-slot `slots` shape so the backend
-      // performs a full composition replace; single-slot create stays as-is.
+      // Both create and edit use the same unified slots[] payload.
       let mission;
       if (isEditMode && editMissionId) {
-        const editPayload = {
-          ...base,
-          isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
-          slots: sortedSlots.map(s => ({
-            startAt:       new Date(s.startAt).toISOString(),
-            endAt:         new Date(s.endAt).toISOString(),
-            durationHours: clampDuration(durationHours(s.startAt, s.endAt)),
-            bookingLines:  slotApiLines(s),
-          })),
-        };
-        const { data: mRes } = await missionsApi.update(editMissionId, editPayload as any);
+        const { data: mRes } = await missionsApi.update(editMissionId, missionPayload as any);
         mission = (mRes as any).data;
       } else {
         const { data: mRes } = await missionsApi.create(missionPayload);
@@ -786,30 +766,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         createdMissionId = mission.id;
       }
 
-      if (sortedSlots.length === 1) {
-        await quotesApi.calculate({
-          missionId:    mission.id,
-          bookingLines: slotApiLines(sortedSlots[0]),
-        });
-      } else {
-        let createdSlots: MissionSlotRecord[] = (mission.slots ?? []).slice();
-        if (createdSlots.length === 0) {
-          const { data: refetch } = await missionsApi.getById(mission.id);
-          mission = (refetch as any).data;
-          createdSlots = (mission.slots ?? []).slice();
-        }
-        if (createdSlots.length === 0) {
-          throw new Error('Mission créée mais créneaux non récupérés. Ouvrez la mission pour générer le devis.');
-        }
-        const apiSorted = [...createdSlots].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-        await quotesApi.calculate({
-          missionId: mission.id,
-          slotLines: sortedSlots.map((draft, idx) => ({
-            slotId:       apiSorted[idx].id,
-            bookingLines: slotApiLines(draft),
-          })),
-        });
-      }
+      // Backend derives quote lines from existing Booking rows (created in the
+      // mission transaction above). Only missionId is needed.
+      await quotesApi.calculate({ missionId: mission.id });
 
       if (!isEditMode && userId) missionDraftStorage.clear(userId);
       if (isEditMode) {
@@ -823,11 +782,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       const apiMsg       = (err as any)?.response?.data?.message;
       const localMsg     = (err as any)?.message;
       const isNetworkErr = !status && typeof localMsg === 'string' && localMsg.includes('Network');
-      const isServerErr  = (typeof status === 'number' && status >= 500) || isNetworkErr;
 
-      if (createdMissionId && isServerErr) {
-        missionsApi.cancel(createdMissionId).catch(() => {});
-      }
+      // NOTE: Do NOT auto-cancel a created mission when the downstream quote
+      // calculation fails. The mission is valid; destroying it on a transient
+      // error loses user work. The recovery toast below handles this.
 
       const details = Array.isArray(apiMsg)
         ? apiMsg.map(String)
@@ -843,7 +801,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
       setSubmitError({ title: t('create.submit_error_title'), details, jumpTo });
 
-      if (createdMissionId && !isServerErr) {
+      if (createdMissionId) {
         toast.info(t('detail.cta_get_quote'), {
           action: {
             label:   t('detail.cta_get_quote'),
@@ -853,6 +811,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         });
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

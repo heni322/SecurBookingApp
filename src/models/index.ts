@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   UserRole, UserStatus, MissionStatus, BookingStatus, PaymentStatus, ClientType} from '@constants/enums';
 
 // -----------------------------------------------------------------------------
@@ -247,8 +247,8 @@ export interface Mission {
  *
  * Multi-slot (per-slot agents):
  *   { slots: MissionSlot[], ...location }
- *   Each slot carries its own bookingLines.  Falls back to root bookingLines
- *   when a slot has none.
+ *   Every mission uses the slots[] format (1 slot = single-day mission).
+ *   Each slot carries its own bookingLines.
  */
 export interface CreateMissionPayload {
   address:   string;
@@ -257,16 +257,8 @@ export interface CreateMissionPayload {
   latitude:  number;
   longitude: number;
 
-  // Single-slot fields
-  startAt?:       string;
-  endAt?:         string;
-  durationHours?: number;
-
-  // Multi-slot fields
-  slots?: MissionSlot[];
-
-  // Global booking lines (single-slot or per-slot fallback)
-  bookingLines?: BookingLine[];
+  /** Always required — a single-slot mission is slots with 1 entry. */
+  slots: MissionSlot[];
 
   title?:    string;
   notes?:    string;
