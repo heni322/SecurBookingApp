@@ -1,4 +1,4 @@
-﻿import type { NavigationNS } from '../types';
+import type { NavigationNS } from '../types';
 
 const navigation: NavigationNS = {
   tabs: {

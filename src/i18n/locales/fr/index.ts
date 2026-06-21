@@ -1,4 +1,4 @@
-﻿import common        from './common';
+import common        from './common';
 import auth          from './auth';
 import home          from './home';
 import missions      from './missions';

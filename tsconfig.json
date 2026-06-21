@@ -6,6 +6,8 @@
     "paths": {
       "@api":          ["src/api/index.ts"],
       "@api/*":        ["src/api/*"],
+      "@config":       ["src/config/index.ts"],
+      "@config/*":     ["src/config/*"],
       "@constants":    ["src/constants/index.ts"],
       "@constants/*":  ["src/constants/*"],
       "@models":       ["src/models/index.ts"],

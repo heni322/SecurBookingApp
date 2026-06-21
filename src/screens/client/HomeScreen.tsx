@@ -21,6 +21,7 @@ import { useApi }                from '@hooks/useApi';
 import { useAuthStore }          from '@store/authStore';
 import { useNotificationsStore } from '@store/notificationsStore';
 import { MissionCard }           from '@components/domain/MissionCard';
+import { EmailVerificationBanner } from '@components/domain/EmailVerificationBanner';
 import { EmptyState }            from '@components/ui/EmptyState';
 import { StatCardSkeleton, MissionListSkeleton } from '@components/ui/SkeletonLoader';
 import { colors, palette }       from '@theme/colors';
@@ -145,6 +146,9 @@ export const HomeScreen: React.FC = () => {
             <Plus size={22} color={colors.textInverse} strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
+
+        {/* Email verification reminder (renders only when unverified) */}
+        <EmailVerificationBanner />
 
         {/* ── Stats row ── */}
         {loading && !missions ? (

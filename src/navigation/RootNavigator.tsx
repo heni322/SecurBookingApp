@@ -7,6 +7,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider }           from 'react-native-safe-area-context';
 import { useAuthStore }    from '@store/authStore';
 import { navigationRef }   from '@services/navigationRef';
+import { fcmService }      from '@services/fcmService';
+import { flushPendingNotification } from '@services/notificationRouter';
 import { AuthNavigator }   from './AuthNavigator';
 import { MainNavigator }   from './MainNavigator';
 import { LoadingState }    from '@components/ui/LoadingState';
@@ -33,7 +35,15 @@ export const RootNavigator: React.FC = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          // Navigation is mounted: safe to wire push tap-through and replay any
+          // notification that cold-started the app (quit state).
+          fcmService.registerTapHandlers();
+          flushPendingNotification();
+        }}
+      >
         <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>
           {!onboardingDone ? (
             <Stack.Screen name="Onboarding">

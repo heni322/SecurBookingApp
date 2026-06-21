@@ -1,4 +1,4 @@
-﻿import type { AnalyticsNS } from '../types';
+import type { AnalyticsNS } from '../types';
 
 const analytics: AnalyticsNS = {
   missions_per_month: 'Missions par mois',

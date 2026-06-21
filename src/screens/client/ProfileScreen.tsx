@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Avatar }           from '@components/ui/Avatar';
 import { Card }             from '@components/ui/Card';
+import { PhoneVerificationCard } from '@components/domain/PhoneVerificationCard';
 import { ScreenHeader }     from '@components/ui/ScreenHeader';
 import { ProfileSkeleton }  from '@components/ui/SkeletonLoader';
 import { useAuthStore }     from '@store/authStore';
@@ -133,6 +134,9 @@ export const ProfileScreen: React.FC = () => {
             <Text style={styles.memberSince}>{t('hero.since', { date: formatDate(user.createdAt) })}</Text>
           </View>
         </Card>
+
+        {/* Phone verification prompt (renders only when phone present & unverified) */}
+        <PhoneVerificationCard />
 
         {/* ── My Account ── */}
         <View style={styles.sectionGroup}>

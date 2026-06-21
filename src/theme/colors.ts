@@ -90,6 +90,9 @@ export const colors = {
   // -- Surfaces ------------------------------------------------------------------
   background:         palette.bg,
   backgroundElevated: palette.panel,
+  // Fully OPAQUE elevated surface for floating overlays (toasts/popovers) that
+  // render over arbitrary content; translucent tints bleed and become unreadable.
+  backgroundElevatedSolid: palette.panelSolid,
   surface:            'rgba(15, 23, 42, 0.5)',
   surfaceHigh:        'rgba(15, 23, 42, 0.65)',
   surfaceBorder:      palette.panelBorder,

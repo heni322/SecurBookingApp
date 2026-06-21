@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   UserRole, UserStatus, MissionStatus, BookingStatus, PaymentStatus, ClientType} from '@constants/enums';
 
 // -----------------------------------------------------------------------------
@@ -34,7 +34,8 @@ export interface LoginPayload {
 export interface RegisterPayload {
   email:           string;
   password:        string;
-  fullName:        string;
+  firstName:       string;
+  lastName:        string;
   phone?:          string;
   role?:           UserRole;
   clientType?:     ClientType;
@@ -49,6 +50,14 @@ export interface RegisterPayload {
   billingCity?:    string;
   billingZipCode?: string;
   vatNumber?:      string;
+}
+
+export interface VerifyPhonePayload {
+  code: string;
+}
+
+export interface ResendVerificationPayload {
+  email: string;
 }
 
 export interface TwoFaSetupResponse {
@@ -68,6 +77,10 @@ export interface User {
   role:           UserRole;
   status:         UserStatus;
   twoFaEnabled?:  boolean;
+  /** ISO timestamp of email verification; null/undefined = not yet verified. */
+  emailVerifiedAt?: string | null;
+  /** ISO timestamp of phone (SMS) verification; null/undefined = not yet verified. */
+  phoneVerifiedAt?: string | null;
   createdAt:      string;
   updatedAt:      string;
 }

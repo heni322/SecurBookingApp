@@ -1,17 +1,17 @@
-﻿/**
+/**
  * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
  * Map engine: WebView + Leaflet (zero Google dependency, zero API key)
- * Real-time updates: injectJavaScript() â†’ Leaflet JS API
+ * Real-time updates: injectJavaScript() → Leaflet JS API
  *
  * FIX HISTORY:
- *  v2 — html memoized with useMemo (was rebuilt every render â†’ WebView remounted
- *        every second â†’ tracking reset on every GPS update) [CRITICAL]
+ *  v2 — html memoized with useMemo (was rebuilt every render → WebView remounted
+ *        every second → tracking reset on every GPS update) [CRITICAL]
  *     — Removed dead react-native-svg imports
  *     — WebView readiness confirmed via postMessage ('ready') not just onLoad
  *     — inject() guard: skip if webRef null or not ready
  *     — leaveMission now emits socket event to stop server-side forwarding
- *  v3 — [BUG FIX] alertBanner elevation raised from 14 â†’ 30.
+ *  v3 — [BUG FIX] alertBanner elevation raised from 14 → 30.
  *        On Android, elevation determines z-order inside a stacking context.
  *        The bottom card had elevation:24, which placed it ABOVE the alertBanner
  *        (elevation:14), hiding the out-of-zone error popup completely on Android.
@@ -48,7 +48,7 @@
  *          screen always sees at most one alert at a time and the next queued
  *          alert surfaces only after dismissAlert() is acknowledged.
  *
- *       4. Inline initials computation — duplicated 3Ã— in the component.
+ *       4. Inline initials computation — duplicated 3× in the component.
  *          Replaced with getInitials() from formatters.ts.
  *
  *       5. handleDismissAlert was defined after the useEffect that referenced
@@ -89,7 +89,7 @@ const GEOFENCE_RADIUS_M  = 30;
 const ALERT_SLIDE_OUT_MS = 220;
 const ALERT_SLIDE_IN_CONFIG = { friction: 8, tension: 80, useNativeDriver: true } as const;
 
-// â”€â”€ Leaflet HTML â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Leaflet HTML ──────────────────────────────────────────────────────────────
 function buildTrackingHTML(siteLat: number, siteLng: number): string {
   return `<!DOCTYPE html>
 <html>
@@ -249,7 +249,7 @@ function buildTrackingHTML(siteLat: number, siteLng: number): string {
 </html>`;
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const {
     missionId, bookingId, agentName,
@@ -270,7 +270,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     distanceM, inZone, pendingAlert, dismissAlert,
   } = useSocketTracking({ missionId, bookingId, onMissionEnd: () => navigation.goBack() });
 
-  // â”€â”€ Alert banner animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alert banner animation ────────────────────────────────────────────────
   const alertSlide     = useRef(new Animated.Value(-160)).current;
   /**
    * isAlertVisible — ref (not state) so it can be read synchronously inside
@@ -349,13 +349,13 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, [inZone, handleDismissAlert]);
 
-  // â”€â”€ Map HTML (memoized — must never change identity or WebView remounts) â”€â”€
+  // ── Map HTML (memoized — must never change identity or WebView remounts) ──
   const html = useMemo(
     () => buildTrackingHTML(siteLat, siteLng),
     [siteLat, siteLng],
   );
 
-  // â”€â”€ WebView JS bridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── WebView JS bridge ─────────────────────────────────────────────────────
   const inject = useCallback((js: string) => {
     if (!webRef.current || !jsReadyRef.current) return;
     webRef.current.injectJavaScript(`(function(){${js}})(); true;`);
@@ -417,7 +417,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     inject('window.flyToSite();');
   }, [inject]);
 
-  // â”€â”€ Derived display values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Derived display values ────────────────────────────────────────────────
   const agentInitials = useMemo(() => getInitials(agentName), [agentName]);
 
   const distanceLabel = useMemo(() => {
@@ -432,12 +432,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     return t('status_waiting');
   }, [connected, signalLost, agentPosition, lastSeenAt, t]);
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
 
-      {/* â”€â”€ Map â”€â”€ */}
+      {/* ── Map ── */}
       <View style={StyleSheet.absoluteFill}>
         {mapLoading && (
           <View style={styles.mapLoadingOverlay}>
@@ -463,12 +463,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {/* â”€â”€ OSM Attribution â”€â”€ */}
+      {/* ── OSM Attribution ── */}
       <View style={styles.attribution} pointerEvents="none">
         <Text style={styles.attributionTxt}>{t('attribution')}</Text>
       </View>
 
-      {/* â”€â”€ Status bar â”€â”€ */}
+      {/* ── Status bar ── */}
       <View style={styles.statusBar}>
         {connected
           ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
@@ -485,13 +485,13 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* â”€â”€ Geofence alert banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      {/* ── Geofence alert banner ─────────────────────────────────────────────
        *  pointerEvents is driven by alertPointerEvents state, which is only
        *  set to 'none' inside the slide-out animation callback — NOT on
        *  pendingAlert state change. This prevents the race where a tap on ✕
        *  was swallowed because React had already flipped pointerEvents to
        *  'none' in the same render that started the animation.
-       * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+       * ─────────────────────────────────────────────────────────────────── */}
       <Animated.View
         style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
         pointerEvents={alertPointerEvents}
@@ -513,14 +513,14 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* â”€â”€ Re-center FAB â”€â”€ */}
+      {/* ── Re-center FAB ── */}
       {showFollowBtn && (
         <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8}>
           <Target size={20} color={colors.primary} strokeWidth={2} />
         </TouchableOpacity>
       )}
 
-      {/* â”€â”€ Bottom card â”€â”€ */}
+      {/* ── Bottom card ── */}
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.avatarBubble}>
@@ -581,7 +581,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   );
 }
 
-// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.navy },
   webview:   { flex: 1, backgroundColor: palette.bg },

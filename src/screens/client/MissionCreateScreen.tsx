@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MissionCreateScreen — Enterprise 2-step mission creation.
  *
  * Flow (redesigned):

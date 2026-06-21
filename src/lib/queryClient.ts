@@ -1,31 +1,36 @@
 /**
  * queryClient.ts — TanStack Query v5 singleton.
  *
- * Stale-time strategy (aligned with @constants/config.ts STALE_TIME tokens):
+ * Stale-time strategy (sourced from @config.cache):
  *   SHORT  2 min — availabilities, quotes
  *   MEDIUM 5 min — missions, bookings, profiles
  *   LONG  10 min — service types, pricing rules, static lists
  *
  * Error handling: errors bubble to the nearest <QueryErrorResetBoundary>.
  * Mutation errors are NOT thrown globally — each mutation handles its own UI.
+ *
+ * Reconnect behaviour: refetchOnReconnect is intentionally false here. Instead,
+ * connectivityService refetches only the ACTIVE queries on an offline→online
+ * transition (see services/connectivityService.ts), refreshing what the user is
+ * looking at without a global refetch storm.
  */
 
 import { QueryClient } from '@tanstack/react-query';
-import { STALE_TIME }  from '@constants/config';
+import { config }      from '@config';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       /** Data is fresh for 5 min by default — screens override per-query. */
-      staleTime:          STALE_TIME.MEDIUM,
+      staleTime:          config.cache.staleMediumMs,
       /** Keep inactive cache for 10 min before garbage-collection. */
-      gcTime:             10 * 60 * 1000,
+      gcTime:             config.cache.staleLongMs,
       /** Retry failed requests up to 2 times with exponential back-off. */
       retry:              2,
       retryDelay:         (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
       /** Refetch on window focus (user switches app → comes back). */
       refetchOnWindowFocus: true,
-      /** Don't refetch just because the device reconnects. */
+      /** Reconnect handled by connectivityService (active queries only). */
       refetchOnReconnect:   false,
       /** Don't refetch when the component re-mounts (cache is enough). */
       refetchOnMount:       true,

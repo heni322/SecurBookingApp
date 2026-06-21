@@ -171,14 +171,14 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={16} color={colors.primary} strokeWidth={1.8} />
-            {/* Fix: was 'DÃ©penses mensuelles' — encoding corruption */}
+            {/* Fix: was 'Dépenses mensuelles' — encoding corruption */}
             <Text style={styles.chartTitle}>Dépenses mensuelles</Text>
           </View>
           <View style={styles.barsRow}>
             {monthlySpend.map(m => (
               <View key={m.key} style={styles.barCol}>
                 <Text style={styles.barValue}>
-                  {/* Fix: was 'â‚¬' — € sign encoding corruption */}
+                  {/* Fix: was '€' — € sign encoding corruption */}
                   {m.value > 0 ? `${Math.round(m.value)}€` : ''}
                 </Text>
                 <View style={[styles.barTrack, { height: BAR_H }]}>
@@ -213,7 +213,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.textSecondary} strokeWidth={1.8} />
-            {/* Fix: was 'RÃ©partition des missions' — encoding corruption */}
+            {/* Fix: was 'Répartition des missions' — encoding corruption */}
             <Text style={styles.chartTitle}>Répartition des missions</Text>
           </View>
           <View style={styles.statusList}>

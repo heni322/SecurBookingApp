@@ -1,4 +1,4 @@
-﻿import type { MapPickerNS } from '../types';
+import type { MapPickerNS } from '../types';
 
 const map_picker: MapPickerNS = {
   label:        'GPS position *',

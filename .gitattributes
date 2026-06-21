@@ -1,0 +1,19 @@
+# Mark binary assets so Git never tries to text-diff, merge, or re-encode them.
+# Intentionally NO text/eol rules here: this repo is currently CRLF, and forcing
+# normalization would rewrite every file. Encoding (UTF-8, no BOM) is enforced
+# via .editorconfig at save time instead.
+
+*.png      binary
+*.jpg      binary
+*.jpeg     binary
+*.gif      binary
+*.webp     binary
+*.ico      binary
+*.ttf      binary
+*.otf      binary
+*.woff     binary
+*.woff2    binary
+*.keystore binary
+*.jks      binary
+*.so       binary
+*.aar      binary

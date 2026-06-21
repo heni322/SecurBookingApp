@@ -31,14 +31,14 @@ export interface AuthNS {
   register: {
     title: string; subtitle: string;
     perks: { verified: string; quote: string; payment: string; };
-    email_label: string; email_placeholder: string;
+    email_label: string; email_placeholder: string; email_available: string;
     account_type: string; individual: string; individual_sub: string;
     company: string; company_sub: string;
-    full_name_label: string; full_name_placeholder: string;
-    phone_label: string; phone_placeholder: string;
+    first_name_label: string; first_name_placeholder: string; last_name_label: string; last_name_placeholder: string;
+    phone_label: string; phone_placeholder: string; phone_hint: string; phone_available: string;
     password_hint: string; password_placeholder: string;
     submit: string; rgpd: string; has_account: string; login_link: string; company_name_label: string; company_name_placeholder: string; siret_label: string; siret_hint: string; accept_terms: string; strength: { weak: string; fair: string; good: string; strong: string; };
-    errors: { full_name_required: string; email_required: string; email_invalid: string; password_length: string; password_complexity: string; phone_invalid: string; company_name_required: string; siret_invalid: string; terms_required: string; email_taken: string; too_many_attempts: string; network: string; generic: string; };
+    errors: { first_name_required: string; last_name_required: string; email_required: string; email_invalid: string; password_length: string; password_complexity: string; phone_invalid: string; phone_checking: string; phone_taken: string; email_checking: string; company_name_required: string; siret_invalid: string; terms_required: string; email_taken: string; too_many_attempts: string; network: string; generic: string; };
     alert: { title: string; };
   };
   onboarding: {
@@ -76,6 +76,17 @@ export interface AuthNS {
     strength: { weak: string; fair: string; good: string; strong: string; };
     success_title: string; success_body: string; go_to_login: string;
     errors: { token_required: string; password_length: string; password_complexity: string; mismatch: string; invalid_token: string; generic: string; };
+  };
+  emailVerification: {
+    bannerTitle: string; bannerBody: string; resendButton: string;
+    sentTitle: string; sentBody: string; errorTitle: string; errorBody: string;
+  };
+  phoneVerification: {
+    cardTitle: string; cardBody: string; verifyButton: string;
+    modalTitle: string; modalBody: string; sendButton: string; confirmButton: string;
+    resendButton: string; codeLabel: string; close: string;
+    sentTitle: string; sentBody: string; verifiedTitle: string; verifiedBody: string;
+    errorTitle: string; sendErrorBody: string; verifyErrorBody: string;
   };
 }
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MissionMapView — Leaflet/OSM read-only (or interactive) map.
  *
  * Why WebView instead of react-native-maps?
@@ -11,6 +11,7 @@
  *     — Added onHttpError handler
  *     — html memoized with useMemo (was rebuilding on every render)
  *     — Leaflet CSS + JS loaded from unpkg CDN (HTTPS — no cleartext needed)
+ *  v3 — Tile URL template sourced from @config.maps.tileUrlTemplate
  */
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import {
@@ -19,6 +20,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { MapPin, RefreshCw, WifiOff } from 'lucide-react-native';
+import { config }  from '@config';
 import { colors }  from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
@@ -39,6 +41,8 @@ function buildHTML(
 ): string {
   const zoom = 14;
   const escapedTitle = title.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  // Centralised tile template (Leaflet expects literal {z}/{x}/{y} tokens).
+  const tileUrl = config.maps.tileUrlTemplate;
 
   return `<!DOCTYPE html>
 <html>
@@ -72,7 +76,7 @@ function buildHTML(
     tap:             ${interactive},
   }).setView([${lat}, ${lng}], ${zoom});
 
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('${tileUrl}', {
     maxZoom: 19, attribution: ''
   }).addTo(map);
 
@@ -254,5 +258,3 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
 });
-
-

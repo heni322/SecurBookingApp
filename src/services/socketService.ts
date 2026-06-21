@@ -1,18 +1,19 @@
-﻿/**
+/**
  * socketService.ts — Bulletproof WebSocket client (CLIENT app).
  *
  * Changes vs previous version:
  *  ● reconnect(token) — called by the Axios interceptor after a token refresh so
  *    the socket always holds a valid JWT. Prevents the `io server disconnect`
  *    that occurred when rehydrate() connected with an expired token.
- *  ● All other APIs remain identical.
+ *  ● Config (URL + logging) sourced from @config.
  */
 
 import type { Socket } from 'socket.io-client';
 import { io } from 'socket.io-client';
-import { API_BASE_URL } from '../constants/config';
+import { config } from '@config';
 
-const WS_URL = API_BASE_URL.replace('/api/v1', '');
+const WS_URL = config.api.baseUrl.replace('/api/v1', '');
+const DEBUG = config.features.debugLogging;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface AgentPosition {
@@ -97,7 +98,7 @@ class SocketService {
       this.socket = null;
     }
     this.setState('disconnected');
-    if (__DEV__) console.log('[WS-Client] Reconnecting with fresh token...');
+    if (DEBUG) console.log('[WS-Client] Reconnecting with fresh token...');
     this._createSocket(accessToken);
   }
 
@@ -114,22 +115,22 @@ class SocketService {
     });
 
     this.socket.on('connect', () => {
-      if (__DEV__) console.log('[WS-Client] Connected');
+      if (DEBUG) console.log('[WS-Client] Connected');
       this.setState('connected');
       // Rejoin all tracked mission rooms after connect / reconnect
       this.joinedRooms.forEach(mid => {
         this.socket?.emit('join_mission', { missionId: mid });
-        if (__DEV__) console.log(`[WS-Client] Rejoined mission:${mid}`);
+        if (DEBUG) console.log(`[WS-Client] Rejoined mission:${mid}`);
       });
     });
 
     this.socket.on('connect_error', (e: Error) => {
-      if (__DEV__) console.warn('[WS-Client] connect_error:', e.message);
+      if (DEBUG) console.warn('[WS-Client] connect_error:', e.message);
       this.setState('disconnected');
     });
 
     this.socket.on('disconnect', (reason: string) => {
-      if (__DEV__) console.warn('[WS-Client] Disconnected:', reason);
+      if (DEBUG) console.warn('[WS-Client] Disconnected:', reason);
       this.setState('disconnected');
     });
   }

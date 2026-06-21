@@ -2,6 +2,10 @@
  * AddressSearch — OpenStreetMap Nominatim autocomplete.
  * Zero extra dependencies — uses axios already in the project.
  * Debounced 400ms · min 3 chars · max 5 results.
+ *
+ * Endpoint, User-Agent and default country come from @config.maps so they are
+ * environment-aware and centrally managed (Nominatim's usage policy requires a
+ * descriptive User-Agent).
  */
 import React, { useState, useCallback, useRef } from 'react';
 import {
@@ -10,6 +14,7 @@ import {
 } from 'react-native';
 import { Search, MapPin, X } from 'lucide-react-native';
 import axios from 'axios';
+import { config } from '@config';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
@@ -41,14 +46,14 @@ interface Props {
   countrycodes?: string; // e.g. 'fr' to restrict to France
 }
 
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+const NOMINATIM_URL = config.maps.nominatimUrl;
 
 export const AddressSearch: React.FC<Props> = ({
   value,
   onSelect,
   placeholder   = 'Rechercher une adresse…',
   error,
-  countrycodes  = 'fr',
+  countrycodes  = config.maps.geocodeCountryCodes,
 }) => {
   const [query,    setQuery]    = useState(value);
   const [results,  setResults]  = useState<NominatimResult[]>([]);
@@ -71,7 +76,7 @@ export const AddressSearch: React.FC<Props> = ({
         },
         headers: {
           'Accept-Language': 'fr',
-          'User-Agent':      'SecurBook/1.0',
+          'User-Agent':      config.maps.nominatimUserAgent,
         },
       });
       setResults(res.data ?? []);

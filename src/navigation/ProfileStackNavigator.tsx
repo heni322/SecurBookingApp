@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ProfileScreen }        from '@screens/client/ProfileScreen';
 import { ProfileEditScreen }    from '@screens/client/ProfileEditScreen';

@@ -1,5 +1,5 @@
 /**
- * PaymentHistoryScreen â€” full payment list with invoice download.
+ * PaymentHistoryScreen — full payment list with invoice download.
  * Premium UI: grouped by month, status badges, PDF tap-to-open.
  */
 import React, { useEffect, useCallback, useMemo } from 'react';
@@ -27,7 +27,7 @@ import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'PaymentHistory'>;
 
-// â”€â”€â”€ Group payments by month â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Group payments by month ──────────────────────────────────────────────────
 function groupByMonth(payments: Payment[]) {
   const map = new Map<string, Payment[]>();
   const list = Array.isArray(payments) ? payments : [];
@@ -182,7 +182,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-// â”€â”€â”€ Row styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Row styles ───────────────────────────────────────────────────────────────
 const rowStyles = StyleSheet.create({
   row: {
     flexDirection:     'row',

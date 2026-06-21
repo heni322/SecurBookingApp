@@ -10,10 +10,12 @@ import { QueryClientProvider }     from '@tanstack/react-query';
 import { StripeProvider }          from '@stripe/stripe-react-native';
 import { RootNavigator }           from '@navigation/RootNavigator';
 import { queryClient }             from '@lib/queryClient';
+import { config }                  from '@config';
 import { useAuthStore }            from '@store/authStore';
 import { useNotificationsStore }   from '@store/notificationsStore';
 import { tokenStorage }            from '@services/tokenStorage';
 import { fcmService }              from '@services/fcmService';
+import { connectivityService }     from '@services/connectivityService';
 import { ErrorBoundary }           from '@components/ui/ErrorBoundary';
 import { OfflineBanner }           from '@components/ui/OfflineBanner';
 import { ToastHost }               from '@components/ui/ToastHost';
@@ -23,10 +25,6 @@ import i18n                        from '@i18n';
 
 LogBox.ignoreLogs(['Non-serializable values were found in the navigation state']);
 
-const STRIPE_PUBLISHABLE_KEY = __DEV__
-  ? 'pk_test_REMPLACER_PAR_VOTRE_CLE_TEST_STRIPE'
-  : 'pk_live_REMPLACER_PAR_VOTRE_CLE_LIVE_STRIPE';
-
 const LANGUAGE_STORAGE_KEY = '@secur_booking/language';
 
 function App(): React.JSX.Element {
@@ -34,6 +32,10 @@ function App(): React.JSX.Element {
   const { increment } = useNotificationsStore();
 
   useEffect(() => {
+    // Start the single connectivity subscription early so reconnect-driven
+    // refetches work app-wide, not only while the OfflineBanner is mounted.
+    connectivityService.start();
+
     // CRITICAL FIX: tokenStorage.hydrate() populates the in-memory token
     // cache (_accessToken / _refreshToken) from AsyncStorage.
     // rehydrate() calls tokenStorage.getAccessToken() synchronously — so it
@@ -63,7 +65,7 @@ function App(): React.JSX.Element {
       .catch(() => {/* AsyncStorage unavailable — stay on 'fr' */});
 
     const unsubFcm = fcmService.onForegroundMessage((type, title, body) => {
-      if (__DEV__) console.log(`[FCM] ${type}: ${title} — ${body}`);
+      if (config.features.debugLogging) console.log(`[FCM] ${type}: ${title} — ${body}`);
       increment();
     });
 
@@ -73,7 +75,10 @@ function App(): React.JSX.Element {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY}>
+        <StripeProvider
+          publishableKey={config.stripe.publishableKey}
+          merchantIdentifier={config.stripe.merchantIdentifier || undefined}
+        >
           <SafeAreaProvider>
             <StatusBar barStyle="light-content" backgroundColor="#05172b" />
             <View style={{ flex: 1 }}>

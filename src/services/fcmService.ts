@@ -6,8 +6,17 @@
  *
  * All methods are wrapped in try/catch so that a missing or placeholder
  * google-services.json never crashes the app — FCM simply stays inactive.
+ *
+ * Notification tap-through (deep-linking) is delegated to notificationRouter so
+ * that push taps and in-app notification taps share one mapping. There are three
+ * tap entry points handled here:
+ *   1. Foreground   → onForegroundMessage (no auto-nav; caller decides)
+ *   2. Background    → onNotificationOpenedApp (app was backgrounded)
+ *   3. Quit / cold start → getInitialNotification (app launched by the tap)
  */
 import apiClient from '../api/client';
+import { navigateFromNotification } from './notificationRouter';
+import type { NotificationData } from './notificationRouter';
 
 // Lazy imports to avoid crashes when Firebase is not configured
 let _messaging: any = null;
@@ -23,6 +32,14 @@ function getMessaging(): any {
   } catch {
     return null;
   }
+}
+
+/** Coerce an FCM RemoteMessage into the flat data map the router expects. */
+function toData(msg: any): NotificationData | null {
+  if (!msg) return null;
+  const data = (msg.data ?? {}) as Record<string, string>;
+  // Fall back to notification.title/body type if backend only set data.type.
+  return data && Object.keys(data).length > 0 ? data : null;
 }
 
 class FcmService {
@@ -66,7 +83,7 @@ class FcmService {
       return m.onMessage(async (msg: any) => {
         cb(
           (msg.data?.type as string) ?? 'GENERIC',
-          msg.notification?.title ?? 'SecurBook',
+          msg.notification?.title ?? 'Provalk',
           msg.notification?.body ?? '',
         );
       });
@@ -76,16 +93,61 @@ class FcmService {
   }
 
   /**
-   * setBackgroundMessageHandler — must be called once at app startup.
-   * Called ONLY from index.js (the entry point) so it runs before the app
-   * tree mounts. App.tsx no longer calls this to avoid the double registration
-   * warning from @react-native-firebase.
+   * registerTapHandlers — wires deep-linking for the two "tap opened the app"
+   * cases. Must be called once after the navigation container is mounted
+   * (App.tsx onReady). Returns an unsubscribe for the background listener.
+   *
+   *   • onNotificationOpenedApp → app was in the background, user tapped a push.
+   *   • getInitialNotification  → app was killed; the tap cold-started it. The
+   *     router buffers the target until navigation is ready, so calling this even
+   *     slightly before <NavigationContainer> mounts is safe.
+   */
+  registerTapHandlers(): () => void {
+    try {
+      const m = getMessaging();
+      if (!m) return () => {};
+
+      // Background → foreground tap
+      const unsub = m.onNotificationOpenedApp((msg: any) => {
+        navigateFromNotification(toData(msg));
+      });
+
+      // Quit-state cold start: resolve the launch notification (if any)
+      m.getInitialNotification()
+        .then((msg: any) => {
+          if (msg) navigateFromNotification(toData(msg));
+        })
+        .catch(() => { /* silent */ });
+
+      return typeof unsub === 'function' ? unsub : () => {};
+    } catch {
+      return () => {};
+    }
+  }
+
+  /**
+   * setBackgroundMessageHandler — must be called once at app startup from
+   * index.js (the entry point) so it runs before the app tree mounts.
+   *
+   * The handler itself runs in a headless JS context where navigation does NOT
+   * exist, so it must NOT try to navigate. Its job is limited to side effects
+   * that are safe headless (e.g. data sync). Actual tap-through navigation is
+   * handled by registerTapHandlers() once the UI is alive.
    */
   setBackgroundMessageHandler() {
     try {
       const m = getMessaging();
-      m?.setBackgroundMessageHandler(async () => {});
+      m?.setBackgroundMessageHandler(async (_msg: any) => {
+        // Headless context: no navigation. The OS already displays the
+        // notification from the `notification` payload; nothing else required.
+        // Returning a resolved promise acknowledges handling to the OS.
+      });
     } catch { /* silent — Firebase not configured */ }
+  }
+
+  onForegroundTap(): void {
+    // Reserved for future: building a local notification on foreground messages
+    // and routing on tap. Foreground messages currently only bump the badge.
   }
 
   async unregisterToken() {

@@ -1,6 +1,10 @@
 /**
  * OfflineBanner — slide-in strip when device loses connectivity.
- * Uses @react-native-community/netinfo.
+ *
+ * Connectivity is sourced from connectivityService (a single NetInfo wrapper)
+ * instead of importing NetInfo directly. This guarantees the banner reflects the
+ * same state used to trigger reconnect refetches, and degrades gracefully (stays
+ * hidden) when NetInfo is unavailable in tests.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Text, Animated, StyleSheet } from 'react-native';
@@ -9,10 +13,7 @@ import { useTranslation } from '@i18n';
 import { colors } from '@theme/colors';
 import { spacing } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-
-// Soft import — app works even if NetInfo not installed
-let NetInfo: any = null;
-try { NetInfo = require('@react-native-community/netinfo').default; } catch { /* ok */ }
+import { connectivityService } from '@services/connectivityService';
 
 export const OfflineBanner: React.FC = () => {
   const [offline, setOffline] = useState(false);
@@ -20,11 +21,9 @@ export const OfflineBanner: React.FC = () => {
   const slideY = useRef(new Animated.Value(-60)).current;
 
   useEffect(() => {
-    if (!NetInfo) return;
-    const unsub = NetInfo.addEventListener((state: any) => {
-      const isOffline = !(state.isConnected && state.isInternetReachable !== false);
-      setOffline(isOffline);
-    });
+    // Ensure the single NetInfo subscription is running, then mirror its state.
+    connectivityService.start();
+    const unsub = connectivityService.subscribe(online => setOffline(!online));
     return () => unsub();
   }, []);
 
@@ -68,4 +67,3 @@ const styles = StyleSheet.create({
     color:      colors.white,
   },
 });
-

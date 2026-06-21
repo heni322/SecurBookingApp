@@ -14,11 +14,12 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "postinstall": "patch-package",
-    "assets:generate": "node scripts/generate-app-assets.js"
+    "icon:generate": "node scripts/generate-app-icons.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/geolocation": "^3.4.0",
+    "@react-native-community/netinfo": "^11.4.1",
     "@react-native-firebase/app": "^21.14.0",
     "@react-native-firebase/messaging": "^21.14.0",
     "@react-navigation/bottom-tabs": "^7.15.8",
@@ -30,10 +31,12 @@
     "@tanstack/react-query": "^5.100.11",
     "axios": "^1.7.9",
     "i18next": "^26.0.4",
+    "libphonenumber-js": "1.13.6",
     "lucide-react-native": "^1.7.0",
     "react": "19.2.3",
     "react-i18next": "^17.0.3",
     "react-native": "0.84.1",
+    "react-native-haptic-feedback": "^3.0.0",
     "react-native-image-picker": "^8.2.1",
     "react-native-keychain": "^10.0.0",
     "react-native-maps": "^1.27.2",
@@ -81,10 +84,12 @@
       "json"
     ],
     "transformIgnorePatterns": [
-      "node_modules/(?!(react-native|@react-native|@react-navigation|zustand|@stripe)/)"
+      "node_modules/(?!(react-native|@react-native|@react-navigation|zustand|@stripe|@react-native-community)/)"
     ],
     "moduleNameMapper": {
       "^@api/(.*)$": "<rootDir>/src/api/$1",
+      "^@config$": "<rootDir>/src/config/index.ts",
+      "^@config/(.*)$": "<rootDir>/src/config/$1",
       "^@constants/(.*)$": "<rootDir>/src/constants/$1",
       "^@models/(.*)$": "<rootDir>/src/models/$1",
       "^@services/(.*)$": "<rootDir>/src/services/$1",

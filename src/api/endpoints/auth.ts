@@ -6,11 +6,38 @@ import type {
   RegisterPayload,
   TwoFaSetupResponse,
   User,
+  ResendVerificationPayload,
+  VerifyPhonePayload,
 } from '@models/index';
 
 export const authApi = {
   register: (payload: RegisterPayload) =>
     apiClient.post<ApiResponse<{ user: User; tokens: AuthTokens }>>('/auth/register', payload),
+
+  /**
+   * Live phone-availability check used during registration.
+   * Backend caps this at 10 requests/min/IP. Returns { available }.
+   */
+  checkPhone: (phone: string) =>
+    apiClient.get<ApiResponse<{ available: boolean }>>('/auth/check-phone', { params: { phone } }),
+  checkEmail: (email: string) =>
+    apiClient.get<ApiResponse<{ available: boolean }>>('/auth/check-email', { params: { email } }),
+
+  resendVerification: (payload: ResendVerificationPayload) =>
+    apiClient.post<ApiResponse<{ message: string }>>('/auth/resend-verification', payload),
+
+  /**
+   * Send a 6-digit SMS code to the account's phone (valid 10 min, 3/min limit).
+   * Requires auth; uses the phone already on the account.
+   */
+  sendPhoneCode: () =>
+    apiClient.post<ApiResponse<{ message: string }>>('/auth/phone/send-code'),
+
+  /**
+   * Verify the SMS code and confirm the phone. 5 attempts max per code.
+   */
+  verifyPhone: (payload: VerifyPhonePayload) =>
+    apiClient.post<ApiResponse<{ message: string }>>('/auth/phone/verify', payload),
 
   login: (payload: LoginPayload) =>
     apiClient.post<ApiResponse<{ user: User; tokens: AuthTokens }>>('/auth/login', payload),

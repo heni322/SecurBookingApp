@@ -1,12 +1,17 @@
 /**
  * NotificationsScreen — notification feed with unread management + deep navigation.
+ *
+ * Navigation mapping is delegated to the shared notificationRouter so that an
+ * in-app tap and a push-notification tap land on exactly the same screen. The
+ * in-app notification carries a typed `metadata` object; we normalise it into
+ * the flat string map the router expects (the same shape FCM `data` uses).
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, RefreshControl, StyleSheet,
 } from 'react-native';
 import { Bell, CheckCheck, BellOff }     from 'lucide-react-native';
-import { CommonActions, useNavigation }  from '@react-navigation/native';
+import { useNavigation }                 from '@react-navigation/native';
 import type { NavigationProp }           from '@react-navigation/native';
 import { notificationsApi }      from '@api/endpoints/notifications';
 import { useApi }                from '@hooks/useApi';
@@ -20,60 +25,23 @@ import { fontSize, fontFamily }  from '@theme/typography';
 import type { AppNotification, MainTabParamList } from '@models/index';
 import { useTranslation }        from '@i18n';
 import { useSafeAreaInsets }    from 'react-native-safe-area-context';
+import {
+  resolveNotificationAction,
+  type NotificationData,
+} from '@services/notificationRouter';
 
+/**
+ * Normalise an in-app notification (typed `metadata`) into the flat string map
+ * the shared router consumes, then resolve the navigation action. Keeping a
+ * single switch (in notificationRouter) guarantees in-app and push taps agree.
+ */
 function resolveNavAction(notif: AppNotification) {
-  const meta = (notif.metadata ?? {}) as Record<string, string>;
-  switch (notif.type) {
-    case 'MISSION_AVAILABLE': case 'MISSION_PUBLISHED': case 'BOOKING_ASSIGNED':
-      return meta.missionId
-        ? CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } })
-        : CommonActions.navigate('Missions', { screen: 'MissionList' });
-    case 'BOOKING_CHECKIN': case 'BOOKING_CHECKOUT':
-      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
-      if (meta.missionId) return CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } });
-      return CommonActions.navigate('Missions', { screen: 'MissionList' });
-    case 'AGENT_LOCATION_UPDATE':
-      if (meta.missionId && meta.bookingId)
-        return CommonActions.navigate('Missions', { screen: 'LiveTracking', params: { missionId: meta.missionId, bookingId: meta.bookingId, agentName: meta.agentName ?? 'Agent', missionAddress: meta.missionAddress ?? '', siteLat: parseFloat(meta.siteLat ?? '0'), siteLng: parseFloat(meta.siteLng ?? '0') } });
-      return null;
-    case 'PAYMENT_CONFIRMED': case 'PAYMENT_FAILED':
-      return CommonActions.navigate('Profile', { screen: 'PaymentHistory' });
-    case 'INCIDENT_REPORTED':
-      return meta.missionId
-        ? CommonActions.navigate('Missions', { screen: 'Dispute', params: { missionId: meta.missionId, bookingId: meta.bookingId, missionTitle: meta.missionTitle ?? 'Mission' } })
-        : null;
-    case 'RATING_RECEIVED':
-      return meta.missionId
-        ? CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } })
-        : null;
-    case 'DOCUMENT_APPROVED': case 'DOCUMENT_REJECTED':
-      return CommonActions.navigate('Profile', { screen: 'ProfileMain' });
-    // Backend: agent checked in / checked out
-    case 'AGENT_CHECKED_IN': case 'AGENT_CHECKED_OUT':
-      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
-      if (meta.missionId) return CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } });
-      return CommonActions.navigate('Missions', { screen: 'MissionList' });
-    // Backend: PDF report ready
-    case 'MISSION_REPORT_READY':
-      return meta.missionId
-        ? CommonActions.navigate('Missions', { screen: 'MissionDetail', params: { missionId: meta.missionId } })
-        : CommonActions.navigate('Missions', { screen: 'MissionList' });
-    // Backend: account status
-    case 'ACCOUNT_SUSPENDED': case 'ACCOUNT_ACTIVATED':
-      return CommonActions.navigate('Profile', { screen: 'ProfileMain' });
-    // Backend: booking cancelled / forced checkout by admin
-    case 'BOOKING_CANCELLED': case 'BOOKING_FORCE_CHECKOUT':
-      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
-      return CommonActions.navigate('Missions', { screen: 'MissionList' });
-    // Backend: rating requested post-mission
-    case 'RATING_REQUESTED':
-      if (meta.bookingId) return CommonActions.navigate('Missions', { screen: 'BookingDetail', params: { bookingId: meta.bookingId } });
-      return CommonActions.navigate('Missions', { screen: 'MissionList' });
-    // Backend: payment status change
-    case 'PAYMENT_CONFIRMED': case 'PAYMENT_PENDING': case 'PAYMENT_PROCESSING':
-      return CommonActions.navigate('Profile', { screen: 'PaymentHistory' });
-    default: return null;
+  const meta = (notif.metadata ?? {}) as Record<string, unknown>;
+  const data: NotificationData = { type: notif.type };
+  for (const [k, v] of Object.entries(meta)) {
+    if (v != null) data[k] = String(v);
   }
+  return resolveNotificationAction(data);
 }
 
 export const NotificationsScreen: React.FC = () => {

@@ -162,13 +162,17 @@ export const Toast: React.FC<Props> = ({ item }) => {
       style={[
         styles.toast,
         {
-          backgroundColor: bg,
+          backgroundColor: colors.backgroundElevatedSolid,
           borderColor:     border,
           opacity,
           transform:       [{ translateY: Animated.add(translateY, dragY) }],
         },
       ]}
     >
+      {/* Opaque base is on the container; this paints the variant tint on top
+          so the card stays fully readable while keeping the colored wash. */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { backgroundColor: bg }]} />
+
       <View style={styles.row}>
         <View style={[styles.iconWrap, { backgroundColor: border }]}>
           <Icon size={18} color={fg} strokeWidth={2.2} />

@@ -1,36 +1,41 @@
+/**
+ * constants/config.ts — BACKWARD-COMPATIBILITY SHIM.
+ *
+ * The single source of truth for configuration is now `@config` (src/config/*),
+ * a typed, validated, environment-aware module. This file re-exports the legacy
+ * named constants so existing imports keep working while the codebase migrates
+ * to `import { config } from '@config'`.
+ *
+ * Prefer the new API in new code:
+ *   import { config } from '@config';
+ *   config.api.baseUrl, config.api.timeoutMs, config.cache.staleMediumMs, …
+ *
+ * These aliases are intentionally thin and may be removed once all call sites
+ * use `@config` directly.
+ */
+import { config } from '@config';
 
-// ─── API Base URL ─────────────────────────────────────────────────────────────
-// Dev host strategy (pick ONE):
-//
-//  A) USB (recommended) — run once per session:
-//       adb reverse tcp:3000 tcp:3000
-//     DEV_HOST = 'localhost'                    <- active
-//
-//  B) Wi-Fi — set to your machine's Wi-Fi IP:
-//     DEV_HOST = '192.168.1.15'               <- your current Wi-Fi IP
-//
-//  C) Android emulator (no USB):
-//     DEV_HOST = '10.0.2.2'
-const DEV_HOST = '192.168.1.13';
-export const API_BASE_URL = __DEV__
-  ? `http://${DEV_HOST}:3000/api/v1`
-  : 'https://api.securbooking.com/api/v1';
+/** @deprecated use `config.api.baseUrl` */
+export const API_BASE_URL = config.api.baseUrl;
 
-export const API_TIMEOUT = 15_000;
+/** @deprecated use `config.api.timeoutMs` */
+export const API_TIMEOUT = config.api.timeoutMs;
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
-export const DEFAULT_PAGE_SIZE = 20;
+/** @deprecated use `config.defaultPageSize` */
+export const DEFAULT_PAGE_SIZE = config.defaultPageSize;
 
-// ─── Cache (stale times in ms) ────────────────────────────────────────────────
+/** @deprecated use `config.cache.*` */
 export const STALE_TIME = {
-  SHORT:  2 * 60 * 1000,   // 2 min  — disponibilités, devis
-  MEDIUM: 5 * 60 * 1000,   // 5 min  — profils, missions
-  LONG:   10 * 60 * 1000,  // 10 min — service-types, pricing-rules
+  SHORT:  config.cache.staleShortMs,
+  MEDIUM: config.cache.staleMediumMs,
+  LONG:   config.cache.staleLongMs,
 } as const;
 
-// ─── GPS ──────────────────────────────────────────────────────────────────────
-export const CHECKIN_RADIUS_METERS = 30; // rayon toléré pour le check-in
+/** @deprecated use `config.checkinRadiusMeters` */
+export const CHECKIN_RADIUS_METERS = config.checkinRadiusMeters;
 
-// ─── App ─────────────────────────────────────────────────────────────────────
-export const APP_NAME    = 'Provalk';
-export const APP_VERSION = '1.0.0';
+/** @deprecated use `config.appName` */
+export const APP_NAME = config.appName;
+
+/** @deprecated use `config.appVersion` */
+export const APP_VERSION = config.appVersion;

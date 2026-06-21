@@ -9,14 +9,14 @@
  *  ● Phone E.164 normalization on submit (strip spaces / dashes / parens).
  *  ● Per-field backend error mapping (409 → email, 400 → field, 429 → throttle).
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, StyleSheet,
+  KeyboardAvoidingView, Platform, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  ArrowLeft, User, Building2, Mail, Phone,
+  ArrowLeft, User, Building2, Mail,
   Lock, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2,
   Hash, Check,
 } from 'lucide-react-native';
@@ -24,6 +24,7 @@ import { authApi }      from '@api/endpoints/auth';
 import { useAuthStore } from '@store/authStore';
 import { Button }       from '@components/ui/Button';
 import { Input }        from '@components/ui/Input';
+import { PhoneInput, validatePhone } from '@components/ui/PhoneInput';
 import { colors }       from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
@@ -63,9 +64,16 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const { top } = useSafeAreaInsets();
   const toast   = useToast();
 
-  const [fullName,    setFullName]    = useState('');
+  const [firstName,   setFirstName]   = useState('');
+  const [lastName,    setLastName]    = useState('');
   const [email,       setEmail]       = useState('');
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const emailDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const emailReqToken = useRef(0);
   const [phone,       setPhone]       = useState('');
+  const [phoneStatus, setPhoneStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const phoneDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phoneReqToken = useRef(0);
   const [password,    setPassword]    = useState('');
   const [showPass,    setShowPass]    = useState(false);
   const [clientType,  setClientType]  = useState<'INDIVIDUAL' | 'COMPANY'>('INDIVIDUAL');
@@ -78,20 +86,82 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
 
   const pwStrength = useMemo(() => computePasswordStrength(password), [password]);
 
+  // ── Email availability check (debounced, mirrors agent app) ───────────────
+  const handleEmailChange = (val: string) => {
+    setEmail(val);
+    setErrors(e => ({ ...e, email: '' }));
+    setEmailStatus('idle');
+    if (emailDebounce.current) clearTimeout(emailDebounce.current);
+
+    const candidate = val.trim().toLowerCase();
+    if (!candidate || !/^\S+@\S+\.\S+$/.test(candidate)) return;
+
+    emailDebounce.current = setTimeout(async () => {
+      const myToken = ++emailReqToken.current;
+      setEmailStatus('checking');
+      try {
+        const res = await authApi.checkEmail(candidate);
+        if (myToken !== emailReqToken.current) return;
+        const rawAvailable = (res.data as any)?.data?.available;
+        if (typeof rawAvailable !== 'boolean') { setEmailStatus('idle'); return; }
+        setEmailStatus(rawAvailable ? 'available' : 'taken');
+        if (!rawAvailable) {
+          setErrors(e => ({ ...e, email: t('register.errors.email_taken') }));
+        }
+      } catch {
+        if (myToken === emailReqToken.current) setEmailStatus('idle');
+      }
+    }, 500);
+  };
+  // ── Phone availability check (debounced, mirrors agent app) ───────────────
+  const handlePhoneChange = (e164: string) => {
+    setPhone(e164);
+    setErrors(e => ({ ...e, phone: '' }));
+    setPhoneStatus('idle');
+    if (phoneDebounce.current) clearTimeout(phoneDebounce.current);
+
+    // Only probe once the number looks complete/valid.
+    const national = e164.replace(/^\+33/, '');
+    if (!e164 || !validatePhone(national, 'FR').valid) return;
+
+    phoneDebounce.current = setTimeout(async () => {
+      const myToken = ++phoneReqToken.current;
+      setPhoneStatus('checking');
+      try {
+        const res = await authApi.checkPhone(e164);
+        if (myToken !== phoneReqToken.current) return;
+        const rawAvailable = (res.data as any)?.data?.available;
+        if (typeof rawAvailable !== 'boolean') { setPhoneStatus('idle'); return; }
+        setPhoneStatus(rawAvailable ? 'available' : 'taken');
+        if (!rawAvailable) {
+          setErrors(e => ({ ...e, phone: t('register.errors.phone_taken') }));
+        }
+      } catch {
+        if (myToken === phoneReqToken.current) setPhoneStatus('idle');
+      }
+    }, 500);
+  };
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): boolean => {
     const e: Record<string, string> = {};
 
-    if (!fullName.trim() || fullName.trim().length < 2)
-      e.fullName = t('register.errors.full_name_required');
+    if (!firstName.trim() || firstName.trim().length < 2)
+      e.firstName = t('register.errors.first_name_required');
+
+    if (!lastName.trim() || lastName.trim().length < 2)
+      e.lastName = t('register.errors.last_name_required');
 
     if (!email.trim())
       e.email = t('register.errors.email_required');
     else if (!/^\S+@\S+\.\S+$/.test(email.trim()))
       e.email = t('register.errors.email_invalid');
+    if (emailStatus === 'checking') e.email = t('register.errors.email_checking');
+    if (emailStatus === 'taken')    e.email = t('register.errors.email_taken');
 
-    if (phone.trim() && !isValidPhone(phone))
+    if (phone.trim() && !validatePhone(phone.replace(/^\+33/, ''), 'FR').valid)
       e.phone = t('register.errors.phone_invalid');
+    if (phoneStatus === 'checking') e.phone = t('register.errors.phone_checking');
+    if (phoneStatus === 'taken')    e.phone = t('register.errors.phone_taken');
 
     if (password.length < 8)
       e.password = t('register.errors.password_length');
@@ -137,7 +207,8 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     setLoading(true);
     try {
       const payload: RegisterPayload = {
-        fullName:    fullName.trim().replace(/\s+/g, ' '),
+        firstName:   firstName.trim().replace(/\s+/g, ' '),
+        lastName:    lastName.trim().replace(/\s+/g, ' '),
         email:       email.trim().toLowerCase(),
         password,
         phone:       phone.trim() ? normalizePhone(phone) : undefined,
@@ -247,32 +318,49 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         {/* ── Form card ─────────────────────────────────────────────────── */}
         <View style={styles.formCard}>
           <Input
-            label={t('register.full_name_label')}
-            value={fullName}
-            onChangeText={setFullName}
+            label={t('register.first_name_label')}
+            value={firstName}
+            onChangeText={(v) => { setFirstName(v); if (errors.firstName) setErrors(p => ({ ...p, firstName: '' })); }}
             autoCapitalize="words"
-            placeholder={t('register.full_name_placeholder')}
-            error={errors.fullName}
-            leftIcon={<User size={16} color={errors.fullName ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
+            placeholder={t('register.first_name_placeholder')}
+            error={errors.firstName}
+            leftIcon={<User size={16} color={errors.firstName ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
+          />
+          <Input
+            label={t('register.last_name_label')}
+            value={lastName}
+            onChangeText={(v) => { setLastName(v); if (errors.lastName) setErrors(p => ({ ...p, lastName: '' })); }}
+            autoCapitalize="words"
+            placeholder={t('register.last_name_placeholder')}
+            error={errors.lastName}
+            leftIcon={<User size={16} color={errors.lastName ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
           />
           <Input
             label={t('register.email_label' as any) ?? 'Email'}
             value={email}
-            onChangeText={(v) => { setEmail(v); if (errors.email) setErrors(p => ({ ...p, email: '' })); }}
+            onChangeText={handleEmailChange}
             keyboardType="email-address"
             autoCapitalize="none"
             placeholder={t('login.email_placeholder')}
             error={errors.email}
+            hint={emailStatus === 'available' ? t('register.email_available') : undefined}
             leftIcon={<Mail size={16} color={errors.email ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
+            rightIcon={
+              emailStatus === 'checking'
+                ? <ActivityIndicator size="small" color={colors.textMuted} />
+                : emailStatus === 'available'
+                  ? <CheckCircle2 size={16} color={colors.success} strokeWidth={2} />
+                  : undefined
+            }
           />
-          <Input
+          <PhoneInput
             label={t('register.phone_label')}
             value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholder={t('register.phone_placeholder')}
+            onChangePhone={handlePhoneChange}
+            hint={t('register.phone_hint')}
             error={errors.phone}
-            leftIcon={<Phone size={16} color={errors.phone ? colors.danger : colors.textMuted} strokeWidth={1.8} />}
+            loading={phoneStatus === 'checking'}
+            success={phoneStatus === 'available' ? t('register.phone_available') : undefined}
           />
 
           {/* ── Conditional COMPANY fields ─────────────────────────────── */}

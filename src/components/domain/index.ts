@@ -7,3 +7,5 @@ export { AgentCard }          from './AgentCard';
 export { QuoteBreakdownCard } from './QuoteBreakdownCard';
 export { NotificationItem }   from './NotificationItem';
 export { AgentApproachBanner } from './AgentApproachBanner';
+export { EmailVerificationBanner } from './EmailVerificationBanner';
+export { PhoneVerificationCard } from './PhoneVerificationCard';

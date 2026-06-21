@@ -5,7 +5,7 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>fr</string>
 	<key>CFBundleDisplayName</key>
 	<string>Provalk</string>
 	<key>CFBundleExecutable</key>
@@ -116,9 +116,29 @@
 		</dict>
 	</dict>
 
-	<!-- ── Permissions ─────────────────────────────────────────────────── -->
+	<!-- ── Permissions (toutes les descriptions sont en français, exigées par App Review) ── -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>SecurBook accède à votre position pour afficher votre localisation sur la carte de suivi.</string>
+	<string>Provalk accède à votre position pour afficher votre localisation et suivre l'agent en temps réel sur la carte de la mission.</string>
+
+	<!-- Suivi de l'agent possible lorsque l'app est en arrière-plan pendant une mission active -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Provalk utilise votre position, y compris en arrière-plan, pour suivre la progression de l'agent vers le lieu de la mission et déclencher les alertes de proximité.</string>
+
+	<!-- Photos de check-in / check-out et pièces jointes de litige -->
+	<key>NSCameraUsageDescription</key>
+	<string>Provalk accède à l'appareil photo pour prendre les photos de prise de poste, de fin de mission et les justificatifs en cas de litige.</string>
+
+	<!-- Sélection d'images depuis la photothèque (justificatifs, avatar) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Provalk accède à vos photos pour joindre des justificatifs à une mission ou un litige et pour définir votre photo de profil.</string>
+
+	<!-- Enregistrement de pièces (factures, justificatifs) dans la photothèque -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Provalk enregistre dans votre photothèque les justificatifs et documents générés par l'application.</string>
+
+	<!-- Authentification biométrique (react-native-keychain) -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>Provalk utilise Face ID pour sécuriser l'accès à votre compte et valider vos opérations sensibles.</string>
 
 	<!-- iOS 11+ — required for MapKit overlays + react-native-maps -->
 	<key>UILaunchStoryboardName</key>

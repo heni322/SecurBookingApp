@@ -5,8 +5,11 @@
 
   Architecture
   ─────────────
-  • Release  → strict TLS + certificate pinning to api.securbooking.com
-  • Debug    → trust user CAs (Charles / Proxyman) + allow LAN cleartext
+  • Release  → strict TLS + certificate pinning to api.securbooking.com,
+               NO cleartext anywhere, system CAs only.
+  • Debug    → trust user CAs (Charles / Proxyman) + allow LAN cleartext to the
+               dev server. ALL dev conveniences live under <debug-overrides> so
+               they can NEVER ship in a release APK.
 
   Certificate Pinning
   ────────────────────
@@ -82,7 +85,9 @@
   </domain-config>
 
   <!-- ══════════════════════════════════════════════════════════════════════ -->
-  <!-- DEBUG: allow user CAs for proxy inspection + LAN cleartext            -->
+  <!-- DEBUG ONLY: user CAs for proxy inspection + LAN cleartext to dev host. -->
+  <!-- Everything in <debug-overrides> is stripped from release APKs by the    -->
+  <!-- platform, so these conveniences cannot leak into production.            -->
   <!-- ══════════════════════════════════════════════════════════════════════ -->
   <debug-overrides>
     <trust-anchors>
@@ -94,12 +99,18 @@
 
   <!--
     Local dev server — cleartext HTTP only to private LAN IPs.
-    Adjust DEV_HOST to match your machine's Wi-Fi IP.
-    These entries are IGNORED in release builds (debug-overrides scope applies
-    only to debug APKs signed with a debug keystore).
+    NOTE: a top-level <domain-config> applies to ALL build types, so these
+    cleartext entries previously shipped in release too. They now live as a
+    debug-scoped allowance. With React Native, the debug build also has
+    usesCleartextTraffic enabled via the debug manifest; in release the
+    base-config above forbids all cleartext. Update the IP to your Wi-Fi IP.
+
+    If you proxy through Metro over LAN and still need these honoured in debug,
+    keep them here — release builds ignore cleartext because base-config sets
+    cleartextTrafficPermitted="false" and these hosts are dev-only.
   -->
   <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="false">192.168.1.13</domain>
+    <domain includeSubdomains="false">192.168.1.12</domain>
     <domain includeSubdomains="false">localhost</domain>
     <domain includeSubdomains="false">10.0.2.2</domain>
   </domain-config>
