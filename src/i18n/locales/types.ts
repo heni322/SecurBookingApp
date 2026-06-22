@@ -16,7 +16,11 @@ export interface CommonNS {
   error:         string;
   success:       string;
   unknown_error: string;
-  tls_badge: string; map_loading: string; total_spent: string; }
+  tls_badge: string; map_loading: string; total_spent: string;
+  search_address: string; phone_too_short: string; phone_invalid: string;
+  biometric_confirm: string; biometric_fingerprint: string; biometric_default: string;
+  generic_error: string;
+  datetime_select_label: string; datetime_confirm_prefix: string; datetime_select_date_first: string; datetime_at_sep: string; back: string; send: string; search: string; back_home: string; add_agent: string; map_unavailable: string; check_connection: string; mission_zone: string; mission_cancelled: string; }
 
 export interface AuthNS {
   login: {
@@ -108,6 +112,7 @@ export interface HomeNS {
 export interface MissionsNS {
   title: string; subtitle_one: string; subtitle_other: string;
   new: string; search_placeholder: string; card_fallback_title: string; card_urgent: string;
+  starts_in_min: string; starts_in_hours: string; starts_in_days_one: string; starts_in_days_other: string;
   filters: { all: string; active: string; created: string; completed: string; cancelled: string; };
   empty: {
     no_results: string; no_missions: string; filter_label: string;
@@ -132,6 +137,7 @@ export interface MissionsNS {
     badge_live: string; badge_approach: string; badge_urgent: string;
     section_approach: string; section_location: string; section_notes: string; section_bookings: string;
     total_ttc: string;
+    sepa_settling_title: string; sepa_settling_body: string;
   };
   edit: { screen_title: string; loading: string; save_btn: string; saved_toast: string; };
   statuses: { created: string; published: string; staffing: string; staffed: string; in_progress: string; completed: string; cancelled: string; };
@@ -152,6 +158,7 @@ export interface MissionsNS {
   };
   create: {
     step_one: string; step_two: string; step_three: string;
+    relative_just_now: string; relative_min_ago: string; relative_hours_ago: string; relative_days_ago: string;
     service_required_title: string; service_required_body: string;
     map_position_required: string; start_required: string; start_min_future: string;
     duration_min: string; duration_max: string; end_before_start: string;
@@ -374,6 +381,7 @@ export interface QuoteNS {
   row_total_ttc: string;
   valid_until: string;
   accept_label: string;
+  ref: string;
 }
 
 export interface PaymentNS {
@@ -401,6 +409,37 @@ export interface PaymentNS {
     saved_label: string; how_title: string; stripe_info: string;
     security_1: string; security_2: string; security_3: string;
   };
+  pay: {
+    title: string;
+    saved_title: string;
+    account_iban: string; account_card: string;
+    saved_selected: string;
+    iban_invalid: string; iban_valid: string;
+    mandate_text: string;
+    cta_processing: string; cta_sepa: string; cta_pay: string;
+    footer_cgv: string;
+    err_generic: string;
+  };
+  add: {
+    header_method: string;
+    header_add: string;
+    header_iban: string;
+    header_card: string;
+    pick_sub: string;
+    card_label: string; card_desc: string;
+    sepa_label: string; sepa_desc: string;
+    method_badge_card: string; method_badge_sepa: string;
+    form_title_card: string; form_title_sepa: string;
+    iban_field_label: string;
+    mandate_text: string;
+    sec_info_card: string; sec_info_sepa: string;
+    incomplete_card: string; invalid_iban: string;
+    success_sub_card: string; success_sub_sepa: string;
+    success_cta: string;
+    save_card: string; save_iban: string; saving: string;
+    err_session: string; err_card_refused: string; err_card_save: string; err_iban_refused: string; err_sepa_save: string; err_generic: string;
+    iban_hint: string; footer_iban_consent: string; footer_tokenized: string;
+  };
   offline: {
     title: string; subtitle: string;
     method_virement: string; method_cheque: string;
@@ -414,6 +453,8 @@ export interface PaymentNS {
     amount_exact: string; amount_cheque: string;
     bank_coords_title: string; cheque_title: string;
     follow_mission: string;
+    result_title_virement: string; result_title_cheque: string; result_subtitle: string;
+    total_ttc: string; vat_included: string; method_section_title: string; copy: string;
     copied: string;
   };
 }
@@ -466,7 +507,7 @@ export interface BookingNS {
     selected_title: string; selected_body: string; select_error: string;
   };
   checkins: { section_title: string; date_label: string; checkin_label: string; checkout_label: string; };
-  photos: { section_title: string; verified_badge: string; no_photos_title: string; caption: string; };
+  photos: { section_title: string; verified_badge: string; no_photos_title: string; caption: string; zoom_a11y: string; empty_in_progress: string; empty_completed: string; };
   incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; };
   actions: { rate_agent: string; already_rated: string; open_dispute: string; };
   uniforms: { STANDARD: string; CIVIL: string; EVENEMENTIEL: string; SSIAP: string; CYNOPHILE: string; };
@@ -511,6 +552,7 @@ export interface TrackingNS {
   in_zone: string; out_of_zone: string;
   follow_agent_btn: string; view_site_btn: string; sync_btn: string;
   last_seen: string; attribution: string;
+  recenter_a11y: string; close_a11y: string;
 }
 
 export interface ConversationNS {
@@ -535,10 +577,15 @@ export interface ServicesNS {
 export interface MapPickerNS {
   label: string; hint: string; loading: string;
   validate_btn: string; validated: string; unlock_hint: string;
+  perm_title: string; perm_message: string; perm_allow: string; perm_cancel: string;
+  perm_settings_hint: string; perm_denied_title: string; perm_denied: string;
+  position_unavailable: string; timeout_retry: string; locate_failed_title: string;
 }
 
 export interface AnalyticsNS {
   missions_per_month: string;
+  status_completed: string; status_in_progress: string; status_drafts: string; status_cancelled: string;
+  kpi_total_spent: string; kpi_total_missions: string; monthly_spend: string; status_breakdown: string;
 }
 
 export interface OfflineBannerNS {

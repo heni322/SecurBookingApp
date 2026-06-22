@@ -5,6 +5,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ApiResponse } from '@models/index';
 import type { AxiosResponse } from 'axios';
+import i18n from '@i18n';
 
 interface ApiState<T> {
   data:    T | null;
@@ -48,7 +49,7 @@ export function useApi<TArgs extends unknown[], TData>(
         const message =
           (err as { response?: { data?: { message?: string } } })
             ?.response?.data?.message ??
-          (err instanceof Error ? err.message : 'Une erreur est survenue');
+          (err instanceof Error ? err.message : i18n.t('common:generic_error'));
         if (mountedRef.current) {
           setState((prev) => ({ ...prev, loading: false, error: message }));
         }

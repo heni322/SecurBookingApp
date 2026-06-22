@@ -12,7 +12,7 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, Modal, StyleSheet, Image,
-  Dimensions,
+  Dimensions, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -37,6 +37,7 @@ import { isActiveBooking }      from '@utils/typeGuards';
 import { BookingStatus }        from '@constants/enums';
 import type { BookingNS }       from '@i18n/locales/types';
 import { useTranslation }       from '@i18n';
+import i18n from '@i18n';
 import { useToast } from '@hooks/useToast';
 import type { Application, MissionStackParamList } from '@models/index';
 
@@ -44,14 +45,6 @@ type Props = NativeStackScreenProps<MissionStackParamList, 'BookingDetail'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// ── Uniform label map ──────────────────────────────────────────────────────────
-const UNIFORM_LABEL: Record<string, string> = {
-  STANDARD:     '🦺 Standard',
-  CIVIL:        '👔 Civil',
-  EVENEMENTIEL: '🤵 Soirée',
-  SSIAP:        '🔥 SSIAP',
-  CYNOPHILE:    '🐕 Cynophile',
-};
 
 /**
  * Static map: BookingStatus → keyof BookingNS['statuses']
@@ -68,7 +61,8 @@ const BOOKING_STATUS_I18N_KEY: Record<BookingStatus, keyof BookingNS['statuses']
 
 export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { bookingId }                             = route.params;
-  const { t }                                     = useTranslation('booking');
+  const { t }                                     = useTranslation('booking');
+
   const toast = useToast();
   const { data: booking, loading, execute }       = useApi(bookingsApi.getById);
   const [showIncidentModal, setShowIncidentModal] = useState(false);
@@ -133,7 +127,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   };
 
-  if (loading && !booking) return <LoadingState message="Chargement…" />;
+  if (loading && !booking) return <LoadingState message={i18n.t('common:loading')} />;
   if (!booking) return (
     <View style={styles.screen}>
       <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
@@ -174,7 +168,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.statusRight}>
             {booking.uniform && (
               <Text style={styles.uniformBadge}>
-                {UNIFORM_LABEL[booking.uniform] ?? booking.uniform}
+                {t(`uniforms.${booking.uniform}`, { defaultValue: booking.uniform })}
               </Text>
             )}
             {booking.durationMin !== undefined && (
@@ -238,7 +232,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
             </View>
             {isInProgress && (
-              <TouchableOpacity style={styles.trackingBtn} onPress={goToLiveTracking}>
+              <TouchableOpacity style={styles.trackingBtn} onPress={goToLiveTracking} accessibilityRole="button" accessibilityLabel={t('agent.follow_live')}>
                 <MapPin size={15} color="#FFF" strokeWidth={2} />
                 <Text style={styles.trackingBtnTxt}>{t('agent.follow_live')}</Text>
                 <View style={styles.trackingDot} />
@@ -294,7 +288,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
                 <View style={styles.photoRow}>
                   {checkinPhotos.map((url, i) => (
-                    <TouchableOpacity key={i} style={styles.photoThumbWrap} onPress={() => setLightboxUrl(url)} activeOpacity={0.85}>
+                    <TouchableOpacity key={i} style={styles.photoThumbWrap} onPress={() => setLightboxUrl(url)} activeOpacity={0.85} accessibilityRole="imagebutton" accessibilityLabel={t('photos.zoom_a11y')}>
                       <Image source={{ uri: url }} style={styles.photoThumb} resizeMode="cover" />
                       <View style={styles.photoZoomIcon}><ZoomIn size={12} color="#fff" strokeWidth={2} /></View>
                     </TouchableOpacity>
@@ -313,7 +307,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
                 <View style={styles.photoRow}>
                   {checkoutPhotos.map((url, i) => (
-                    <TouchableOpacity key={i} style={styles.photoThumbWrap} onPress={() => setLightboxUrl(url)} activeOpacity={0.85}>
+                    <TouchableOpacity key={i} style={styles.photoThumbWrap} onPress={() => setLightboxUrl(url)} activeOpacity={0.85} accessibilityRole="imagebutton" accessibilityLabel={t('photos.zoom_a11y')}>
                       <Image source={{ uri: url }} style={styles.photoThumb} resizeMode="cover" />
                       <View style={styles.photoZoomIcon}><ZoomIn size={12} color="#fff" strokeWidth={2} /></View>
                     </TouchableOpacity>
@@ -332,8 +326,8 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Text style={styles.noPhotosTitle}>{t('photos.no_photos_title')}</Text>
                 <Text style={styles.noPhotosText}>
                   {isInProgress
-                    ? "Les photos apparaîtront ici lors du check-in de l'agent."
-                    : "Aucune photo de présence disponible pour cette mission."}
+                    ? t('photos.empty_in_progress')
+                    : t('photos.empty_completed')}
                 </Text>
               </View>
             </Card>
@@ -365,7 +359,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             <Button label={t('incidents.report_title')} onPress={() => setShowIncidentModal(true)} variant="outline" fullWidth />
           )}
           {isCompleted && agent && !hasRating && (
-            <TouchableOpacity style={styles.rateBtn} onPress={goToRateAgent}>
+            <TouchableOpacity style={styles.rateBtn} onPress={goToRateAgent} accessibilityRole="button" accessibilityLabel={t('actions.rate_agent')}>
               <Star size={16} color={colors.warning} strokeWidth={2} />
               <Text style={styles.rateBtnTxt}>{t('actions.rate_agent')}</Text>
             </TouchableOpacity>
@@ -377,7 +371,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
           {(isCompleted || isActive) && (
-            <TouchableOpacity style={styles.disputeBtn} onPress={goToDispute}>
+            <TouchableOpacity style={styles.disputeBtn} onPress={goToDispute} accessibilityRole="button" accessibilityLabel={t('actions.open_dispute')}>
               <Flag size={14} color={colors.danger} strokeWidth={2} />
               <Text style={styles.disputeBtnTxt}>{t('actions.open_dispute')}</Text>
             </TouchableOpacity>
@@ -388,7 +382,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* ── Photo Lightbox ─────────────────────────────────────── */}
       <Modal visible={!!lightboxUrl} transparent animationType="fade" onRequestClose={() => setLightboxUrl(null)}>
         <View style={lightbox.overlay}>
-          <TouchableOpacity style={lightbox.closeBtn} onPress={() => setLightboxUrl(null)}>
+          <TouchableOpacity style={lightbox.closeBtn} onPress={() => setLightboxUrl(null)} accessibilityRole="button" accessibilityLabel={i18n.t('common:close')}>
             <X size={22} color="#fff" strokeWidth={2} />
           </TouchableOpacity>
           {lightboxUrl && (
@@ -433,7 +427,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
       {/* ── Modal incident ─────────────────────────────────────── */}
       <Modal visible={showIncidentModal} transparent animationType="slide">
-        <View style={modal.overlay}>
+        <KeyboardAvoidingView style={modal.overlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={modal.sheet}>
             <Text style={modal.title}>{t('incidents.report_title')}</Text>
             <TextInput
@@ -444,13 +438,15 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               placeholderTextColor={colors.textMuted}
               multiline numberOfLines={5}
               textAlignVertical="top"
+              accessibilityLabel={t('incidents.report_title')}
+              accessibilityHint={t('incidents.placeholder')}
             />
             <View style={modal.btns}>
-              <Button label="Annuler" onPress={() => setShowIncidentModal(false)} variant="ghost" />
-              <Button label="Envoyer" onPress={handleIncident} loading={submitting} />
+              <Button label={i18n.t('common:cancel')} onPress={() => setShowIncidentModal(false)} variant="ghost" />
+              <Button label={i18n.t('common:send')} onPress={handleIncident} loading={submitting} />
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

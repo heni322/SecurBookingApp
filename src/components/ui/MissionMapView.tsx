@@ -24,6 +24,7 @@ import { config }  from '@config';
 import { colors }  from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import i18n from '@i18n';
 
 interface Props {
   latitude:     number;
@@ -145,7 +146,7 @@ export const MissionMapView: React.FC<Props> = ({
       {status === 'loading' && (
         <View style={styles.overlay}>
           <ActivityIndicator color={colors.primary} size="small" />
-          <Text style={styles.overlayText}>Chargement de la carte…</Text>
+          <Text style={styles.overlayText}>{i18n.t('common:map_loading')}</Text>
         </View>
       )}
 
@@ -153,8 +154,8 @@ export const MissionMapView: React.FC<Props> = ({
       {status === 'error' && (
         <View style={styles.overlay}>
           <WifiOff size={28} color={colors.textMuted} strokeWidth={1.5} />
-          <Text style={styles.errorTitle}>Carte indisponible</Text>
-          <Text style={styles.errorSub}>Vérifiez votre connexion internet</Text>
+          <Text style={styles.errorTitle}>{i18n.t('common:map_unavailable')}</Text>
+          <Text style={styles.errorSub}>{i18n.t('common:check_connection')}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRetry} activeOpacity={0.8}>
             <RefreshCw size={13} color={colors.primary} strokeWidth={2} />
             <Text style={styles.retryText}>Réessayer</Text>
@@ -191,7 +192,7 @@ export const MissionMapView: React.FC<Props> = ({
       {!interactive && status === 'ready' && (
         <View style={styles.badge} pointerEvents="none">
           <MapPin size={10} color={colors.primary} strokeWidth={2} />
-          <Text style={styles.badgeText}>Zone de mission</Text>
+          <Text style={styles.badgeText}>{i18n.t('common:mission_zone')}</Text>
         </View>
       )}
     </View>

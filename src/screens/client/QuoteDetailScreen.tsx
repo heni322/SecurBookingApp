@@ -187,7 +187,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     <View style={styles.screen}>
       <ScreenHeader
         title={t('title')}
-        subtitle={quote ? `Réf. #${missionId.slice(-6).toUpperCase()}` : ''}
+        subtitle={quote ? t('ref', { ref: missionId.slice(-6).toUpperCase() }) : ''}
         onBack={() => navigation.goBack()}
       />
 
@@ -211,6 +211,9 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 onPress={handleRecalculate}
                 disabled={recalculating}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={t('recalculate')}
+                accessibilityState={{ disabled: recalculating, busy: recalculating }}
               >
                 <RefreshCw size={14} color={recalculating ? colors.textMuted : colors.primary} strokeWidth={2} />
                 {/* FIX: 'recalculating' key doesn't exist in QuoteNS — use 'recalculate' for both states */}
@@ -247,6 +250,9 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={[styles.methodChip, payMethod === 'CARD' && styles.methodChipActive]}
                   onPress={() => setPayMethod('CARD')} activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: payMethod === 'CARD' }}
+                  accessibilityLabel={t('card')}
                 >
                   <CreditCard size={16} color={payMethod === 'CARD' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
                   <Text style={[styles.methodChipText, payMethod === 'CARD' && styles.methodChipTextActive]}>{t('card')}</Text>
@@ -254,6 +260,9 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={[styles.methodChip, payMethod === 'SEPA' && styles.methodChipActive]}
                   onPress={() => setPayMethod('SEPA')} activeOpacity={0.75}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: payMethod === 'SEPA' }}
+                  accessibilityLabel={t('sepa')}
                 >
                   <Landmark size={16} color={payMethod === 'SEPA' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
                   <Text style={[styles.methodChipText, payMethod === 'SEPA' && styles.methodChipTextActive]}>{t('sepa')}</Text>

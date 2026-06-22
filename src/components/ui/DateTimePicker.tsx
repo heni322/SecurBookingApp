@@ -17,6 +17,8 @@ import { Calendar, Clock, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, Che
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { useTranslation } from '@i18n';
+import i18n from '@i18n';
 
 interface Props {
   label:     string;
@@ -27,11 +29,15 @@ interface Props {
   hint?:     string;
 }
 
-const DAYS_FR  = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
-const MONTHS_FR = [
-  'Janvier','Février','Mars','Avril','Mai','Juin',
-  'Juillet','Août','Septembre','Octobre','Novembre','Décembre',
-];
+/** Monday-first short weekday labels for the active locale (Intl-driven, no hardcoded language). */
+const WEEKDAY_MON_REF = new Date(2024, 0, 1); // 2024-01-01 is a Monday
+function weekdayLabels(lang: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(WEEKDAY_MON_REF);
+    d.setDate(WEEKDAY_MON_REF.getDate() + i);
+    return d.toLocaleDateString(lang, { weekday: 'short' });
+  });
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -49,8 +55,8 @@ function toISO(d: Date, h: number, m: number): string {
 function formatDisplay(iso: string): string {
   const d = parseISO(iso);
   if (!d) return '';
-  return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-    + ' à ' + iso.split('T')[1];
+  return d.toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    + i18n.t('common:datetime_at_sep') + iso.split('T')[1];
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -67,6 +73,7 @@ function firstDayOffset(year: number, month: number): number {
 export const DateTimePicker: React.FC<Props> = ({
   label, value, onChange, minDate, error, hint,
 }) => {
+  const { t } = useTranslation('common');
   const now       = useMemo(() => new Date(), []);
   const parsed    = parseISO(value);
   const initDate  = parsed ?? new Date(now.getTime() + 24 * 3_600_000);
@@ -145,7 +152,7 @@ export const DateTimePicker: React.FC<Props> = ({
         >
           <Calendar size={16} color={value ? colors.primary : colors.textMuted} strokeWidth={1.8} />
           <Text style={[styles.triggerText, !value && styles.triggerPlaceholder]}>
-            {value ? formatDisplay(value) : 'Sélectionner date & heure'}
+            {value ? formatDisplay(value) : t('datetime_select_label')}
           </Text>
           {value && <Clock size={14} color={colors.primary} strokeWidth={1.8} />}
         </TouchableOpacity>
@@ -178,7 +185,7 @@ export const DateTimePicker: React.FC<Props> = ({
                 <ChevronLeft size={18} color={colors.textPrimary} strokeWidth={2} />
               </TouchableOpacity>
               <Text style={styles.calTitle}>
-                {MONTHS_FR[viewMonth]} {viewYear}
+                {new Date(viewYear, viewMonth, 1).toLocaleDateString(i18n.language, { month: 'long' })} {viewYear}
               </Text>
               <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
                 <ChevronRight size={18} color={colors.textPrimary} strokeWidth={2} />
@@ -187,7 +194,7 @@ export const DateTimePicker: React.FC<Props> = ({
 
             {/* Day names */}
             <View style={styles.dayNames}>
-              {DAYS_FR.map(d => (
+              {weekdayLabels(i18n.language).map(d => (
                 <Text key={d} style={styles.dayName}>{d}</Text>
               ))}
             </View>
@@ -289,8 +296,8 @@ export const DateTimePicker: React.FC<Props> = ({
               <Check size={18} color="#fff" strokeWidth={2.5} />
               <Text style={styles.confirmText}>
                 {selectedDay
-                  ? `Confirmer — ${selectedDay.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à ${pad(hour)}:${pad(minute)}`
-                  : 'Sélectionnez une date'
+                  ? `${t('datetime_confirm_prefix')} — ${selectedDay.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}${t('datetime_at_sep')}${pad(hour)}:${pad(minute)}`
+                  : t('datetime_select_date_first')
                 }
               </Text>
             </TouchableOpacity>

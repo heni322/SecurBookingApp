@@ -2,7 +2,11 @@ import type { MissionsNS } from '../types';
 
 const missions: MissionsNS = {
   title: 'Missions', subtitle_one: '{{count}} mission', subtitle_other: '{{count}} missions',
-  new: 'New', search_placeholder: 'Search a mission...', card_fallback_title: 'Mission in {{city}}', card_urgent: 'Urgent',
+  new: 'New', search_placeholder: 'Search a mission...', card_fallback_title: 'Mission in {{city}}',
+  starts_in_min:   'Starts in {{count}} min',
+  starts_in_hours: 'Starts in {{h}}h{{m}}',
+  starts_in_days_one:   'Starts in {{count}} day',
+  starts_in_days_other: 'Starts in {{count}} days', card_urgent: 'Urgent',
 
   filters: {
     all: 'All',
@@ -55,6 +59,8 @@ const missions: MissionsNS = {
     badge_live: 'LIVE',
     badge_approach: 'AGENT EN ROUTE',
     badge_urgent: 'URGENT',
+    sepa_settling_title:   'SEPA payment settling',
+    sepa_settling_body:    'Your SEPA payment is still settling (1-3 business days). Your mission is already published; the agent can begin once the funds clear.',
     section_approach: 'Agent approaching',
     section_location: 'Mission location',
     section_notes: 'Notes & instructions',
@@ -246,6 +252,10 @@ const missions: MissionsNS = {
     // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
     draft_restore_title:    'Resume your draft?',
     draft_restore_subtitle: 'You have an unfinished mission (saved {{when}}).',
+    relative_just_now:  'just now',
+    relative_min_ago:   '{{count}} min ago',
+    relative_hours_ago: '{{count}} h ago',
+    relative_days_ago:  '{{count}} d ago',
     draft_restore_btn:      'Resume',
     draft_discard_btn:      'Start over',
     draft_discard_confirm_title:   'Discard draft?',

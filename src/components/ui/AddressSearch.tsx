@@ -18,6 +18,7 @@ import { config } from '@config';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { useTranslation } from '@i18n';
 
 export interface NominatimResult {
   place_id:    number;
@@ -51,10 +52,11 @@ const NOMINATIM_URL = config.maps.nominatimUrl;
 export const AddressSearch: React.FC<Props> = ({
   value,
   onSelect,
-  placeholder   = 'Rechercher une adresse…',
+  placeholder,
   error,
   countrycodes  = config.maps.geocodeCountryCodes,
 }) => {
+  const { t } = useTranslation('common');
   const [query,    setQuery]    = useState(value);
   const [results,  setResults]  = useState<NominatimResult[]>([]);
   const [loading,  setLoading]  = useState(false);
@@ -127,7 +129,7 @@ export const AddressSearch: React.FC<Props> = ({
           style={styles.input}
           value={query}
           onChangeText={handleChange}
-          placeholder={placeholder}
+          placeholder={placeholder ?? t('search_address')}
           placeholderTextColor={colors.textMuted}
           autoCorrect={false}
           selectionColor={colors.primary}

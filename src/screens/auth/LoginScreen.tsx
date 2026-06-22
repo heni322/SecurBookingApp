@@ -12,6 +12,7 @@ import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Fingerprint } from 'l
 import Svg, { Circle, Defs, RadialGradient as SvgRadialGradient, Stop } from 'react-native-svg';
 import { authApi }           from '@api/endpoints/auth';
 import { tokenStorage }      from '@services/tokenStorage';
+import { fcmService }        from '@services/fcmService';
 import { useAuthStore }      from '@store/authStore';
 import { biometricService }  from '@services/biometricService';
 import { Button }            from '@components/ui/Button';
@@ -76,7 +77,14 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     if (!validate()) return;
     setLoading(true);
     try {
-      const { data: res } = await authApi.login({ email: email.trim().toLowerCase(), password });
+      // Best-effort device token so the backend never sends THIS device a
+      // concurrent-session "Session terminee" notice on a same-device re-login.
+      const deviceToken = await fcmService.getDeviceToken().catch(() => null);
+      const { data: res } = await authApi.login({
+        email: email.trim().toLowerCase(),
+        password,
+        ...(deviceToken ? { deviceToken } : {}),
+      });
       const payload = (res as any).data as any;
       if (payload?.requires2fa && payload?.tempToken) {
         navigation.navigate('TwoFa', { tempToken: payload.tempToken });

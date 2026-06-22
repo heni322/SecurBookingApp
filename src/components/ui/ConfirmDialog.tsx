@@ -31,6 +31,7 @@ import { colors }                  from '@theme/colors';
 import { spacing, radius }         from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { useConfirmDialogStore }   from '@store/confirmDialogStore';
+import { useTranslation } from '@i18n';
 
 // ── Single dialog item (rendered inside the host's <Modal>) ──────────────────
 
@@ -104,6 +105,7 @@ const DialogItem: React.FC<DialogItemProps> = ({
 export const ConfirmDialogHost: React.FC = () => {
   const current = useConfirmDialogStore((s) => s.current);
   const resolve = useConfirmDialogStore((s) => s.resolve);
+  const { t } = useTranslation('common');
 
   // Hardware back on Android → cancel.
   useEffect(() => {
@@ -123,7 +125,7 @@ export const ConfirmDialogHost: React.FC = () => {
       statusBarTranslucent
       onRequestClose={() => resolve(false)}
     >
-      <Pressable style={styles.scrim} onPress={() => resolve(false)} accessibilityLabel="Annuler">
+      <Pressable style={styles.scrim} onPress={() => resolve(false)} accessibilityLabel={t('cancel')}>
         {current ? (
           <DialogItem
             key={current.id}

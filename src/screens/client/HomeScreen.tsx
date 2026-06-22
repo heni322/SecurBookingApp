@@ -142,7 +142,7 @@ export const HomeScreen: React.FC = () => {
               {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
-          <TouchableOpacity style={styles.newMissionBtn} onPress={goToServicePicker} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.newMissionBtn} onPress={goToServicePicker} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('cta.title')}>
             <Plus size={22} color={colors.textInverse} strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
@@ -167,7 +167,7 @@ export const HomeScreen: React.FC = () => {
 
         {/* ── CTA Banner ── */}
         {!featuredMission && !loading && (
-          <TouchableOpacity style={styles.ctaBanner} activeOpacity={0.85} onPress={goToServicePicker}>
+          <TouchableOpacity style={styles.ctaBanner} activeOpacity={0.85} onPress={goToServicePicker} accessibilityRole="button" accessibilityLabel={`${t('cta.title')}. ${t('cta.subtitle')}`}>
             <View style={styles.ctaDots} pointerEvents="none">
               {[0,1,2,3,4,5].map(i => <View key={i} style={[styles.ctaDot, { opacity: 0.08 + i * 0.04 }]} />)}
             </View>
@@ -192,6 +192,8 @@ export const HomeScreen: React.FC = () => {
             style={styles.activeMissionCard}
             activeOpacity={0.85}
             onPress={() => goToMissionDetail(featuredMission.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`: `}
           >
             {featuredIsOngoing
               ? <View style={styles.activeLiveDot} />
@@ -221,7 +223,7 @@ export const HomeScreen: React.FC = () => {
               <Text style={styles.sectionTitle}>{t('recent.title')}</Text>
             </View>
             {totalMissions > 4 && (
-              <TouchableOpacity onPress={goToMissionList} style={styles.seeAllBtn}>
+              <TouchableOpacity onPress={goToMissionList} style={styles.seeAllBtn} accessibilityRole="button" accessibilityLabel={t('recent.see_all')}>
                 <Text style={styles.sectionLink}>{t('recent.see_all')}</Text>
                 <ChevronRight size={14} color={colors.primary} strokeWidth={2} />
               </TouchableOpacity>
@@ -248,7 +250,7 @@ export const HomeScreen: React.FC = () => {
         {/* Cancelled missions — separated from recents, never counted in the total */}
         {cancelledMissions.length > 0 && (
           <View style={styles.section}>
-            <TouchableOpacity style={styles.sectionHeader} activeOpacity={0.7} onPress={() => setCancelledOpen(o => !o)}>
+            <TouchableOpacity style={styles.sectionHeader} activeOpacity={0.7} onPress={() => setCancelledOpen(o => !o)} accessibilityRole="button" accessibilityState={{ expanded: cancelledOpen }} accessibilityLabel={t('cancelled.title')}>
               <View style={styles.sectionTitleRow}>
                 <View style={[styles.sectionAccent, styles.sectionAccentMuted]} />
                 <Text style={styles.sectionTitle}>{t('cancelled.title')}</Text>
@@ -268,7 +270,7 @@ export const HomeScreen: React.FC = () => {
       </ScrollView>
 
       {/* ── SOS floating button ── */}
-      <TouchableOpacity style={styles.sosBtn} onPress={() => setSosVisible(true)} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.sosBtn} onPress={() => setSosVisible(true)} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('sos.title')}>
         <AlertOctagon size={22} color={colors.white} strokeWidth={2.2} />
       </TouchableOpacity>
 
@@ -276,7 +278,7 @@ export const HomeScreen: React.FC = () => {
       <Modal visible={sosVisible} transparent animationType="fade" onRequestClose={() => setSosVisible(false)}>
         <View style={sosStyles.overlay}>
           <View style={sosStyles.sheet}>
-            <TouchableOpacity style={sosStyles.closeBtn} onPress={() => setSosVisible(false)}>
+            <TouchableOpacity style={sosStyles.closeBtn} onPress={() => setSosVisible(false)} accessibilityRole="button" accessibilityLabel={t('sos.cancel')}>
               <X size={18} color={colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
             <View style={sosStyles.iconWrap}>
@@ -284,13 +286,13 @@ export const HomeScreen: React.FC = () => {
             </View>
             <Text style={sosStyles.title}>{t('sos.title')}</Text>
             <Text style={sosStyles.body}>{t('sos.body')}</Text>
-            <TouchableOpacity style={sosStyles.sendBtn} onPress={handleSos} disabled={sosSending} activeOpacity={0.85}>
+            <TouchableOpacity style={sosStyles.sendBtn} onPress={handleSos} disabled={sosSending} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('sos.send')} accessibilityState={{ disabled: sosSending, busy: sosSending }}>
               {sosSending
                 ? <ActivityIndicator color={colors.white} size="small" />
                 : (<><AlertOctagon size={16} color={colors.white} strokeWidth={2} /><Text style={sosStyles.sendBtnText}>{t('sos.send')}</Text></>)
               }
             </TouchableOpacity>
-            <TouchableOpacity style={sosStyles.cancelBtn} onPress={() => setSosVisible(false)}>
+            <TouchableOpacity style={sosStyles.cancelBtn} onPress={() => setSosVisible(false)} accessibilityRole="button" accessibilityLabel={t('sos.cancel')}>
               <Text style={sosStyles.cancelText}>{t('sos.cancel')}</Text>
             </TouchableOpacity>
           </View>

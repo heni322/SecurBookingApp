@@ -508,6 +508,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           activeOpacity={0.6}
           style={styles.alertCloseBtn}
+          accessibilityRole="button"
+          accessibilityLabel={t('close_a11y')}
         >
           <Text style={styles.alertClose}>✕</Text>
         </TouchableOpacity>
@@ -515,7 +517,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
       {/* ── Re-center FAB ── */}
       {showFollowBtn && (
-        <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('recenter_a11y')}>
           <Target size={20} color={colors.primary} strokeWidth={2} />
         </TouchableOpacity>
       )}
@@ -552,7 +554,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.ctrlRow}>
-          <TouchableOpacity style={styles.ctrlBtn} onPress={handleViewSite} activeOpacity={0.75}>
+          <TouchableOpacity style={styles.ctrlBtn} onPress={handleViewSite} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={t('view_site_btn')}>
             <MapPin size={15} color={colors.textSecondary} strokeWidth={2} />
             <Text style={styles.ctrlTxt}>{t('view_site_btn')}</Text>
           </TouchableOpacity>
@@ -562,6 +564,9 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             onPress={handleFollowAgent}
             disabled={!agentPosition}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t('follow_agent_btn')}
+            accessibilityState={{ disabled: !agentPosition }}
           >
             <Navigation2 size={15} color="#fff" strokeWidth={2} />
             <Text style={[styles.ctrlTxt, styles.ctrlTxtPrimary]}>{t('follow_agent_btn')}</Text>
@@ -571,6 +576,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             style={styles.ctrlBtn}
             onPress={() => socketService.joinMission(missionId)}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t('sync_btn')}
           >
             <RefreshCw size={15} color={colors.textSecondary} strokeWidth={2} />
             <Text style={styles.ctrlTxt}>{t('sync_btn')}</Text>

@@ -5,7 +5,7 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TextInput, TouchableOpacity, Animated,
+  TextInput, TouchableOpacity, Animated, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -115,7 +115,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── Success ───────────────────────────────────────────────────────────────
+  // ── Success ──
   if (done) {
     const npsCategory = nps !== null ? getNpsCategory(nps) : null;
     return (
@@ -175,6 +175,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
         ))}
       </View>
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -202,7 +203,10 @@ export default function RateAgentScreen({ navigation, route }: Props) {
             <View style={styles.starsRow}>
               {STARS.map(val => (
                 <TouchableOpacity key={val} onPress={() => handleStarPress(val)} activeOpacity={0.7}
-                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
+                  hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: val <= score, checked: val <= score }}
+                  accessibilityLabel={`${val} / 5${starLabels[val] ? ' — ' + starLabels[val] : ''}`}>
                   <Animated.View style={{ transform: [{ scale: starAnims[val - 1] }] }}>
                     <Star size={48}
                       color={val <= score ? palette.gold : colors.border}
@@ -242,6 +246,9 @@ export default function RateAgentScreen({ navigation, route }: Props) {
                     style={[styles.npsCell, isActive && { backgroundColor: color, borderColor: color }]}
                     onPress={() => setNps(n)}
                     activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isActive }}
+                    accessibilityLabel={`${n} / 10`}
                   >
                     <Text style={[styles.npsCellText, isActive && styles.npsCellTextActive]}>{n}</Text>
                   </TouchableOpacity>
@@ -297,6 +304,9 @@ export default function RateAgentScreen({ navigation, route }: Props) {
                     style={[styles.chip, active && styles.chipActive]}
                     onPress={() => setComment(active ? '' : q)}
                     activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={q}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>{q}</Text>
                   </TouchableOpacity>
@@ -314,6 +324,8 @@ export default function RateAgentScreen({ navigation, route }: Props) {
               numberOfLines={4}
               textAlignVertical="top"
               maxLength={300}
+              accessibilityLabel={t('step_comment.title')}
+              accessibilityHint={t('step_comment.placeholder')}
             />
             <Text style={styles.charCount}>{comment.length} / 300</Text>
 
@@ -328,7 +340,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <TouchableOpacity onPress={handleSubmit} style={styles.skipBtn} disabled={busy}>
+            <TouchableOpacity onPress={handleSubmit} style={styles.skipBtn} disabled={busy} accessibilityRole="button" accessibilityLabel={t('step_comment.skip')}>
               <Text style={styles.skipTxt}>{t('step_comment.skip')}</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -336,6 +348,7 @@ export default function RateAgentScreen({ navigation, route }: Props) {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

@@ -75,6 +75,7 @@ const quote: QuoteNS = {
   accepted_badge: '✓ Devis accepté',
   valid_until:    "Valable jusqu'au {{date}}",
   accept_label:   'Accepter ce devis',
+  ref:            'Réf. #{{ref}}',
 };
 
 export default quote;

@@ -61,6 +61,24 @@ class FcmService {
     }
   }
 
+  /**
+   * getDeviceToken - best-effort read of the current FCM token WITHOUT
+   * triggering a permission prompt. Sent as `deviceToken` on login/register so
+   * the backend can exclude this device from concurrent-session "Session
+   * terminee" notices. Returns null if Firebase is unconfigured or the token is
+   * not yet available (e.g. iOS before APNs registration) - the backend treats
+   * null as "unknown device" and simply suppresses the notice.
+   */
+  async getDeviceToken(): Promise<string | null> {
+    try {
+      const m = getMessaging();
+      if (!m) return null;
+      return (await m.getToken()) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async registerToken(): Promise<void> {
     try {
       const token = await this.requestPermissionAndGetToken();

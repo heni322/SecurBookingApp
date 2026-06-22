@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from '@i18n';
 import {
   View, TextInput, Text, TouchableOpacity, StyleSheet,
   type StyleProp, type ViewStyle, Animated,
@@ -152,6 +153,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   containerStyle,
   testID,
 }) => {
+  const { t } = useTranslation('common');
   const [country, setCountry] = useState<CountryEntry>(COUNTRIES[0]);
   const [focused, setFocused] = useState(false);
   const [internalError, setInternalError] = useState<string | undefined>();
@@ -223,8 +225,8 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
       if (!result.valid) {
         setInternalError(
           result.reason === 'too_short'
-            ? 'Numéro trop court'
-            : 'Numéro invalide',
+            ? t('phone_too_short')
+            : t('phone_invalid'),
         );
       } else {
         setInternalError(undefined);

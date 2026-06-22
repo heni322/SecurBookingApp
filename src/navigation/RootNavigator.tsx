@@ -12,6 +12,7 @@ import { flushPendingNotification } from '@services/notificationRouter';
 import { AuthNavigator }   from './AuthNavigator';
 import { MainNavigator }   from './MainNavigator';
 import { LoadingState }    from '@components/ui/LoadingState';
+import i18n from '@i18n';
 import { OnboardingScreen, checkOnboardingDone } from '@screens/auth/OnboardingScreen';
 import type { RootStackParamList } from '@models/index';
 
@@ -28,7 +29,7 @@ export const RootNavigator: React.FC = () => {
   if (isLoading || onboardingDone === null) {
     return (
       <SafeAreaProvider>
-        <LoadingState message="Chargement…" />
+        <LoadingState message={i18n.t('common:loading')} />
       </SafeAreaProvider>
     );
   }

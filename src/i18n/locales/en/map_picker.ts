@@ -7,6 +7,16 @@ const map_picker: MapPickerNS = {
   validate_btn: 'Validate',
   validated:    'Validated',
   unlock_hint:  'Tap to interact with the map',
+  perm_title:           'Location required',
+  perm_message:         'Provalk needs your location to center the map.',
+  perm_allow:           'Allow',
+  perm_cancel:          'Cancel',
+  perm_settings_hint:   'Enable location in your settings.',
+  perm_denied_title:    'Permission denied',
+  perm_denied:          'Location permission denied.',
+  position_unavailable: 'Position not found. Check that GPS is enabled.',
+  timeout_retry:        'Request timed out. Please try again.',
+  locate_failed_title:  'Location failed',
 };
 
 export default map_picker;

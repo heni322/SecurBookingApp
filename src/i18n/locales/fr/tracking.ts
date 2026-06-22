@@ -14,6 +14,8 @@ const tracking: TrackingNS = {
   sync_btn:           'Sync',
   last_seen:          'Vu {{time}}',
   attribution:        '© OpenStreetMap contributors',
+  recenter_a11y:      'Recentrer sur la carte',
+  close_a11y:         'Fermer',
 };
 
 export default tracking;

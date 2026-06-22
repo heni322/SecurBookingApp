@@ -190,14 +190,14 @@ export const MapLocationPicker: React.FC<Props> = ({
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-          title:   'Localisation requise',
-          message: 'SecurBook a besoin de votre position pour centrer la carte.',
-          buttonPositive: 'Autoriser',
-          buttonNegative: 'Annuler',
+          title:   t('perm_title'),
+          message: t('perm_message'),
+          buttonPositive: t('perm_allow'),
+          buttonNegative: t('perm_cancel'),
         },
       );
       if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        toast.warning('Activez la localisation dans les reglages.', { title: 'Permission refusee' });
+        toast.warning(t('perm_settings_hint'), { title: t('perm_denied_title') });
         return;
       }
     }
@@ -211,11 +211,11 @@ export const MapLocationPicker: React.FC<Props> = ({
       },
       (err) => {
         const msg =
-          err.code === 1 ? 'Permission de localisation refusee.' :
-          err.code === 2 ? 'Position introuvable. Verifiez que le GPS est active.' :
-                           'Delai depasse. Reessayez.';
+          err.code === 1 ? t('perm_denied') :
+          err.code === 2 ? t('position_unavailable') :
+                           t('timeout_retry');
         setLocating(false);
-        toast.error(msg, { title: 'Localisation impossible' });
+        toast.error(msg, { title: t('locate_failed_title') });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );

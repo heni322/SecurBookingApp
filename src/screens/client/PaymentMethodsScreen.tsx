@@ -22,6 +22,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { PaymentMethod, ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import i18n from '@i18n';
 import { useToast } from '@hooks/useToast';
 import { useConfirmDialogStore } from '@store/confirmDialogStore';
 
@@ -93,6 +94,8 @@ export const PaymentMethodsScreen: React.FC<Props> = ({ navigation }) => {
             style={styles.addBtn}
             onPress={() => navigation.navigate('AddPaymentMethod')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('add.header_add')}
           >
             <Plus size={20} color={colors.primary} strokeWidth={2.2} />
           </TouchableOpacity>
@@ -204,6 +207,9 @@ const MethodCard: React.FC<{
         onPress={onDelete}
         disabled={deleting}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        accessibilityRole="button"
+        accessibilityLabel={i18n.t('payment:methods.delete_confirm_title')}
+        accessibilityState={{ disabled: deleting, busy: deleting }}
       >
         {deleting
           ? <ActivityIndicator size="small" color={colors.danger} />

@@ -22,6 +22,7 @@ import { BOOKING_STATUS_COLOR } from '@utils/statusHelpers'; // BOOKING_STATUS_L
 import { BookingStatus }        from '@constants/enums';
 import type { BookingNS }       from '@i18n/locales/types';
 import { useTranslation }       from '@i18n';
+import i18n from '@i18n';
 import type { Booking }         from '@models/index';
 
 interface Props {
@@ -73,7 +74,7 @@ export const BookingCard: React.FC<Props> = ({
         {perspective === 'agent' && mission && (
           <>
             <Text style={styles.missionTitle} numberOfLines={1}>
-              {mission.title?.trim() || `Mission à ${mission.city}`}
+              {mission.title?.trim() || i18n.t('missions:card_fallback_title', { city: mission.city })}
             </Text>
             <Text style={styles.meta}>🗓 {formatMissionRange(mission.startAt, mission.endAt)}</Text>
             <Text style={styles.meta} numberOfLines={1}>📍 {mission.city}</Text>

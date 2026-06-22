@@ -2,6 +2,7 @@
  * ErrorBoundary — catches render crashes and shows a branded retry screen.
  */
 import React from 'react';
+import i18n from '@i18n';
 import {
   View, Text, TouchableOpacity, StyleSheet,
 } from 'react-native';
@@ -37,11 +38,11 @@ export class ErrorBoundary extends React.Component<
         <View style={styles.iconWrap}>
           <AlertTriangle size={32} color={colors.warning} strokeWidth={1.8} />
         </View>
-        <Text style={styles.title}>Une erreur est survenue</Text>
+        <Text style={styles.title}>{i18n.t('common:generic_error')}</Text>
         <Text style={styles.message} numberOfLines={3}>{this.state.message}</Text>
         <TouchableOpacity style={styles.btn} onPress={this.handleRetry} activeOpacity={0.8}>
           <RefreshCw size={16} color={colors.textInverse} strokeWidth={2} />
-          <Text style={styles.btnText}>Réessayer</Text>
+          <Text style={styles.btnText}>{i18n.t('common:retry')}</Text>
         </TouchableOpacity>
       </View>
     );

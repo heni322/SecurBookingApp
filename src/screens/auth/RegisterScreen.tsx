@@ -21,6 +21,7 @@ import {
   Hash, Check,
 } from 'lucide-react-native';
 import { authApi }      from '@api/endpoints/auth';
+import { fcmService }   from '@services/fcmService';
 import { useAuthStore } from '@store/authStore';
 import { Button }       from '@components/ui/Button';
 import { Input }        from '@components/ui/Input';
@@ -206,6 +207,9 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     if (!validate()) return;
     setLoading(true);
     try {
+      // Best-effort device token so the backend can exclude THIS device from
+      // any concurrent-session "Session terminee" notice. Never blocks signup.
+      const deviceToken = await fcmService.getDeviceToken().catch(() => null);
       const payload: RegisterPayload = {
         firstName:   firstName.trim().replace(/\s+/g, ' '),
         lastName:    lastName.trim().replace(/\s+/g, ' '),
@@ -215,6 +219,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         role:        'CLIENT',
         clientType,
         acceptTerms: true,
+        ...(deviceToken ? { deviceToken } : {}),
         ...(clientType === 'COMPANY' && {
           companyName: companyName.trim(),
           siret:       siret.replace(/\s/g, ''),

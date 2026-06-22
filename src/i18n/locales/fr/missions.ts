@@ -7,6 +7,10 @@ const missions: MissionsNS = {
   new:                 'Nouvelle',
   search_placeholder:  'Rechercher une mission…',
   card_fallback_title: 'Mission à {{city}}',
+  starts_in_min:   'Démarre dans {{count}} min',
+  starts_in_hours: 'Démarre dans {{h}}h{{m}}',
+  starts_in_days_one:   'Démarre dans {{count}} jour',
+  starts_in_days_other: 'Démarre dans {{count}} jours',
   card_urgent:         'Urgent',
 
   filters: {
@@ -76,6 +80,8 @@ const missions: MissionsNS = {
     badge_live:       'EN DIRECT',
     badge_approach:   'AGENT EN ROUTE',
     badge_urgent:     'URGENT',
+    sepa_settling_title:   'Prélèvement SEPA en cours',
+    sepa_settling_body:    'Le paiement SEPA est en cours de règlement (1 à 3 jours ouvrés). Votre mission est déjà publiée ; l\'agent pourra commencer une fois les fonds reçus.',
     section_approach: 'Votre agent arrive',
     section_location: 'Localisation de la mission',
     section_notes:    'Notes & instructions',
@@ -279,6 +285,10 @@ const missions: MissionsNS = {
     // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
     draft_restore_title:    'Reprendre votre brouillon ?',
     draft_restore_subtitle: 'Vous avez une mission en cours de création (sauvegardée {{when}}).',
+    relative_just_now:  'à l\'instant',
+    relative_min_ago:   'il y a {{count}} min',
+    relative_hours_ago: 'il y a {{count}} h',
+    relative_days_ago:  'il y a {{count}} j',
     draft_restore_btn:      'Reprendre',
     draft_discard_btn:      'Recommencer',
     draft_discard_confirm_title:   'Supprimer le brouillon ?',

@@ -43,6 +43,7 @@ import {
   RotateCcw, Copy, AlertTriangle, Receipt, UserPlus,
 } from 'lucide-react-native';
 import { useTranslation }    from '@i18n';
+import i18n from '@i18n';
 import { useToast }          from '@hooks/useToast';
 import { useConfirmDialog }  from '@hooks/useConfirmDialog';
 import { useApi }            from '@hooks/useApi';
@@ -190,12 +191,12 @@ function formatDateShort(iso: string): string {
 /** Human-readable relative time for the draft restore banner. */
 function formatRelativeFromNow(savedAt: number): string {
   const diffMin = Math.max(0, Math.floor((Date.now() - savedAt) / 60_000));
-  if (diffMin < 1)  return 'à l\'instant';
-  if (diffMin < 60) return `il y a ${diffMin} min`;
+  if (diffMin < 1)  return i18n.t('missions:create.relative_just_now');
+  if (diffMin < 60) return i18n.t('missions:create.relative_min_ago', { count: diffMin });
   const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24)   return `il y a ${diffH} h`;
+  if (diffH < 24)   return i18n.t('missions:create.relative_hours_ago', { count: diffH });
   const diffD = Math.floor(diffH / 24);
-  return `il y a ${diffD} j`;
+  return i18n.t('missions:create.relative_days_ago', { count: diffD });
 }
 
 /** API booking lines for one slot (drops excluded lines, fans uniform out per agent). */
@@ -984,11 +985,11 @@ const DraftRestoreBanner: React.FC<{
         {t('create.draft_restore_subtitle', { when: formatRelativeFromNow(savedAt) })}
       </Text>
       <View style={draftBannerS.actions}>
-        <TouchableOpacity style={draftBannerS.restoreBtn} onPress={onRestore} activeOpacity={0.85}>
+        <TouchableOpacity style={draftBannerS.restoreBtn} onPress={onRestore} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('create.draft_restore_btn')}>
           <RotateCcw size={12} color={colors.textInverse} strokeWidth={2.4} />
           <Text style={draftBannerS.restoreText}>{t('create.draft_restore_btn')}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={draftBannerS.discardBtn} onPress={onDiscard} activeOpacity={0.7}>
+        <TouchableOpacity style={draftBannerS.discardBtn} onPress={onDiscard} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('create.draft_discard_btn')}>
           <Text style={draftBannerS.discardText}>{t('create.draft_discard_btn')}</Text>
         </TouchableOpacity>
       </View>
@@ -1035,7 +1036,7 @@ const SubmitErrorBanner: React.FC<{
     <View style={submitErrS.headerRow}>
       <AlertTriangle size={16} color={colors.danger} strokeWidth={2.2} />
       <Text style={submitErrS.title}>{error.title}</Text>
-      <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+      <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={i18n.t('common:close')}>
         <X size={16} color={colors.textMuted} strokeWidth={2} />
       </TouchableOpacity>
     </View>
@@ -1043,7 +1044,7 @@ const SubmitErrorBanner: React.FC<{
       <Text key={i} style={submitErrS.detail}>• {d}</Text>
     ))}
     {onJump && (
-      <TouchableOpacity style={submitErrS.jumpBtn} onPress={onJump} activeOpacity={0.8}>
+      <TouchableOpacity style={submitErrS.jumpBtn} onPress={onJump} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('create.submit_error_jump_to')}>
         <Pencil size={12} color={colors.danger} strokeWidth={2.2} />
         <Text style={submitErrS.jumpText}>{t('create.submit_error_jump_to')}</Text>
       </TouchableOpacity>
@@ -1117,12 +1118,16 @@ const StepProgress: React.FC<{ current: Step; t: MissionsT }> = ({ current, t })
     2: t('create.progress_staff'),
   };
   return (
-    <View style={progressS.wrap}>
+    <View
+      style={progressS.wrap}
+      accessibilityRole="header"
+      accessibilityLabel={`${t('create.footer_step_progress', { current, total: TOTAL_STEPS })} : ${labels[current]}`}
+    >
       {([1, 2] as Step[]).map((s) => {
         const active = current === s;
         const done   = current > s;
         return (
-          <View key={s} style={progressS.item}>
+          <View key={s} style={progressS.item} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             <View style={[progressS.dot, active && progressS.dotActive, done && progressS.dotDone]}>
               {done
                 ? <Check size={10} color={colors.textInverse} strokeWidth={3} />
@@ -1325,7 +1330,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
         <View style={styles.sectionBlock}>
           <View style={styles.sectionHeader}>
             <Sparkles size={14} color={colors.textMuted} strokeWidth={2} />
-            <Text style={styles.sectionTitle}>{t('create.preset_section')}</Text>
+            <Text style={styles.sectionTitle} accessibilityRole="header">{t('create.preset_section')}</Text>
           </View>
           <View style={styles.presetGrid}>
             {SCHEDULE_PRESETS.map(p => {
@@ -1337,6 +1342,9 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
                   style={[styles.presetCard, isActive && styles.presetCardActive]}
                   onPress={() => onApplyPreset(p)}
                   activeOpacity={0.78}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={t(p.i18n as any)}
                 >
                   {isActive && (
                     <View style={styles.presetActiveDot}>
@@ -1356,7 +1364,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
 
       <View style={styles.sectionHeader}>
         <Calendar size={14} color={colors.textMuted} strokeWidth={2} />
-        <Text style={styles.sectionTitle}>
+        <Text style={styles.sectionTitle} accessibilityRole="header">
           {singleSlot ? t('create.custom_section') : t('create.slots_count', { n: slots.length })}
         </Text>
       </View>
@@ -1386,7 +1394,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
       ))}
 
       {slots.length < MAX_SLOTS && (
-        <TouchableOpacity style={styles.addSlotBtn} onPress={onAddSlot} activeOpacity={0.78}>
+        <TouchableOpacity style={styles.addSlotBtn} onPress={onAddSlot} activeOpacity={0.78} accessibilityRole="button" accessibilityLabel={t('create.add_another_creneau')}>
           <Plus size={14} color={colors.primary} strokeWidth={2.5} />
           <Text style={styles.addSlotText}>{t('create.add_another_creneau')}</Text>
         </TouchableOpacity>
@@ -1434,7 +1442,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
       <View style={styles.sectionBlock}>
         <View style={styles.sectionHeader}>
           <FileText size={14} color={colors.textMuted} strokeWidth={2} />
-          <Text style={styles.sectionTitle}>{t('create.optional_section')}</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">{t('create.optional_section')}</Text>
         </View>
         <Input
           label={t('create.title_label')}
@@ -1556,7 +1564,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
           </View>
         )}
         {canRemove && (
-          <TouchableOpacity onPress={onRemove} style={styles.slotRemoveBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={onRemove} style={styles.slotRemoveBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityRole="button" accessibilityLabel={t('create.slot_remove')}>
             <X size={14} color={colors.danger} strokeWidth={2} />
           </TouchableOpacity>
         )}
@@ -1565,7 +1573,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
       {copySources.length > 0 && (!slot.startAt || !slot.endAt) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.copyChipsRow}>
           {copySources.map(({ s, i }) => (
-            <TouchableOpacity key={s.key} style={styles.copyChip} onPress={() => onCopyFrom(i)} activeOpacity={0.78}>
+            <TouchableOpacity key={s.key} style={styles.copyChip} onPress={() => onCopyFrom(i)} activeOpacity={0.78} accessibilityRole="button" accessibilityLabel={t('create.slot_copy_from', { n: i + 1 })}>
               <Copy size={10} color={colors.primary} strokeWidth={2.2} />
               <Text style={styles.copyChipText}>{t('create.slot_copy_from', { n: i + 1 })}</Text>
             </TouchableOpacity>
@@ -1594,7 +1602,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
       <View style={styles.staffHeader}>
         <View style={styles.sectionHeader}>
           <Users size={13} color={colors.textMuted} strokeWidth={2} />
-          <Text style={styles.sectionTitle}>{t('create.staff_section')}</Text>
+          <Text style={styles.sectionTitle} accessibilityRole="header">{t('create.staff_section')}</Text>
         </View>
         {agents > 0 && (
           <View style={styles.staffCountPill}>
@@ -1621,6 +1629,9 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 onPress={() => onChangeLineCount(line.serviceTypeId, -1)}
                 disabled={line.agentCount <= 1}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel="Retirer un agent"
+                accessibilityState={{ disabled: line.agentCount <= 1 }}
               >
                 <Minus size={11} color={line.agentCount <= 1 ? colors.textMuted : line.accent} strokeWidth={2.5} />
               </TouchableOpacity>
@@ -1630,11 +1641,14 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 onPress={() => onChangeLineCount(line.serviceTypeId, +1)}
                 disabled={line.agentCount >= MAX_AGENTS}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t('common:add_agent')}
+                accessibilityState={{ disabled: line.agentCount >= MAX_AGENTS }}
               >
                 <Plus size={11} color={line.agentCount >= MAX_AGENTS ? colors.textMuted : line.accent} strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => onRemoveLine(line.serviceTypeId)} style={styles.lineRemoveBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+            <TouchableOpacity onPress={() => onRemoveLine(line.serviceTypeId)} style={styles.lineRemoveBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel="Retirer ce service">
               <X size={13} color={colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
           </View>
@@ -1648,10 +1662,13 @@ const SlotCard: React.FC<SlotCardProps> = ({
                   style={[styles.lineUniformChip, active && { backgroundColor: line.accent + '20', borderColor: line.accent }]}
                   onPress={() => onSetLineUniform(line.serviceTypeId, opt.value as UniformValue)}
                   hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={t(`uniforms.${opt.value}.label`, { ns: 'services' })}
                 >
                   <Text style={styles.lineUniformEmoji}>{opt.emoji}</Text>
                   <Text style={[styles.lineUniformText, active && { color: line.accent, fontFamily: fontFamily.bodySemiBold }]}>
-                    {t(`uniforms.${opt.value}.label`, { ns: 'services', defaultValue: opt.label })}
+                    {t(`uniforms.${opt.value}.label`, { ns: 'services' })}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1665,6 +1682,9 @@ const SlotCard: React.FC<SlotCardProps> = ({
         style={[styles.addServiceBtn, slot.pickerOpen && styles.addServiceBtnActive]}
         onPress={onTogglePicker}
         activeOpacity={0.78}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: slot.pickerOpen }}
+        accessibilityLabel={t('create.staff_add_service')}
       >
         <UserPlus size={13} color={colors.primary} strokeWidth={2.2} />
         <Text style={styles.addServiceText}>{t('create.staff_add_service')}</Text>
@@ -1696,6 +1716,8 @@ const SlotCard: React.FC<SlotCardProps> = ({
                   style={styles.pickerRow}
                   onPress={() => onAddLine(svc)}
                   activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={svc.name}
                 >
                   <View style={[styles.pickerIconWrap, { backgroundColor: accent + '18', borderColor: accent + '40' }]}>
                     <Icon size={16} color={accent} strokeWidth={1.8} />

@@ -18,11 +18,11 @@ import { palette } from '@theme/colors';
 
 // -- Uniform config ------------------------------------------------------------
 export const UNIFORM_OPTIONS = [
-  { value: 'STANDARD',     label: 'Standard',   desc: 'Uniforme noir réglementaire',  emoji: '🦺' },
-  { value: 'CIVIL',        label: 'Civil',      desc: 'Tenue discrète, en civil',     emoji: '👔' },
-  { value: 'EVENEMENTIEL', label: 'Soirée',     desc: 'Costume / tenue de gala',      emoji: '🤵' },
-  { value: 'SSIAP',        label: 'SSIAP',      desc: 'Tenue incendie réglementaire', emoji: '🔥' },
-  { value: 'CYNOPHILE',    label: 'Cynophile',  desc: 'Tenue maître-chien',           emoji: '🐕' },
+  { value: 'STANDARD', emoji: '🦺' },
+  { value: 'CIVIL', emoji: '👔' },
+  { value: 'EVENEMENTIEL', emoji: '🤵' },
+  { value: 'SSIAP', emoji: '🔥' },
+  { value: 'CYNOPHILE', emoji: '🐕' },
 ] as const;
 
 export type UniformValue = (typeof UNIFORM_OPTIONS)[number]['value'];

@@ -121,6 +121,8 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
               style={rowStyles.dlBtn}
               onPress={() => handleDownload(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Telecharger la facture"
             >
               <Download size={13} color={colors.primary} strokeWidth={2} />
             </TouchableOpacity>

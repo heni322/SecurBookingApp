@@ -5,9 +5,10 @@ import type {
 // GENERIC API WRAPPERS
 // -----------------------------------------------------------------------------
 export interface ApiResponse<T> {
-  data:    T;
-  message: string;
   success: boolean;
+  data:    T;
+  message?: string;
+  timestamp?: string;
 }
 
 export interface ApiError {
@@ -29,21 +30,25 @@ export interface LoginPayload {
   email:      string;
   password:   string;
   twoFaCode?: string;
+  /** FCM token of the current device - lets the backend exclude this device from concurrent-session logout notices. */
+  deviceToken?: string;
 }
 
 export interface RegisterPayload {
   email:           string;
   password:        string;
+  /** FCM token of the current device (optional) - excludes this device from concurrent-session logout notices. */
+  deviceToken?:    string;
   firstName:       string;
   lastName:        string;
   phone?:          string;
   role?:           UserRole;
   clientType?:     ClientType;
-  /** RGPD/CGU consent — must be true for the backend to accept the request. */
+  /** RGPD/CGU consent â€” must be true for the backend to accept the request. */
   acceptTerms:     boolean;
   /** Required when role === PARTNER (and no companyId) OR clientType === COMPANY. */
   companyName?:    string;
-  /** 14-digit SIRET — required for COMPANY clients and new partner companies. */
+  /** 14-digit SIRET â€” required for COMPANY clients and new partner companies. */
   siret?:          string;
   /** Optional billing fields for COMPANY clients. */
   billingAddress?: string;

@@ -2,6 +2,7 @@
  * SearchBar — debounced search input with clear button.
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from '@i18n';
 import {
   View, TextInput, TouchableOpacity, StyleSheet, Animated,
 } from 'react-native';
@@ -21,10 +22,11 @@ interface Props {
 export const SearchBar: React.FC<Props> = ({
   value,
   onChangeText,
-  placeholder = 'Rechercher…',
+  placeholder,
   debounceMs  = 300,
   autoFocus   = false,
 }) => {
+  const { t } = useTranslation('common');
   const [localValue, setLocalValue] = useState(value);
   const clearOpacity = useRef(new Animated.Value(0)).current;
 
@@ -63,7 +65,7 @@ export const SearchBar: React.FC<Props> = ({
         style={styles.input}
         value={localValue}
         onChangeText={setLocalValue}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('search')}
         placeholderTextColor={colors.textMuted}
         autoFocus={autoFocus}
         autoCorrect={false}

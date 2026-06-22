@@ -109,7 +109,7 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
         onBack={() => navigation.goBack()}
         rightElement={
           isDirty ? (
-            <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} disabled={loading}>
+            <TouchableOpacity style={styles.saveHeaderBtn} onPress={handleSave} disabled={loading} accessibilityRole="button" accessibilityLabel={t('edit.save')} accessibilityState={{ disabled: loading, busy: loading }}>
               {loading
                 ? <ActivityIndicator size="small" color={colors.primary} />
                 : <Check size={18} color={colors.primary} strokeWidth={2.5} />
@@ -131,6 +131,9 @@ export const ProfileEditScreen: React.FC<Props> = ({ navigation }) => {
             onPress={handlePickAvatar}
             activeOpacity={0.8}
             disabled={avatarUploading}
+            accessibilityRole="button"
+            accessibilityLabel={t('edit.avatar_hint')}
+            accessibilityState={{ disabled: avatarUploading, busy: avatarUploading }}
           >
             {displayAvatarUri ? (
               <Image

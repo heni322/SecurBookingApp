@@ -111,7 +111,7 @@ export const NotificationsScreen: React.FC = () => {
           </View>
         </View>
         {unread > 0 && (
-          <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.75}>
+          <TouchableOpacity onPress={handleMarkAllRead} style={styles.readAllBtn} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={t('mark_all_read')}>
             <CheckCheck size={14} color={colors.primary} strokeWidth={2.2} />
             <Text style={styles.readAllText}>{t('mark_all_read')}</Text>
           </TouchableOpacity>

@@ -14,6 +14,8 @@ const tracking: TrackingNS = {
   sync_btn:           'Sync',
   last_seen:          'Last seen {{time}}',
   attribution:        '© OpenStreetMap contributors',
+  recenter_a11y:      'Re-center on map',
+  close_a11y:         'Close',
 };
 
 export default tracking;

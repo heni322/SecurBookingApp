@@ -99,7 +99,7 @@ export const ProfileScreen: React.FC = () => {
       <ScreenHeader
         title={t('title')}
         rightElement={
-          <TouchableOpacity style={styles.editHeaderBtn} onPress={() => navigation.navigate('ProfileEdit')}>
+          <TouchableOpacity style={styles.editHeaderBtn} onPress={() => navigation.navigate('ProfileEdit')} accessibilityRole="button" accessibilityLabel={t('menu.edit_profile')}>
             <Edit3 size={18} color={colors.primary} strokeWidth={2} />
           </TouchableOpacity>
         }
@@ -113,7 +113,7 @@ export const ProfileScreen: React.FC = () => {
         {/* ── Hero card ── */}
         <Card style={styles.heroCard} elevated>
           <View style={styles.avatarSection}>
-            <TouchableOpacity onPress={() => navigation.navigate('ProfileEdit')} activeOpacity={0.85}>
+            <TouchableOpacity onPress={() => navigation.navigate('ProfileEdit')} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('menu.edit_profile')}>
               <View style={styles.avatarRingOuter}>
                 <View style={styles.avatarRingInner}>
                   <Avatar name={user.fullName} avatarUrl={user.avatarUrl} size={72} />
@@ -236,13 +236,13 @@ export const ProfileScreen: React.FC = () => {
         </View>
 
         {/* ── Sign out ── */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.78}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.78} accessibilityRole="button" accessibilityLabel={t('logout.button')}>
           <LogOut size={18} color={colors.danger} strokeWidth={2} />
           <Text style={styles.logoutText}>{t('logout.button')}</Text>
         </TouchableOpacity>
 
         {/* ── Delete account ── */}
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => navigation.navigate('DeleteAccount')} activeOpacity={0.7}>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => navigation.navigate('DeleteAccount')} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={t('delete_account')}>
           <Trash2 size={14} color={colors.danger + '99'} strokeWidth={2} />
           <Text style={styles.deleteText}>{t('delete_account')}</Text>
         </TouchableOpacity>
@@ -276,6 +276,9 @@ export const ProfileScreen: React.FC = () => {
                     style={[modalStyles.option, isActive && modalStyles.optionActive]}
                     onPress={() => handleSelectLanguage(lang)}
                     activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isActive }}
+                    accessibilityLabel={label}
                   >
                     <Text style={[modalStyles.optionText, isActive && modalStyles.optionTextActive]}>
                       {label}
@@ -294,7 +297,7 @@ export const ProfileScreen: React.FC = () => {
   );
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ──
 const Divider: React.FC = () => <View style={divStyles.line} />;
 const divStyles = StyleSheet.create({
   line: { height: 1, backgroundColor: colors.border, marginLeft: spacing[4] + 36 + spacing[3] },
@@ -304,7 +307,7 @@ const MenuRow: React.FC<{
   Icon: LucideIconComp; iconColor?: string; label: string;
   value?: string; valueColor?: string; tappable?: boolean; onPress?: () => void;
 }> = ({ Icon, iconColor = colors.textMuted, label, value, valueColor, tappable, onPress }) => (
-  <TouchableOpacity style={rowStyles.row} onPress={onPress} activeOpacity={tappable ? 0.7 : 1} disabled={!tappable}>
+  <TouchableOpacity style={rowStyles.row} onPress={onPress} activeOpacity={tappable ? 0.7 : 1} disabled={!tappable} accessibilityRole={tappable ? 'button' : 'text'} accessibilityLabel={value ? `${label}: ${value}` : label}>
     <View style={[rowStyles.iconBox, { backgroundColor: (iconColor ?? colors.textMuted) + '18' }]}>
       <Icon size={15} color={iconColor ?? colors.textMuted} strokeWidth={1.8} />
     </View>

@@ -23,6 +23,7 @@ import { fontSize, fontFamily }    from '@theme/typography';
 import { MissionStatus } from '@constants/enums';
 import type { MissionStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
+import i18n from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionSuccess'>;
 type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -85,9 +86,9 @@ export const MissionSuccessScreen: React.FC<Props> = ({ route, navigation }) => 
       <View style={styles.screen}>
         <View style={styles.pendingWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.pendingTitle}>Confirmation en cours...</Text>
+          <Text style={styles.pendingTitle}>{t('success.pending_title')}</Text>
           <Text style={styles.pendingSubtitle}>
-            Nous verifions la reception du paiement. Cela prend generalement quelques secondes.
+            {t('success.pending_subtitle')}
           </Text>
         </View>
       </View>
@@ -106,27 +107,25 @@ export const MissionSuccessScreen: React.FC<Props> = ({ route, navigation }) => 
                 </View>
               </View>
             </View>
-            <Text style={styles.title}>Paiement en cours de traitement</Text>
+            <Text style={styles.title}>{t('success.timeout_title')}</Text>
             <Text style={styles.subtitle}>
-              Pour les paiements SEPA, la confirmation peut prendre 1 a 2 jours ouvres.
-              Vous recevrez une notification des que votre mission sera confirmee.
+              {t('success.timeout_subtitle')}
             </Text>
           </View>
           <View style={styles.infoBox}>
             <Info size={16} color={colors.info} strokeWidth={2} />
             <Text style={styles.infoText}>
-              Votre mission sera publiee automatiquement aux agents des reception du paiement.
-              Aucune action supplementaire n'est requise.
+              {t('success.timeout_info')}
             </Text>
           </View>
           <Button
-            label="Suivre ma mission"
+            label={t('success.follow_mission')}
             onPress={() => navigation.replace('MissionDetail', { missionId })}
             fullWidth size="lg"
             rightIcon={<ArrowRight size={18} color={colors.textInverse} strokeWidth={2} />}
           />
           <Button
-            label="Retour a l'accueil"
+            label={i18n.t('common:back_home')}
             onPress={() => navigation.popToTop()}
             fullWidth variant="ghost" size="md"
           />

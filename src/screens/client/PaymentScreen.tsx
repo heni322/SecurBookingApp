@@ -14,7 +14,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, TextInput, Platform,
+  TouchableOpacity, TextInput, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useStripe, CardField } from '@stripe/stripe-react-native';
@@ -144,7 +144,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!canConfirm) {
       setErrorMsg(
         isSepa
-          ? 'Veuillez saisir un IBAN valide (ex : FR76 3000 4028 3798 7654 3210 943).'
+          ? t('pay.iban_invalid')
           : t('incomplete_card'),
       );
       return;
@@ -211,7 +211,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       }
     } catch (err: unknown) {
-      setErrorMsg((err as any)?.message ?? 'Une erreur est survenue lors du paiement.');
+      setErrorMsg((err as any)?.message ?? t('pay.err_generic'));
     } finally {
       setLoading(false);
     }
@@ -258,11 +258,12 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="Paiement"
+        title={t('pay.title')}
         subtitle={t('secured_by')}
         onBack={() => navigation.goBack()}
       />
 
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Amount recap */}
@@ -289,7 +290,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         {/* Saved payment methods selector (card only) */}
         {!isSepa && compatibleSaved.length > 0 && (
           <View style={styles.savedSection}>
-            <Text style={styles.savedTitle}>CARTES ENREGISTREES</Text>
+            <Text style={styles.savedTitle}>{t('pay.saved_title')}</Text>
             {compatibleSaved.map((m: any) => {
               const selected = selectedMethodId === m.id;
               const brand = m.card?.brand ?? '';
@@ -301,6 +302,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                   style={[styles.savedMethod, selected && styles.savedMethodActive]}
                   onPress={() => setSelectedMethodId(selected ? null : m.id)}
                   activeOpacity={0.8}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`${label}. ${sub}`}
                 >
                   <View style={[styles.savedMethodIcon, selected && styles.savedMethodIconActive]}>
                     <CreditCard size={16} color={selected ? colors.primary : colors.textMuted} strokeWidth={1.8} />
@@ -319,6 +323,9 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.newCardToggle}
               onPress={() => setSelectedMethodId(null)}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: selectedMethodId === null }}
+              accessibilityLabel="Utiliser une nouvelle carte"
             >
               <Star size={13} color={selectedMethodId === null ? colors.primary : colors.textMuted} strokeWidth={2} />
               <Text style={[styles.newCardToggleText, selectedMethodId === null && styles.newCardToggleTextActive]}>
@@ -333,7 +340,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.stripeHeaderLeft}>
               <Lock size={18} color={colors.success} strokeWidth={2} />
               <Text style={styles.stripeTitle}>
-                {isSepa ? 'Compte bancaire (IBAN)' : 'Carte bancaire'}
+                {isSepa ? t('pay.account_iban') : t('pay.account_card')}
               </Text>
             </View>
             <View style={styles.sslBadge}>
@@ -344,7 +351,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
           <Separator marginV={spacing[3]} />
 
-          {!isSepa && usingSaved ? (<View style={styles.savedSelectedBanner}><CheckCircle2 size={16} color={colors.success} strokeWidth={2} /><Text style={styles.savedSelectedText}>Carte enregistree selectionnee — aucune saisie requise.</Text></View>) : isSepa ? (
+          {!isSepa && usingSaved ? (<View style={styles.savedSelectedBanner}><CheckCircle2 size={16} color={colors.success} strokeWidth={2} /><Text style={styles.savedSelectedText}>{t('pay.saved_selected')}</Text></View>) : isSepa ? (
             <>
               {/* SEPA — manual IBAN TextInput (IbanField not exported in v0.40) */}
               <Text style={styles.ibanLabel}>IBAN</Text>
@@ -360,6 +367,8 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
                 onBlur={() => setIbanFocused(false)}
                 placeholder="FR76 3000 4028 3798 7654 3210 943"
                 placeholderTextColor={colors.textMuted}
+                accessibilityLabel="IBAN"
+                accessibilityHint={t('add.iban_hint')}
                 autoCapitalize="characters"
                 autoCorrect={false}
                 keyboardType="default"
@@ -372,16 +381,12 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               {ibanValid && (
                 <View style={styles.ibanValidRow}>
                   <CheckCircle2 size={13} color={colors.success} strokeWidth={2} />
-                  <Text style={styles.ibanValidText}>IBAN valide</Text>
+                  <Text style={styles.ibanValidText}>{t('pay.iban_valid')}</Text>
                 </View>
               )}
               <View style={styles.sepaMandate}>
                 <Info size={13} color={colors.primary} strokeWidth={2} />
-                <Text style={styles.sepaMandateText}>
-                  En fournissant votre IBAN, vous autorisez Provalk à débiter votre compte
-                  du montant indiqué conformément au mandat SEPA. Vous bénéficiez d'un droit
-                  au remboursement dans les 8 semaines suivant le débit.
-                </Text>
+                <Text style={styles.sepaMandateText}>{t('pay.mandate_text')}</Text>
               </View>
             </>
           ) : (
@@ -439,7 +444,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             loading
               ? 'Traitement en cours…'
               : isSepa
-              ? 'Confirmer le mandat SEPA'
+              ? t('pay.cta_sepa')
               : `Payer ${totalTTC ? formatCurrency(totalTTC * 100) : ''}`
           }
           onPress={handleConfirm}
@@ -450,10 +455,11 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.footerNote}>
           {isSepa
             ? t('sepa_legal')
-            : "En confirmant, vous acceptez les CGV Provalk et la politique de remboursement."
+            : t('pay.footer_cgv')
           }
         </Text>
       </View>
+      </KeyboardAvoidingView>
     </View>
   );
 };

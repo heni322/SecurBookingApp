@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TextInput, TouchableOpacity,
+  TextInput, TouchableOpacity, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -19,7 +19,7 @@ import { Card }           from '@components/ui/Card';
 import { colors }         from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import apiClient from '@api/client';
+import { disputesApi } from '@api/endpoints/disputes';
 import type { MissionStackParamList } from '@models/index';
 import { useToast } from '@hooks/useToast';
 
@@ -64,10 +64,11 @@ export default function DisputeScreen({ navigation, route }: Props) {
     }
     setBusy(true);
     try {
-      await apiClient.post('/disputes', {
+      await disputesApi.create({
         missionId,
         ...(bookingId ? { bookingId } : {}),
-        reason,
+        // Envoie le libellé lisible du motif, pas la clé interne (slug).
+        reason: t(`reasons.${reason}.label` as any),
         description: desc.trim(),
       });
       setDone(true);
@@ -79,16 +80,16 @@ export default function DisputeScreen({ navigation, route }: Props) {
     }
   };
 
-  // ── Success screen ────────────────────────────────────────────────────────
+  // â”€â”€ Success screen ────────────────────────────────────────────────────────
   if (done) {
     return (
       <View style={styles.container}>
         <ScreenHeader title={t('done_title')} />
-        <View style={styles.center}>
-          <View style={styles.successIcon}>
+        <View style={styles.center} accessibilityLiveRegion="polite">
+          <View style={styles.successIcon} importantForAccessibility="no-hide-descendants">
             <CheckCircle2 size={52} color={colors.success} strokeWidth={1.5} />
           </View>
-          <Text style={styles.doneTitle}>{t('done_title')}</Text>
+          <Text style={styles.doneTitle} accessibilityRole="header">{t('done_title')}</Text>
           <Text style={styles.doneSub}>
             {t('done_subtitle')}
           </Text>
@@ -112,6 +113,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
         subtitle={missionTitle}
         onBack={() => navigation.goBack()}
       />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
@@ -126,7 +128,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
         </View>
 
         {/* Reason picker */}
-        <Text style={styles.sectionLabel}>{t('reason_label')}</Text>
+        <Text style={styles.sectionLabel} accessibilityRole="header">{t('reason_label')}</Text>
         {REASON_IDS.map((id) => {
           const { Icon, color } = REASON_ICONS[id];
           const active = reason === id;
@@ -136,6 +138,10 @@ export default function DisputeScreen({ navigation, route }: Props) {
               style={[styles.reasonCard, active && styles.reasonCardOn]}
               onPress={() => setReason(id)}
               activeOpacity={0.75}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={t(`reasons.${id}.label` as any)}
+              accessibilityHint={t(`reasons.${id}.desc` as any)}
             >
               <View style={[styles.reasonIconWrap, { backgroundColor: active ? colors.primarySurface : colors.surface }]}>
                 <Icon size={18} color={active ? colors.primary : color} strokeWidth={1.8} />
@@ -154,7 +160,7 @@ export default function DisputeScreen({ navigation, route }: Props) {
         })}
 
         {/* Description */}
-        <Text style={styles.sectionLabel}>{t('description_label')}</Text>
+        <Text style={styles.sectionLabel} accessibilityRole="header">{t('description_label')}</Text>
         <Card style={styles.textareaCard}>
           <TextInput
             style={styles.textarea}
@@ -166,6 +172,8 @@ export default function DisputeScreen({ navigation, route }: Props) {
             numberOfLines={6}
             textAlignVertical="top"
             maxLength={600}
+            accessibilityLabel={t('description_label')}
+            accessibilityHint={t('form.description_placeholder')}
           />
           <View style={styles.textareaFooter}>
             <Text style={styles.charCount}>{desc.length} / 600</Text>
@@ -185,12 +193,13 @@ export default function DisputeScreen({ navigation, route }: Props) {
           size="lg"
           style={styles.submitBtn}
         />
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelBtn} accessibilityRole="button" accessibilityLabel={tc('cancel')}>
           <Text style={styles.cancelTxt}>{tc('cancel')}</Text>
         </TouchableOpacity>
 
         <View style={{ height: 32 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

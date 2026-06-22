@@ -38,6 +38,9 @@ const booking: BookingNS = {
     verified_badge:  'Vérifiées',
     no_photos_title: 'Photos de présence',
     caption:         'Photo horodatée · Agent {{name}}',
+    zoom_a11y:       'Agrandir la photo de présence',
+    empty_in_progress: "Les photos apparaîtront ici lors du check-in de l'agent.",
+    empty_completed: 'Aucune photo de présence disponible pour cette mission.',
   },
 
   incidents: {

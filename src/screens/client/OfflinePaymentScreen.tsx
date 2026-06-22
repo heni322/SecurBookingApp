@@ -22,6 +22,8 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList, OfflinePaymentInstructions } from '@models/index';
 import { useToast } from '@hooks/useToast';
+import { useTranslation } from '@i18n';
+import i18n from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'OfflinePayment'>;
 type OfflineMethod = 'VIREMENT' | 'CHEQUE';
@@ -29,6 +31,7 @@ type OfflineMethod = 'VIREMENT' | 'CHEQUE';
 export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   const { missionId, totalTTC } = route.params;
   const toast = useToast();
+  const { t } = useTranslation('payment');
   const [method,       setMethod]       = useState<OfflineMethod>('VIREMENT');
   const [submitting,   setSubmitting]   = useState(false);
   const [instructions, setInstructions] = useState<OfflinePaymentInstructions | null>(null);
@@ -47,7 +50,7 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
       const result = (res as any).data ?? res;
       setInstructions(result.instructions);
     } catch (err: unknown) {
-      const msg = (err as any)?.response?.data?.message ?? 'Une erreur est survenue.';
+      const msg = (err as any)?.response?.data?.message ?? t('add.err_generic');
       toast.error(Array.isArray(msg) ? msg.join('\n') : msg, { title: 'Erreur' });
     } finally {
       setSubmitting(false);
@@ -59,8 +62,8 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
     return (
       <View style={styles.screen}>
         <ScreenHeader
-          title={isVirement ? 'Coordonnees bancaires' : 'Envoi du cheque'}
-          subtitle="Votre declaration a ete enregistree"
+          title={isVirement ? t('offline.result_title_virement') : t('offline.result_title_cheque')}
+          subtitle={t('offline.result_subtitle')}
           onBack={() => navigation.popToTop()}
         />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -68,36 +71,36 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
             <View style={styles.successIcon}>
               <CheckCircle2 size={36} color={colors.success} strokeWidth={1.6} />
             </View>
-            <Text style={styles.successTitle}>Declaration enregistree</Text>
+            <Text style={styles.successTitle}>{t('offline.declared_title')}</Text>
             <Text style={styles.successSubtitle}>
               {isVirement
-                ? "Effectuez le virement avec les coordonnees ci-dessous. Votre mission sera confirmee des reception (1 a 3 jours ouvres)."
-                : "Envoyez votre cheque a l'adresse ci-dessous. Votre mission sera confirmee des reception."
+                ? t('offline.declared_subtitle_virement')
+                : t('offline.declared_subtitle_cheque')
               }
             </Text>
           </View>
           <Card elevated style={styles.instructCard}>
             {isVirement ? (
               <>
-                <Text style={styles.instructTitle}>COORDONNEES BANCAIRES</Text>
+                <Text style={styles.instructTitle}>{t('offline.bank_coords_title')}</Text>
                 <Separator marginV={spacing[3]} />
-                <InstructRow label="Beneficiaire" value={instructions.beneficiary ?? 'Provalk SAS'} copyKey="beneficiary" copiedKey={copiedKey} onCopy={handleCopy} />
-                <InstructRow label="IBAN" value={instructions.iban ?? ''} copyKey="iban" copiedKey={copiedKey} onCopy={handleCopy} mono />
-                <InstructRow label="BIC / SWIFT" value={instructions.bic ?? ''} copyKey="bic" copiedKey={copiedKey} onCopy={handleCopy} mono />
-                <InstructRow label="Reference obligatoire" value={instructions.reference ?? ''} copyKey="ref" copiedKey={copiedKey} onCopy={handleCopy} accent />
+                <InstructRow label={t('offline.beneficiary_label')} value={instructions.beneficiary ?? 'Provalk SAS'} copyKey="beneficiary" copiedKey={copiedKey} onCopy={handleCopy} />
+                <InstructRow label={t('offline.iban_label')} value={instructions.iban ?? ''} copyKey="iban" copiedKey={copiedKey} onCopy={handleCopy} mono />
+                <InstructRow label={t('offline.bic_label')} value={instructions.bic ?? ''} copyKey="bic" copiedKey={copiedKey} onCopy={handleCopy} mono />
+                <InstructRow label={t('offline.ref_label')} value={instructions.reference ?? ''} copyKey="ref" copiedKey={copiedKey} onCopy={handleCopy} accent />
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Montant exact</Text>
+                  <Text style={styles.amountLabel}>{t('offline.amount_exact')}</Text>
                   <Text style={styles.amountValue}>{formatEuros(totalTTC * 100)}</Text>
                 </View>
               </>
             ) : (
               <>
-                <Text style={styles.instructTitle}>ENVOI DU CHEQUE</Text>
+                <Text style={styles.instructTitle}>{t('offline.cheque_title')}</Text>
                 <Separator marginV={spacing[3]} />
-                <InstructRow label="A l'ordre de" value={instructions.payable ?? 'Provalk SAS'} copyKey="payable" copiedKey={copiedKey} onCopy={handleCopy} />
-                <InstructRow label="Adresse d'envoi" value={instructions.address ?? ''} copyKey="address" copiedKey={copiedKey} onCopy={handleCopy} />
+                <InstructRow label={t('offline.payable_label')} value={instructions.payable ?? 'Provalk SAS'} copyKey="payable" copiedKey={copiedKey} onCopy={handleCopy} />
+                <InstructRow label={t('offline.address_label')} value={instructions.address ?? ''} copyKey="address" copiedKey={copiedKey} onCopy={handleCopy} />
                 <View style={styles.amountRow}>
-                  <Text style={styles.amountLabel}>Montant du cheque</Text>
+                  <Text style={styles.amountLabel}>{t('offline.amount_cheque')}</Text>
                   <Text style={styles.amountValue}>{formatEuros(totalTTC * 100)}</Text>
                 </View>
               </>
@@ -108,7 +111,7 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
             <Text style={styles.infoText}>{instructions.message}</Text>
           </View>
           <Button
-            label="Suivre ma mission"
+            label={t('offline.follow_mission')}
             onPress={() => navigation.replace('MissionDetail', { missionId })}
             fullWidth size="lg"
             rightIcon={<ArrowRight size={18} color={colors.textInverse} strokeWidth={2} />}
@@ -120,25 +123,25 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader title="Paiement hors-ligne" subtitle="Virement ou cheque" onBack={() => navigation.goBack()} />
+      <ScreenHeader title={t('offline.title')} subtitle={t('offline.subtitle')} onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Card elevated style={styles.amountCard}>
-          <Text style={styles.amountCardLabel}>Montant total TTC</Text>
+          <Text style={styles.amountCardLabel}>{t('offline.total_ttc')}</Text>
           <Text style={styles.amountCardValue}>{formatEuros(totalTTC * 100)}</Text>
-          <Text style={styles.amountCardSub}>TVA 20% incluse</Text>
+          <Text style={styles.amountCardSub}>{t('offline.vat_included')}</Text>
         </Card>
         <View style={styles.methodSection}>
-          <Text style={styles.methodSectionTitle}>MODE DE PAIEMENT</Text>
+          <Text style={styles.methodSectionTitle}>{t('offline.method_section_title')}</Text>
           <View style={styles.methodRow}>
-            <TouchableOpacity style={[styles.methodChip, method === 'VIREMENT' && styles.methodChipActive]} onPress={() => setMethod('VIREMENT')} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.methodChip, method === 'VIREMENT' && styles.methodChipActive]} onPress={() => setMethod('VIREMENT')} activeOpacity={0.8} accessibilityRole="radio" accessibilityState={{ selected: method === 'VIREMENT' }} accessibilityLabel={t('offline.method_virement')}>
               <Landmark size={20} color={method === 'VIREMENT' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-              <Text style={[styles.methodChipLabel, method === 'VIREMENT' && styles.methodChipLabelActive]}>Virement</Text>
-              <Text style={styles.methodChipSub}>Bancaire</Text>
+              <Text style={[styles.methodChipLabel, method === 'VIREMENT' && styles.methodChipLabelActive]}>{t('offline.method_virement')}</Text>
+              <Text style={styles.methodChipSub}>{t('offline.method_bank')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.methodChip, method === 'CHEQUE' && styles.methodChipActive]} onPress={() => setMethod('CHEQUE')} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.methodChip, method === 'CHEQUE' && styles.methodChipActive]} onPress={() => setMethod('CHEQUE')} activeOpacity={0.8} accessibilityRole="radio" accessibilityState={{ selected: method === 'CHEQUE' }} accessibilityLabel={t('offline.method_cheque')}>
               <FileText size={20} color={method === 'CHEQUE' ? colors.primary : colors.textMuted} strokeWidth={1.8} />
-              <Text style={[styles.methodChipLabel, method === 'CHEQUE' && styles.methodChipLabelActive]}>Cheque</Text>
-              <Text style={styles.methodChipSub}>Postal</Text>
+              <Text style={[styles.methodChipLabel, method === 'CHEQUE' && styles.methodChipLabelActive]}>{t('offline.method_cheque')}</Text>
+              <Text style={styles.methodChipSub}>{t('offline.method_postal')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -146,25 +149,25 @@ export const OfflinePaymentScreen: React.FC<Props> = ({ route, navigation }) => 
           <Info size={14} color={colors.info} strokeWidth={2} />
           <Text style={styles.infoText}>
             {method === 'VIREMENT'
-              ? "Vous recevrez les coordonnees bancaires (IBAN + reference). Votre mission sera publiee apres reception du virement (1 a 3 jours ouvres)."
-              : "Vous recevrez l'adresse d'envoi du cheque. Votre mission sera publiee apres reception et validation."
+              ? t('offline.info_virement')
+              : t('offline.info_cheque')
             }
           </Text>
         </View>
         <Card style={styles.delayCard}>
           <Building2 size={16} color={colors.warning} strokeWidth={1.8} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.delayTitle}>Delai de traitement</Text>
+            <Text style={styles.delayTitle}>{t('offline.delay_title')}</Text>
             <Text style={styles.delayText}>
               {method === 'VIREMENT'
-                ? "1 a 3 jours ouvres. Pour une confirmation immediate, privilegiez la carte ou le SEPA."
-                : "2 a 5 jours ouvres selon les delais postaux."
+                ? t('offline.delay_virement')
+                : t('offline.delay_cheque')
               }
             </Text>
           </View>
         </Card>
         <Button
-          label={submitting ? 'Enregistrement...' : `Confirmer le ${method === 'VIREMENT' ? 'virement' : 'cheque'}`}
+          label={submitting ? t('offline.confirming') : (method === 'VIREMENT' ? t('offline.confirm_virement') : t('offline.confirm_cheque'))}
           onPress={handleSubmit}
           loading={submitting}
           disabled={submitting}
@@ -186,7 +189,7 @@ const InstructRow: React.FC<{
         <Text style={rowStyles.label}>{label}</Text>
         <Text style={[rowStyles.value, mono && rowStyles.mono, accent && rowStyles.accent]}>{value}</Text>
       </View>
-      <TouchableOpacity style={[rowStyles.copyBtn, copied && rowStyles.copyBtnDone]} onPress={() => onCopy(copyKey, value)} hitSlop={{ top:8, bottom:8, left:8, right:8 }}>
+      <TouchableOpacity style={[rowStyles.copyBtn, copied && rowStyles.copyBtnDone]} onPress={() => onCopy(copyKey, value)} hitSlop={{ top:8, bottom:8, left:8, right:8 }} accessibilityRole="button" accessibilityLabel={i18n.t('payment:offline.copy')} accessibilityState={{ selected: copied }}>
         {copied
           ? <CheckCircle2 size={16} color={colors.success} strokeWidth={2} />
           : <Copy size={16} color={colors.textMuted} strokeWidth={1.8} />

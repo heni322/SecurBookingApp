@@ -3,6 +3,8 @@
  * Soft-import: gracefully degrades when library is not installed.
  */
 
+import i18n from '@i18n';
+
 let ReactNativeBiometrics: any = null;
 try {
   ReactNativeBiometrics = require('react-native-biometrics').default;
@@ -37,7 +39,7 @@ class BiometricService {
   }
 
   /** Prompt biometric authentication */
-  async authenticate(promptMessage = 'Confirmer votre identité'): Promise<boolean> {
+  async authenticate(promptMessage = i18n.t('common:biometric_confirm')): Promise<boolean> {
     if (!this.instance) return false;
     try {
       const { success } = await this.instance.simplePrompt({ promptMessage });
@@ -63,8 +65,8 @@ class BiometricService {
     switch (type) {
       case 'FaceID':    return 'Face ID';
       case 'TouchID':   return 'Touch ID';
-      case 'Biometrics': return 'Empreinte digitale';
-      default:          return 'Biométrie';
+      case 'Biometrics': return i18n.t('common:biometric_fingerprint');
+      default:          return i18n.t('common:biometric_default');
     }
   }
 }

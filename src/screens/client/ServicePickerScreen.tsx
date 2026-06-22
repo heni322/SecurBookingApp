@@ -30,6 +30,7 @@ import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { formatEuros }         from '@utils/formatters';
 import { useTranslation }      from '@i18n';
+import i18n from '@i18n';
 import type { MissionStackParamList } from '@models/index';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'ServicePicker'>;
@@ -37,11 +38,11 @@ type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: numbe
 
 // -- Uniform config ------------------------------------------------------------
 export const UNIFORM_OPTIONS = [
-  { value: 'STANDARD',     label: 'Standard',   desc: 'Uniforme noir réglementaire',  emoji: '🦺' },
-  { value: 'CIVIL',        label: 'Civil',       desc: 'Tenue discrète, en civil',     emoji: '👔' },
-  { value: 'EVENEMENTIEL', label: 'Soirée', desc: 'Costume / tenue de gala',           emoji: '🤵' },
-  { value: 'SSIAP',        label: 'SSIAP',       desc: 'Tenue incendie réglementaire', emoji: '🔥' },
-  { value: 'CYNOPHILE',    label: 'Cynophile',   desc: 'Tenue maître-chien',           emoji: '🐕' },
+  { value: 'STANDARD', emoji: '🦺' },
+  { value: 'CIVIL', emoji: '👔' },
+  { value: 'EVENEMENTIEL', emoji: '🤵' },
+  { value: 'SSIAP', emoji: '🔥' },
+  { value: 'CYNOPHILE', emoji: '🐕' },
 ] as const;
 
 export type UniformValue = (typeof UNIFORM_OPTIONS)[number]['value'];
@@ -238,7 +239,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.summaryText}>
             {t('summary', { lines: totalLines, agents: totalAgents })}
           </Text>
-          <TouchableOpacity onPress={() => setSelected(new Map())} style={styles.clearBtn}>
+          <TouchableOpacity onPress={() => setSelected(new Map())} style={styles.clearBtn} accessibilityRole="button" accessibilityLabel={t('clear_all')}>
             <Text style={styles.clearBtnText}>{t('clear_all')}</Text>
           </TouchableOpacity>
         </View>
@@ -293,7 +294,7 @@ export const ServicePickerScreen: React.FC<Props> = ({ navigation, route }) => {
               ).join(' · ')}
             </Text>
           </View>
-          <TouchableOpacity style={styles.ctaBtn} onPress={handleConfirm} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.ctaBtn} onPress={handleConfirm} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('continue_btn')}>
             <Text style={styles.ctaBtnText}>{t('continue_btn')}</Text>
             <ArrowRight size={18} color={colors.textInverse} strokeWidth={2.2} />
           </TouchableOpacity>
@@ -326,7 +327,7 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
   return (
     <View style={[styles.card, isSelected && { borderColor: accent, borderWidth: 1.5 }]}>
       {/* Header row — tap to add/remove */}
-      <TouchableOpacity style={styles.cardHeader} onPress={onToggle} activeOpacity={0.85}>
+      <TouchableOpacity style={styles.cardHeader} onPress={onToggle} activeOpacity={0.85} accessibilityRole="checkbox" accessibilityState={{ checked: isSelected }} accessibilityLabel={item.name}>
         {isSelected && (
           <View style={[styles.checkBadge, { backgroundColor: colors.primary }]}>
             <Check size={10} color="#fff" strokeWidth={3} />
@@ -369,6 +370,9 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                 onPress={() => onCountDelta(-1)}
                 disabled={line.agentCount <= 1}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel="Retirer un agent"
+                accessibilityState={{ disabled: line.agentCount <= 1 }}
               >
                 <Minus size={13} color={line.agentCount <= 1 ? colors.textMuted : accent} strokeWidth={2.5} />
               </TouchableOpacity>
@@ -378,6 +382,9 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                 onPress={() => onCountDelta(+1)}
                 disabled={line.agentCount >= 20}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={i18n.t('common:add_agent')}
+                accessibilityState={{ disabled: line.agentCount >= 20 }}
               >
                 <Plus size={13} color={line.agentCount >= 20 ? colors.textMuted : accent} strokeWidth={2.5} />
               </TouchableOpacity>
@@ -396,6 +403,9 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                     style={[styles.uniformChip, active && { backgroundColor: accent + '20', borderColor: accent }]}
                     onPress={() => onSetDefaultUniform(opt.value as UniformValue)}
                     hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={t(`uniforms.${opt.value}.label`)}
                   >
                     <Text style={styles.uniformEmoji}>{opt.emoji}</Text>
                     <Text style={[styles.uniformChipText, active && { color: accent, fontFamily: fontFamily.bodySemiBold }]}>
@@ -419,6 +429,9 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                 style={[styles.customizeToggle, line.customizing && { backgroundColor: accent + '12', borderColor: accent + '60' }]}
                 onPress={onToggleCustomize}
                 activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: line.customizing }}
+                accessibilityLabel={line.customizing ? t('customize_hide') : t('customize_show')}
               >
                 <Settings2 size={13} color={line.customizing ? accent : colors.textMuted} strokeWidth={2} />
                 <Text style={[styles.customizeToggleText, line.customizing && { color: accent }]}>
@@ -449,6 +462,9 @@ const ServiceCard: React.FC<CardProps> = React.memo(({
                                 style={[styles.uniformChipSmall, active && { backgroundColor: accent + '20', borderColor: accent }]}
                                 onPress={() => onSetPerAgentUniform(idx, opt.value as UniformValue)}
                                 hitSlop={{ top: 4, bottom: 4, left: 2, right: 2 }}
+                                accessibilityRole="radio"
+                                accessibilityState={{ selected: active }}
+                                accessibilityLabel={t(`uniforms.${opt.value}.label`)}
                               >
                                 <Text style={styles.uniformEmojiSmall}>{opt.emoji}</Text>
                                 <Text style={[styles.uniformChipTextSmall, active && { color: accent }]}>

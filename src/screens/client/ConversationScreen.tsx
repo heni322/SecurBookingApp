@@ -146,6 +146,9 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
           onPress={handleSend}
           disabled={!text.trim() || sending}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t('send')}
+          accessibilityState={{ disabled: !text.trim() || sending }}
         >
           <SendHorizonal
             size={20}

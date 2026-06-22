@@ -1,5 +1,5 @@
 /**
- * MissionDetailScreen � full mission view.
+ * MissionDetailScreen — full mission view.
  *
  * FIX: "Obtenir un devis" CTA now calls POST /quotes/calculate inline before
  * navigating so QuoteDetailScreen always opens with a fresh quote rather than
@@ -36,11 +36,12 @@ import { MissionStatus }         from '@constants/enums';
 import type { MissionsNS }       from '@i18n/locales/types';
 import type { MissionStackParamList, Booking } from '@models/index';
 import { useTranslation }        from '@i18n';
+import i18n from '@i18n';
 import { useConfirmDialogStore } from '@store/confirmDialogStore';
 import { useToast } from '@hooks/useToast';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionDetail'>;
-// Button.variant is 'filled'|'outline'|'ghost'|'danger' � no 'primary'
+// Button.variant is 'filled'|'outline'|'ghost'|'danger' — no 'primary'
 type Cta = { label: string; isLive?: boolean; disabled?: boolean; loading?: boolean; onPress: () => void };
 
 const STATUS_I18N_KEY: Record<MissionStatus, keyof MissionsNS['statuses']> = {
@@ -75,11 +76,11 @@ function startsInLabel(startAt: string | Date | undefined): string | null {
   const ms = new Date(startAt).getTime() - Date.now();
   if (ms <= 0 || ms > 1000 * 60 * 60 * 24 * 7) return null;
   const minutes = Math.floor(ms / 60_000);
-  if (minutes < 60) return `D�marre dans ${minutes} min`;
+  if (minutes < 60) return i18n.t('missions:starts_in_min', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `D�marre dans ${hours}h${minutes % 60 ? ` ${minutes % 60}min` : ''}`;
+  if (hours < 24) return i18n.t('missions:starts_in_hours', { h: hours, m: minutes % 60 ? ` ${minutes % 60}min` : '' });
   const days = Math.floor(hours / 24);
-  return `D�marre dans ${days} jour${days > 1 ? 's' : ''}`;
+  return i18n.t('missions:starts_in_days', { count: days });
 }
 
 /**
@@ -122,7 +123,7 @@ const JourneyStepper: React.FC<{ status: MissionStatus }> = ({ status }) => {
     return (
       <View style={stepStyles.cancelledRow}>
         <XCircle size={16} color={colors.danger} strokeWidth={1.8} />
-        <Text style={stepStyles.cancelledText}>Mission annul�e</Text>
+        <Text style={stepStyles.cancelledText}>{i18n.t('common:mission_cancelled')}</Text>
       </View>
     );
   }
@@ -215,8 +216,8 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
    * FIX: "Obtenir un devis" CTA handler.
    *
    * Previously the CTA called navigation.navigate('QuoteDetail') directly.
-   * QuoteDetailScreen immediately fetched GET /quotes/mission/:id � which
-   * returned 404 because no quote existed yet � showing a dead-end EmptyState.
+   * QuoteDetailScreen immediately fetched GET /quotes/mission/:id — which
+   * returned 404 because no quote existed yet — showing a dead-end EmptyState.
    *
    * Fix: call POST /quotes/calculate here first (building bookingLines from the
    * already-loaded mission.bookings), then navigate only on success.
@@ -247,6 +248,19 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const hasQuote       = useMemo(() => Boolean(mission?.quote), [mission]);
   const bookings       = useMemo(() => mission?.bookings ?? [], [mission]);
   const displayTitle   = useMemo(() => mission?.title?.trim() || t('card_fallback_title', { city: mission?.city }), [mission, t]);
+  // SEPA debit is still settling: mission is published but funds are not yet
+  // captured, so an assigned agent cannot check in until the debit clears.
+  // (Backend includes payment { status, method } on the mission relation.)
+  const sepaSettling   = useMemo(() => {
+    const pay: any = (mission as any)?.payment;
+    if (!pay) return false;
+    const publishedLike = ([
+      MissionStatus.PUBLISHED,
+      MissionStatus.STAFFING,
+      MissionStatus.STAFFED,
+    ] as MissionStatus[]).includes(mission?.status as MissionStatus);
+    return publishedLike && pay.method === 'SEPA' && pay.status === 'PROCESSING';
+  }, [mission]);
   const hasCoords      = useMemo(() =>
     typeof mission?.latitude  === 'number' && mission.latitude  !== 0 &&
     typeof mission?.longitude === 'number' && mission.longitude !== 0,
@@ -269,7 +283,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (mission.status === MissionStatus.PUBLISHED)
       return { label: t('detail.cta_waiting'), onPress: () => {}, disabled: true };
     if (mission.status === MissionStatus.STAFFING)
-      // Agents are auto-assigned when they apply � client waits passively.
+      // Agents are auto-assigned when they apply — client waits passively.
       return { label: t('detail.cta_assigning'), onPress: () => {}, disabled: true };
     if (mission.status === MissionStatus.STAFFED)
       return { label: t('detail.cta_pay'), onPress: () => navigation.navigate('QuoteDetail', { missionId }) };
@@ -324,6 +338,8 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               style={styles.chatBtn}
               onPress={() => navigation.navigate('Conversation', { missionId })}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel={t('detail.cta_messaging')}
             >
               <MessageSquare size={20} color={colors.primary} strokeWidth={1.8} />
             </TouchableOpacity>
@@ -335,6 +351,20 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
       >
         <JourneyStepper status={mission.status as MissionStatus} />
+
+        {sepaSettling && (
+          <View
+            style={styles.sepaBanner}
+            accessibilityRole="alert"
+            accessibilityLabel={`${t('detail.sepa_settling_title')}. ${t('detail.sepa_settling_body')}`}
+          >
+            <Hourglass size={16} color={colors.info} strokeWidth={2} />
+            <View style={styles.sepaBannerText}>
+              <Text style={styles.sepaBannerTitle}>{t('detail.sepa_settling_title')}</Text>
+              <Text style={styles.sepaBannerBody}>{t('detail.sepa_settling_body')}</Text>
+            </View>
+          </View>
+        )}
 
         <Card elevated style={styles.heroCard}>
           <View style={[styles.heroAccent, { backgroundColor: statusColor }]} />
@@ -410,7 +440,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={styles.locationAddress}>{fullAddress}</Text>
           {hasCoords && (
             <View style={styles.mapWrap}>
-              {/* FIX: MissionMapView has no `address` prop � pass as `title` */}
+              {/* FIX: MissionMapView has no `address` prop — pass as `title` */}
               <MissionMapView latitude={mission.latitude} longitude={mission.longitude} title={mission.address} />
             </View>
           )}
@@ -438,7 +468,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       {cta && (
         <View style={styles.footer}>
           {/*
-            FIX: Button variant 'primary' does not exist � use 'filled'.
+            FIX: Button variant 'primary' does not exist — use 'filled'.
             valid values: 'filled' | 'outline' | 'ghost' | 'danger'
           */}
           <Button
@@ -462,7 +492,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
           {canCancel && (
             <TouchableOpacity onPress={handleCancel} style={styles.cancelLink} activeOpacity={0.7}>
-              {/* FIX: 'detail.cancel_link' doesn't exist in MissionsNS � use 'detail.cancel' */}
+              {/* FIX: 'detail.cancel_link' doesn't exist in MissionsNS — use 'detail.cancel' */}
               <Text style={styles.cancelLinkText}>{t('detail.cancel')}</Text>
             </TouchableOpacity>
           )}
@@ -479,6 +509,20 @@ const styles = StyleSheet.create({
   errorWrap:         { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] },
   errorText:         { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, textAlign: 'center' },
   chatBtn:           { padding: spacing[2] },
+
+  sepaBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    backgroundColor: colors.infoSurface,
+    borderRadius: radius.lg,
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.info,
+  },
+  sepaBannerText:  { flex: 1, gap: 2 },
+  sepaBannerTitle: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.info },
+  sepaBannerBody:  { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.55 },
   heroCard:          { overflow: 'hidden', padding: 0 },
   heroAccent:        { height: 3, width: '100%' },
   heroContent:       { padding: spacing[5], gap: spacing[3] },

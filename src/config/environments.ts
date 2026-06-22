@@ -47,7 +47,7 @@ const shared = {
  *   • Emulator:   Android emulator loopback      → '10.0.2.2'
  * Must also be whitelisted in android network_security_config.xml (debug).
  */
-const DEV_HOST = '192.168.1.12';
+const DEV_HOST = '192.168.45.94';
 
 // ── Profiles ──────────────────────────────────────────────────────────────────
 export const ENVIRONMENTS: Record<AppEnv, AppConfig> = {

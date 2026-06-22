@@ -13,6 +13,7 @@ import { colors }     from '@theme/colors';
 import { spacing }    from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import type { AgentSummary } from '@models/index';
+import { useTranslation } from '@i18n';
 
 interface Props {
   agent:       AgentSummary;
@@ -26,7 +27,9 @@ export const AgentCard: React.FC<Props> = ({
   onPress,
   onSelect,
   selectable = false,
-}) => (
+}) => {
+  const { t } = useTranslation('missions');
+  return (
   <TouchableOpacity activeOpacity={onPress ? 0.82 : 1} onPress={onPress}>
     <Card style={styles.card}>
       <View style={styles.header}>
@@ -52,7 +55,7 @@ export const AgentCard: React.FC<Props> = ({
 
       {selectable && onSelect && (
         <Button
-          label="Sélectionner cet agent"
+          label={t('select_agent.select_btn')}
           onPress={onSelect}
           fullWidth
           style={styles.selectBtn}
@@ -60,7 +63,8 @@ export const AgentCard: React.FC<Props> = ({
       )}
     </Card>
   </TouchableOpacity>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   card: { marginBottom: spacing[3], gap: spacing[3] },

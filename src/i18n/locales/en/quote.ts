@@ -64,6 +64,7 @@ const quote: QuoteNS = {
   accepted_badge: 'Accepted',
   valid_until:    'Valid until {{date}}',
   accept_label:   'Accept this quote',
+  ref:            'Ref. #{{ref}}',
 };
 
 export default quote;

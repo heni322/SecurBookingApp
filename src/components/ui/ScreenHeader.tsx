@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { useTranslation } from '@i18n';
 
 interface Props {
   title:         string;
@@ -35,6 +36,7 @@ export const ScreenHeader: React.FC<Props> = ({
   accent = false,
 }) => {
   // Fix #1: actually consume the inset — was imported but never called
+  const { t } = useTranslation('common');
   const { top } = useSafeAreaInsets();
   const renderBack = showBack !== false && !!onBack;
   const rightSlot  = rightAction ?? rightElement;
@@ -56,12 +58,14 @@ export const ScreenHeader: React.FC<Props> = ({
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('back')}
           >
             <ChevronLeft size={18} color={colors.textPrimary} strokeWidth={2.4} />
           </TouchableOpacity>
         )}
         <View style={styles.titleWrap}>
-          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          <Text style={styles.title} numberOfLines={1} accessibilityRole="header">{title}</Text>
           {subtitle && (
             <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
           )}

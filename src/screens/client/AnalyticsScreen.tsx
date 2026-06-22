@@ -98,14 +98,13 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
     const all = Array.isArray(missions) ? missions : [];
     return [
       {
-        // Fix: was 'Terminées' — encoding garbled
-        label: 'Terminées',
+        label: t('status_completed'),
         count: all.filter((m: Mission) => m.status === MissionStatus.COMPLETED).length,
         color: colors.success,
         Icon:  CheckCircle,
       },
       {
-        label: 'En cours',
+        label: t('status_in_progress'),
         count: all.filter((m: Mission) =>
           [MissionStatus.IN_PROGRESS, MissionStatus.PUBLISHED, MissionStatus.STAFFED]
             .includes(m.status as any),
@@ -114,14 +113,13 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
         Icon:  Shield,
       },
       {
-        label: 'Brouillons',
+        label: t('status_drafts'),
         count: all.filter((m: Mission) => m.status === MissionStatus.CREATED).length,
         color: colors.textMuted,
         Icon:  Clock,
       },
       {
-        // Fix: was 'Cancelled' — English in a French app
-        label: 'Annulées',
+        label: t('status_cancelled'),
         count: all.filter((m: Mission) => m.status === MissionStatus.CANCELLED).length,
         color: colors.danger,
         Icon:  XCircle,
@@ -161,24 +159,20 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
       >
         {/* ── Summary KPIs ───────────────────────────────────────────────── */}
         <View style={styles.kpiRow}>
-          {/* Fix: was "Total spent" — English */}
-          <KpiCard label="Total dépensé"  value={formatEuros(totalSpend)} accent />
-          {/* Fix: was "Total missions" — acceptable but aligning to French */}
-          <KpiCard label="Total missions" value={String(totalMissions)} />
+          <KpiCard label={t('kpi_total_spent')}  value={formatEuros(totalSpend)} accent />
+          <KpiCard label={t('kpi_total_missions')} value={String(totalMissions)} />
         </View>
 
         {/* ── Monthly Spending Bar Chart ─────────────────────────────────── */}
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <TrendingUp size={16} color={colors.primary} strokeWidth={1.8} />
-            {/* Fix: was 'Dépenses mensuelles' — encoding corruption */}
-            <Text style={styles.chartTitle}>Dépenses mensuelles</Text>
+            <Text style={styles.chartTitle}>{t('monthly_spend')}</Text>
           </View>
           <View style={styles.barsRow}>
             {monthlySpend.map(m => (
               <View key={m.key} style={styles.barCol}>
                 <Text style={styles.barValue}>
-                  {/* Fix: was '€' — € sign encoding corruption */}
                   {m.value > 0 ? `${Math.round(m.value)}€` : ''}
                 </Text>
                 <View style={[styles.barTrack, { height: BAR_H }]}>
@@ -213,8 +207,7 @@ export const AnalyticsScreen: React.FC<Props> = ({ navigation }) => {
         <Card elevated style={styles.chartCard}>
           <View style={styles.chartHeader}>
             <Shield size={16} color={colors.textSecondary} strokeWidth={1.8} />
-            {/* Fix: was 'Répartition des missions' — encoding corruption */}
-            <Text style={styles.chartTitle}>Répartition des missions</Text>
+            <Text style={styles.chartTitle}>{t('status_breakdown')}</Text>
           </View>
           <View style={styles.statusList}>
             {statusData.map(({ label, count, color }) => {

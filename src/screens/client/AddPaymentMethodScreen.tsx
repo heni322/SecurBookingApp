@@ -3,7 +3,7 @@
  * AddPaymentMethodScreen - save a card or SEPA mandate without a mission.
  */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useStripe, CardField } from '@stripe/stripe-react-native';
 import type { CardFieldInput } from '@stripe/stripe-react-native';
@@ -19,6 +19,7 @@ import { fontSize, fontFamily } from '@theme/typography';
 import { paymentsApi } from '@api/endpoints/payments';
 import { useAuthStore } from '@store/authStore';
 import type { ProfileStackParamList } from '@models/index';
+import { useTranslation } from '@i18n';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'AddPaymentMethod'>;
 type MethodType = 'card' | 'sepa_debit';
@@ -33,6 +34,7 @@ const formatIban = (raw: string): string =>
 const CARD_STYLE = { backgroundColor: palette.panelSolid, textColor: palette.white, placeholderColor: palette.muted, cursorColor: palette.gold, fontSize: 15 };
 export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   const { confirmSetupIntent } = useStripe();
+  const { t } = useTranslation('payment');
   const user = useAuthStore(s => s.user);
   const [step, setStep] = useState<'pick' | 'form' | 'success'>('pick');
   const [methodType, setMethodType] = useState<MethodType>('card');
@@ -44,48 +46,48 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   const ibanValid = isValidIban(iban);
   const canConfirm = methodType === 'card' ? cardComplete : ibanValid;
 
-  const handlePickType = (t: MethodType) => {
-    setMethodType(t); setErrorMsg(null); setCardComplete(false); setIban(''); setStep('form');
+  const handlePickType = (type: MethodType) => {
+    setMethodType(type); setErrorMsg(null); setCardComplete(false); setIban(''); setStep('form');
   };
 
   const handleConfirm = async () => {
     if (!canConfirm) {
-      setErrorMsg(methodType === 'card' ? 'Veuillez saisir vos informations de carte completes.' : 'Veuillez saisir un IBAN valide.');
+      setErrorMsg(methodType === 'card' ? t('add.incomplete_card') : t('add.invalid_iban'));
       return;
     }
     setLoading(true); setErrorMsg(null);
     try {
       const { data: res } = await paymentsApi.setupMethodIntent(methodType);
       const secret = (res as any)?.data?.clientSecret ?? (res as any)?.clientSecret;
-      if (!secret) { setErrorMsg('Impossible de creer la session. Reessayez.'); return; }
+      if (!secret) { setErrorMsg(t('add.err_session')); return; }
       if (methodType === 'card') {
         const { setupIntent, error } = await confirmSetupIntent(secret, {
           paymentMethodType: 'Card',
           paymentMethodData: { billingDetails: { email: user?.email ?? '', name: user?.fullName ?? '' } },
         });
-        if (error) { setErrorMsg(error.localizedMessage ?? 'Carte refusee.'); return; }
+        if (error) { setErrorMsg(error.localizedMessage ?? t('add.err_card_refused')); return; }
         if (setupIntent?.status !== 'Succeeded' && setupIntent?.status !== 'Processing') {
-          setErrorMsg('La carte na pas pu etre enregistree.'); return;
+          setErrorMsg(t('add.err_card_save')); return;
         }
       } else {
         const { setupIntent, error } = await confirmSetupIntent(secret, {
           paymentMethodType: 'SepaDebit',
           paymentMethodData: { iban: iban.replace(/\s/g, ''), billingDetails: { email: user?.email ?? '', name: user?.fullName ?? '' } },
         });
-        if (error) { setErrorMsg(error.localizedMessage ?? 'IBAN refuse.'); return; }
+        if (error) { setErrorMsg(error.localizedMessage ?? t('add.err_iban_refused')); return; }
         if (setupIntent?.status !== 'Succeeded' && setupIntent?.status !== 'Processing') {
-          setErrorMsg('Le mandat SEPA na pas pu etre enregistre.'); return;
+          setErrorMsg(t('add.err_sepa_save')); return;
         }
       }
       setStep('success');
     } catch (err: any) {
-      setErrorMsg(err?.message ?? 'Une erreur est survenue.');
+      setErrorMsg(err?.message ?? t('add.err_generic'));
     } finally { setLoading(false); }
   };
   if (step === 'success') {
     return (
       <View style={s.screen}>
-        <ScreenHeader title="Moyen de paiement" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('add.header_method')} onBack={() => navigation.goBack()} />
         <View style={s.successWrap}>
           <View style={s.successIcon}>
             <CheckCircle2 size={52} color={colors.success} strokeWidth={1.5} />
@@ -95,10 +97,10 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
           <Text style={s.successSub}>
             {methodType === 'card'
-              ? 'Votre carte est sauvegardee en securite chez Stripe. Utilisez-la lors de vos prochains paiements.'
-              : 'Votre IBAN est enregistre et disponible pour vos prochaines missions SEPA.'}
+              ? t('add.success_sub_card')
+              : t('add.success_sub_sepa')}
           </Text>
-          <Button label="Voir mes moyens de paiement" onPress={() => navigation.goBack()} fullWidth size="lg" style={s.successBtn} />
+          <Button label={t('add.success_cta')} onPress={() => navigation.goBack()} fullWidth size="lg" style={s.successBtn} />
         </View>
       </View>
     );
@@ -107,27 +109,27 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   if (step === 'pick') {
     return (
       <View style={s.screen}>
-        <ScreenHeader title="Ajouter un moyen de paiement" onBack={() => navigation.goBack()} />
+        <ScreenHeader title={t('add.header_add')} onBack={() => navigation.goBack()} />
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
           <Text style={s.pickTitle}>Choisissez un type</Text>
-          <Text style={s.pickSub}>Stocke en securite chez Stripe (PCI-DSS niveau 1).</Text>
-          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('card')} activeOpacity={0.82}>
+          <Text style={s.pickSub}>{t('add.pick_sub')}</Text>
+          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('card')} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel="Carte bancaire" accessibilityHint="Visa, Mastercard, CB, AMEX">
             <View style={[s.pickIcon, { backgroundColor: colors.primarySurface }]}>
               <CreditCard size={24} color={colors.primary} strokeWidth={1.8} />
             </View>
             <View style={s.pickInfo}>
-              <Text style={s.pickLabel}>Carte bancaire</Text>
-              <Text style={s.pickDesc}>Visa - Mastercard - CB - AMEX</Text>
+              <Text style={s.pickLabel}>{t('add.card_label')}</Text>
+              <Text style={s.pickDesc}>{t('add.card_desc')}</Text>
             </View>
             <ChevronRight size={18} color={colors.textMuted} strokeWidth={2} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('sepa_debit')} activeOpacity={0.82}>
+          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('sepa_debit')} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t('add.sepa_label')} accessibilityHint={t('add.sepa_desc')}>
             <View style={[s.pickIcon, { backgroundColor: colors.infoSurface }]}>
               <Landmark size={24} color={colors.info} strokeWidth={1.8} />
             </View>
             <View style={s.pickInfo}>
-              <Text style={s.pickLabel}>Debit SEPA (IBAN)</Text>
-              <Text style={s.pickDesc}>Virement SEPA - Zone euro</Text>
+              <Text style={s.pickLabel}>{t('add.sepa_label')}</Text>
+              <Text style={s.pickDesc}>{t('add.sepa_desc')}</Text>
             </View>
             <ChevronRight size={18} color={colors.textMuted} strokeWidth={2} />
           </TouchableOpacity>
@@ -142,17 +144,18 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   const isSepa = methodType === 'sepa_debit';
   return (
     <View style={s.screen}>
-      <ScreenHeader title={isSepa ? 'Ajouter un IBAN' : 'Ajouter une carte'} onBack={() => setStep('pick')} />
+      <ScreenHeader title={isSepa ? t('add.header_iban') : t('add.header_card')} onBack={() => setStep('pick')} />
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
         <View style={s.methodBadge}>
           {isSepa ? <Landmark size={14} color={colors.primary} strokeWidth={1.8} /> : <CreditCard size={14} color={colors.primary} strokeWidth={1.8} />}
-          <Text style={s.methodBadgeText}>{isSepa ? 'Debit SEPA' : 'Carte bancaire'}</Text>
+          <Text style={s.methodBadgeText}>{isSepa ? t('add.method_badge_sepa') : t('add.method_badge_card')}</Text>
         </View>
         <Card style={s.formCard} elevated>
           <View style={s.formHeader}>
             <View style={s.formHeaderL}>
               <Lock size={16} color={colors.success} strokeWidth={2} />
-              <Text style={s.formTitle}>{isSepa ? 'Coordonnees bancaires' : 'Informations de carte'}</Text>
+              <Text style={s.formTitle}>{isSepa ? t('add.form_title_sepa') : t('add.form_title_card')}</Text>
             </View>
             <View style={s.sslBadge}>
               <ShieldCheck size={11} color={colors.success} strokeWidth={2} />
@@ -164,9 +167,11 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
             <>
               <Text style={s.ibanLabel}>IBAN</Text>
               <TextInput
+                accessibilityLabel="IBAN"
+                accessibilityHint={t('add.iban_hint')}
                 style={[s.ibanInput, ibanFocused && s.ibanFocused, ibanValid && s.ibanValid]}
                 value={iban}
-                onChangeText={t => { setIban(formatIban(t.replace(/[^A-Za-z0-9 ]/g, ''))); if (errorMsg) setErrorMsg(null); }}
+                onChangeText={val => { setIban(formatIban(val.replace(/[^A-Za-z0-9 ]/g, ''))); if (errorMsg) setErrorMsg(null); }}
                 onFocus={() => setIbanFocused(true)}
                 onBlur={() => setIbanFocused(false)}
                 placeholder="FR76 3000 4028 3798 7654 3210 943"
@@ -180,7 +185,7 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
               {ibanValid && <View style={s.ibanOkRow}><CheckCircle2 size={13} color={colors.success} strokeWidth={2} /><Text style={s.ibanOkText}>IBAN valide</Text></View>}
               <View style={s.mandate}>
                 <Info size={13} color={colors.primary} strokeWidth={2} />
-                <Text style={s.mandateText}>En fournissant votre IBAN vous autorisez Provalk a debiter votre compte conformement au mandat SEPA. Droit au remboursement dans les 8 semaines.</Text>
+                <Text style={s.mandateText}>{t('add.mandate_text')}</Text>
               </View>
             </>
           ) : (
@@ -208,16 +213,17 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
         )}
         <View style={s.secInfo}>
           {isSepa ? <Landmark size={14} color={colors.textMuted} strokeWidth={1.5} /> : <CreditCard size={14} color={colors.textMuted} strokeWidth={1.5} />}
-          <Text style={s.secInfoText}>{isSepa ? 'Vos coordonnees bancaires transitent directement vers Stripe.' : 'Vos donnees de carte sont chiffrees par Stripe. Paiement 3DS DSP2.'}</Text>
+          <Text style={s.secInfoText}>{isSepa ? t('add.sec_info_sepa') : t('add.sec_info_card')}</Text>
         </View>
       </ScrollView>
       <View style={s.footer}>
         <Button
-          label={loading ? 'Enregistrement...' : isSepa ? "Enregistrer l'IBAN" : 'Enregistrer la carte'}
+          label={loading ? t('add.saving') : isSepa ? t('add.save_iban') : t('add.save_card')}
           onPress={handleConfirm} loading={loading} disabled={!canConfirm || loading} fullWidth size="lg"
         />
-        <Text style={s.footerNote}>{isSepa ? 'En confirmant vous autorisez Provalk a utiliser cet IBAN.' : 'Donnees tokenisees par Stripe, jamais stockees sur nos serveurs.'}</Text>
+        <Text style={s.footerNote}>{isSepa ? t('add.footer_iban_consent') : t('add.footer_tokenized')}</Text>
       </View>
+      </KeyboardAvoidingView>
     </View>
   );
 };
