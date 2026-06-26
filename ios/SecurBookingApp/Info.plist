@@ -117,12 +117,19 @@
 	</dict>
 
 	<!-- ── Permissions (toutes les descriptions sont en français, exigées par App Review) ── -->
+	<!--
+	  [FIX H1] Location is "When In Use" ONLY.
+	  The CLIENT app captures the user's own position solely to centre the map
+	  picker ("Locate me") while the app is in the foreground. The agent's live
+	  position is delivered over the WebSocket channel, NOT from this device's
+	  GPS, so the app has no need for background ("Always") location.
+	  NSLocationAlwaysAndWhenInUseUsageDescription was removed because requesting
+	  Always authorization the app never uses is both an App Review rejection
+	  risk and a GDPR data-minimisation violation. There is also no
+	  UIBackgroundModes=location entry, consistent with no background tracking.
+	-->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Provalk accède à votre position pour afficher votre localisation et suivre l'agent en temps réel sur la carte de la mission.</string>
-
-	<!-- Suivi de l'agent possible lorsque l'app est en arrière-plan pendant une mission active -->
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Provalk utilise votre position, y compris en arrière-plan, pour suivre la progression de l'agent vers le lieu de la mission et déclencher les alertes de proximité.</string>
+	<string>Provalk accède à votre position uniquement lorsque l'application est ouverte, pour centrer la carte sur votre emplacement lorsque vous créez une mission.</string>
 
 	<!-- Photos de check-in / check-out et pièces jointes de litige -->
 	<key>NSCameraUsageDescription</key>

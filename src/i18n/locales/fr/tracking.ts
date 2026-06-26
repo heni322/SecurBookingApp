@@ -13,9 +13,16 @@ const tracking: TrackingNS = {
   view_site_btn:      'Voir le site',
   sync_btn:           'Sync',
   last_seen:          'Vu {{time}}',
+  updated_ago_s:      'Mis à jour il y a {{seconds}}s',
+  zone_unknown:       "Localisation de l'agent…",
   attribution:        '© OpenStreetMap contributors',
   recenter_a11y:      'Recentrer sur la carte',
   close_a11y:         'Fermer',
+  en_route:           'En route vers votre site',
+  track_btn:          'Suivre',
+  eta_label:          '~{{minutes}} min',
+  eta_arriving:       "Arrivée imminente",
+  eta_calculating:    'Estimation…',
 };
 
 export default tracking;

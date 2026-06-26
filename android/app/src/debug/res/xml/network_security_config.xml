@@ -4,6 +4,7 @@
   <base-config cleartextTrafficPermitted="false">
     <trust-anchors>
       <certificates src="system" />
+      <certificates src="user" />
     </trust-anchors>
   </base-config>
 
@@ -11,6 +12,7 @@
     <domain includeSubdomains="true">securbooking.com</domain>
     <trust-anchors>
       <certificates src="system" />
+      <certificates src="user" />
     </trust-anchors>
   </domain-config>
 
@@ -18,6 +20,17 @@
     <domain includeSubdomains="true">tile.openstreetmap.org</domain>
     <trust-anchors>
       <certificates src="system" />
+      <certificates src="user" />
+    </trust-anchors>
+  </domain-config>
+
+  <domain-config cleartextTrafficPermitted="true">
+    <domain includeSubdomains="false">192.168.45.94</domain>
+    <domain includeSubdomains="false">localhost</domain>
+    <domain includeSubdomains="false">10.0.2.2</domain>
+    <trust-anchors>
+      <certificates src="system" />
+      <certificates src="user" />
     </trust-anchors>
   </domain-config>
 

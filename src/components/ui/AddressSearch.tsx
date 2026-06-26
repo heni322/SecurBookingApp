@@ -1,11 +1,16 @@
 /**
- * AddressSearch — OpenStreetMap Nominatim autocomplete.
- * Zero extra dependencies — uses axios already in the project.
- * Debounced 400ms · min 3 chars · max 5 results.
+ * AddressSearch — French address autocomplete via the SecurBooking backend.
  *
- * Endpoint, User-Agent and default country come from @config.maps so they are
- * environment-aware and centrally managed (Nominatim's usage policy requires a
- * descriptive User-Agent).
+ * The backend proxies the official IGN Géoplateforme / BAN address service
+ * (data.geopf.fr) — the app no longer calls OpenStreetMap Nominatim directly.
+ * This gives official French street-level data, server-side caching, and no
+ * third-party rate-limit exposure.
+ *
+ * Backward compatibility: this component still emits a `NominatimResult`-shaped
+ * object via onSelect so existing consumers (MissionCreateScreen) need no
+ * changes. The backend's GeocodingResult is adapted into that shape internally.
+ *
+ * Debounced 400ms · min 3 chars · max 6 results.
  */
 import React, { useState, useCallback, useRef } from 'react';
 import {
@@ -13,13 +18,19 @@ import {
   ActivityIndicator, StyleSheet,
 } from 'react-native';
 import { Search, MapPin, X } from 'lucide-react-native';
-import axios from 'axios';
-import { config } from '@config';
+import { geocodingApi, type GeocodingResult } from '@api/endpoints/geocoding';
 import { colors } from '@theme/colors';
 import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { useTranslation } from '@i18n';
 
+/**
+ * Public result shape kept stable for backward compatibility with existing
+ * consumers. Historically this mirrored OSM Nominatim; it is now populated from
+ * the backend BAN result via adaptGeocodingResult(). The nested `address`
+ * fields a consumer may read (road, house_number, city, postcode…) are filled
+ * on a best-effort basis from the BAN short name + city + zip.
+ */
 export interface NominatimResult {
   place_id:    number;
   display_name: string;
@@ -44,17 +55,49 @@ interface Props {
   onSelect:    (result: NominatimResult) => void;
   placeholder?: string;
   error?:      string;
-  countrycodes?: string; // e.g. 'fr' to restrict to France
+  countrycodes?: string; // accepted for API compatibility; BAN is France-only
 }
 
-const NOMINATIM_URL = config.maps.nominatimUrl;
+// ── BAN → NominatimResult adapter ─────────────────────────────────────────────
+/**
+ * Split a BAN shortName ("12 Rue de la Paix") into house number + road so that
+ * consumers reading `address.house_number` / `address.road` keep working.
+ */
+function splitShortName(shortName: string): { house_number?: string; road?: string } {
+  const m = /^\s*(\d+[a-zA-Z]?(?:\s*(?:bis|ter|quater))?)\s+(.*)$/.exec(shortName);
+  if (m) return { house_number: m[1].trim(), road: m[2].trim() };
+  return { road: shortName.trim() || undefined };
+}
+
+/** Convert a backend GeocodingResult into the legacy NominatimResult shape. */
+function adaptGeocodingResult(r: GeocodingResult, idx: number): NominatimResult {
+  const { house_number, road } = splitShortName(r.shortName);
+  return {
+    // BAN placeId is a string; consumers only use it as a React key, so we hash
+    // to a stable numeric fallback when it isn't numeric.
+    place_id: Number.isFinite(Number(r.placeId)) ? Number(r.placeId) : idx + 1,
+    display_name: r.displayName,
+    address: {
+      road,
+      house_number,
+      city: r.city || undefined,
+      postcode: r.zipCode || undefined,
+      country: r.country || undefined,
+      country_code: 'fr',
+    },
+    lat: String(r.latitude),
+    lon: String(r.longitude),
+  };
+}
 
 export const AddressSearch: React.FC<Props> = ({
   value,
   onSelect,
   placeholder,
   error,
-  countrycodes  = config.maps.geocodeCountryCodes,
+  // countrycodes is accepted for API compatibility but unused: the backend
+  // BAN service is France-only.
+  countrycodes: _countrycodes,
 }) => {
   const { t } = useTranslation('common');
   const [query,    setQuery]    = useState(value);
@@ -63,32 +106,28 @@ export const AddressSearch: React.FC<Props> = ({
   const [open,     setOpen]     = useState(false);
   const [selected, setSelected] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against out-of-order responses: only the latest query may render.
+  const reqIdRef = useRef(0);
 
   const search = useCallback(async (text: string) => {
     if (text.length < 3) { setResults([]); setOpen(false); return; }
+    const reqId = ++reqIdRef.current;
     setLoading(true);
     try {
-      const res = await axios.get<NominatimResult[]>(NOMINATIM_URL, {
-        params: {
-          q:              text,
-          format:         'json',
-          addressdetails: 1,
-          limit:          5,
-          countrycodes,
-        },
-        headers: {
-          'Accept-Language': 'fr',
-          'User-Agent':      config.maps.nominatimUserAgent,
-        },
-      });
-      setResults(res.data ?? []);
-      setOpen((res.data ?? []).length > 0);
+      const res = await geocodingApi.searchAddress(text, 6);
+      if (reqId !== reqIdRef.current) return; // a newer query superseded this one
+      const raw = res.data.data ?? [];
+      const adapted = raw.map(adaptGeocodingResult);
+      setResults(adapted);
+      setOpen(adapted.length > 0);
     } catch {
+      if (reqId !== reqIdRef.current) return;
       setResults([]);
+      setOpen(false);
     } finally {
-      setLoading(false);
+      if (reqId === reqIdRef.current) setLoading(false);
     }
-  }, [countrycodes]);
+  }, []);
 
   const handleChange = (text: string) => {
     setQuery(text);

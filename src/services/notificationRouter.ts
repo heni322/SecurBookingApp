@@ -39,6 +39,29 @@ const toTab = (tab: string): NavAction =>
   CommonActions.navigate('Main', { screen: tab });
 
 /**
+ * Parse a coordinate string from an FCM payload into a valid lat/lng pair, or
+ * null when either value is absent / non-finite / structurally out of range.
+ *
+ * [FIX C3] The previous code used `parseFloat(data.siteLat ?? '0')`, which
+ * silently defaulted a missing coordinate to 0. LiveTrackingScreen then centred
+ * the map on 0°N 0°E (Gulf of Guinea) and reported a permanent multi-thousand-km
+ * "out of zone" breach. We now treat missing/invalid coordinates as "no coords"
+ * and route to MissionDetail instead of opening a broken tracking map.
+ */
+function parseCoords(
+  latStr: string | undefined,
+  lngStr: string | undefined,
+): { lat: number; lng: number } | null {
+  if (latStr == null || lngStr == null) return null;
+  const lat = Number(latStr);
+  const lng = Number(lngStr);
+  if (!isFinite(lat) || !isFinite(lng)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  if (lat === 0 && lng === 0) return null;
+  return { lat, lng };
+}
+
+/**
  * Pure mapping: notification type + flat data → navigation action (or null).
  *
  * NOTE: actions are wrapped at the ROOT level ('Main' → tab → stack screen) so
@@ -69,18 +92,24 @@ export function resolveNotificationAction(data: NotificationData): NavAction | n
       if (missionId) return toMissions('MissionDetail', { missionId });
       return toMissions('MissionList');
 
-    case 'AGENT_LOCATION_UPDATE':
-      if (missionId && bookingId)
+    case 'AGENT_LOCATION_UPDATE': {
+      // [FIX C3] Only open LiveTracking when we have a mission, a booking AND
+      // valid site coordinates. Otherwise fall back to MissionDetail rather than
+      // launching the tracking map with bogus (0,0) coordinates.
+      const coords = parseCoords(data.siteLat, data.siteLng);
+      if (missionId && bookingId && coords) {
         return toMissions('LiveTracking', {
           missionId,
           bookingId,
           agentName: data.agentName ?? 'Agent',
           missionAddress: data.missionAddress ?? '',
-          siteLat: parseFloat(data.siteLat ?? '0'),
-          siteLng: parseFloat(data.siteLng ?? '0'),
+          siteLat: coords.lat,
+          siteLng: coords.lng,
         });
+      }
       if (missionId) return toMissions('MissionDetail', { missionId });
       return null;
+    }
 
     case 'MISSION_REPORT_READY':
     case 'RATING_RECEIVED':

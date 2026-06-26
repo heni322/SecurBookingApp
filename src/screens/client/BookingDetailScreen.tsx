@@ -8,6 +8,11 @@
  *   TypeError: Cannot convert undefined value to object
  * Fix: removed dead import, added useTranslation('booking') +
  * BOOKING_STATUS_I18N_KEY static map, use t('statuses.*').
+ *
+ * [FIX C3] The "Suivre en direct" CTA is now gated on the mission having valid
+ * coordinates (hasValidSiteCoords). A mission created without geocoded lat/lng
+ * previously passed undefined into LiveTrackingScreen → broken Leaflet map.
+ * goToLiveTracking() additionally re-checks before navigating.
  */
 import React, { useEffect, useCallback, useState } from 'react';
 import {
@@ -44,6 +49,20 @@ import type { Application, MissionStackParamList } from '@models/index';
 type Props = NativeStackScreenProps<MissionStackParamList, 'BookingDetail'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+/**
+ * [FIX C3] True only when a lat/lng pair is present, finite, in range, and not
+ * the (0,0) null-island sentinel. Used to gate the live-tracking CTA so we never
+ * launch LiveTrackingScreen with coordinates that produce a broken map or a
+ * false geofence breach.
+ */
+function hasValidCoords(lat: unknown, lng: unknown): boolean {
+  return (
+    typeof lat === 'number' && isFinite(lat) && Math.abs(lat) <= 90 &&
+    typeof lng === 'number' && isFinite(lng) && Math.abs(lng) <= 180 &&
+    !(lat === 0 && lng === 0)
+  );
+}
 
 
 /**
@@ -99,6 +118,11 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const goToLiveTracking = () => {
     if (!booking?.mission || !booking.agent) return;
+    // [FIX C3] Refuse to open tracking without valid site coordinates.
+    if (!hasValidCoords(booking.mission.latitude, booking.mission.longitude)) {
+      toast.warning(i18n.t('common:check_connection'), { title: i18n.t('common:map_unavailable') });
+      return;
+    }
     (navigation as any).navigate('LiveTracking', {
       missionId:      booking.missionId,
       bookingId:      booking.id,
@@ -151,6 +175,9 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const hasRating    = Boolean((booking as any).rating);
   const applications = booking.applications ?? [];
   const pendingApps  = applications.filter(a => a.status === 'PENDING');
+
+  // [FIX C3] Only show the live-tracking CTA when the mission has usable coords.
+  const canTrackLive = hasValidCoords(booking.mission?.latitude, booking.mission?.longitude);
 
   const checkinPhotos  = [booking.checkinPhotoUrl,  booking.checkinPhotoUrl2].filter(Boolean) as string[];
   const checkoutPhotos = [booking.checkoutPhotoUrl, booking.checkoutPhotoUrl2].filter(Boolean) as string[];
@@ -231,7 +258,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 </View>
               </View>
             </View>
-            {isInProgress && (
+            {isInProgress && canTrackLive && (
               <TouchableOpacity style={styles.trackingBtn} onPress={goToLiveTracking} accessibilityRole="button" accessibilityLabel={t('agent.follow_live')}>
                 <MapPin size={15} color="#FFF" strokeWidth={2} />
                 <Text style={styles.trackingBtnTxt}>{t('agent.follow_live')}</Text>
@@ -391,39 +418,6 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           <Text style={lightbox.caption}>{t('photos.caption', { name: booking?.agent?.fullName ?? '' })}</Text>
         </View>
       </Modal>
-
-      {/* ── Modal sélection agent ──────────────────────────────── */}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       {/* ── Modal incident ─────────────────────────────────────── */}
       <Modal visible={showIncidentModal} transparent animationType="slide">
@@ -621,4 +615,3 @@ const styles = StyleSheet.create({
   autoAssignNote: { paddingHorizontal: spacing[3], paddingVertical: spacing[2], backgroundColor: colors.infoSurface, borderRadius: radius.lg },
   autoAssignText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.info },
 });
-

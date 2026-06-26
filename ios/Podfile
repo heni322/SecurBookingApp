@@ -5,8 +5,25 @@ require Pod::Executable.execute_command('node', ['-p',
     {paths: [process.argv[1]]},
   )', __dir__]).strip
 
+# [FIX H2] react-native-permissions setup. v3+/v5 require each permission handler
+# to be explicitly compiled in via setup_permissions(); without this, calls like
+# check(PERMISSIONS.IOS.LOCATION_WHEN_IN_USE) resolve to RESULTS.UNAVAILABLE on
+# iOS and the "Locate me" button silently does nothing. We enable only the
+# handlers the CLIENT app actually uses (foreground location, camera, photo
+# library, Face ID, notifications) — never LocationAlways (see Info.plist H1).
+require File.join(File.dirname(`node --print "require.resolve('react-native-permissions/package.json')"`), "scripts/setup")
+
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
+
+setup_permissions([
+  'LocationWhenInUse',
+  'Camera',
+  'PhotoLibrary',
+  'PhotoLibraryAddOnly',
+  'FaceID',
+  'Notifications',
+])
 
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil

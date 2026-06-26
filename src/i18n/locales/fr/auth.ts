@@ -81,6 +81,10 @@ const auth: AuthNS = {
     sentBody: "Un nouveau lien de confirmation vient de vous être envoyé. Pensez à vérifier vos spams.",
     errorTitle: "Envoi impossible",
     errorBody: "Impossible d'envoyer l'email pour le moment. Réessayez dans un instant.",
+    blockedTitle: "Vérification de l'email requise",
+    blockedBody: "Vous devez confirmer votre adresse email avant de pouvoir payer. Renvoyer le lien de confirmation ?",
+    resendCta: "Renvoyer l'email",
+    cancelCta: "Pas maintenant",
   },
   phoneVerification: {
     cardTitle: "Vérifiez votre numéro de téléphone",

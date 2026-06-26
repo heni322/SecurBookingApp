@@ -5,22 +5,55 @@
  *   onInteractionChange(true)  -> map unlocked  -> parent ScrollView sets scrollEnabled=false
  *   onInteractionChange(false) -> map re-locked -> parent ScrollView sets scrollEnabled=true
  * This gives Leaflet full ownership of vertical pan gestures when active.
+ *
+ * [FIX H2] Location permission handling now uses react-native-permissions on
+ * BOTH platforms via check()/request()/openSettings(), instead of the old
+ * Android-only PermissionsAndroid.request() with no recovery path. When the OS
+ * has permanently blocked the permission (Android "Don't ask again" / iOS denied
+ * in Settings), we surface a confirm dialog that deep-links to system Settings
+ * so the user can actually re-grant — previously this was a silent dead end.
+ *
+ * [FIX H2b] iOS shows its system prompt exactly once per install -- a user
+ * who dismisses it without understanding why we're asking has no second
+ * chance, only the BLOCKED dead-end above. We now show a custom rationale
+ * dialog (perm_title/perm_message) BEFORE triggering the system prompt, but
+ * only on iOS and only the first time (status === DENIED, i.e. not yet
+ * decided). Android's system dialog already carries clear, re-askable
+ * permission text, so no extra screen is added there.
+ *
+ * [FIX H3] Rebuilt on the shared <LeafletMapView> shell: Leaflet's JS/CSS are
+ * inlined from the bundle instead of fetched from unpkg at runtime, and this
+ * picker gains real error/retry UI for the first time — previously a stalled
+ * Leaflet load just left the "loading…" spinner running forever with no way
+ * out short of leaving the screen. The old WebView onLoad fallback (which
+ * flipped mapReady even if the 'ready' postMessage never arrived) is removed:
+ * it existed to paper over a slow/failed <script src> fetch, which can no
+ * longer happen now that Leaflet ships inline in the HTML string itself —
+ * the IIFE that calls signalReady() runs synchronously once the WebView
+ * parses the document, with no separate network round-trip in between.
  */
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from '@i18n';
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
-  StyleSheet, Animated, Platform, PermissionsAndroid,
+  StyleSheet, Animated, Platform,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
 import Geolocation from '@react-native-community/geolocation';
+import {
+  check, request, openSettings,
+  PERMISSIONS, RESULTS,
+  type Permission, type PermissionStatus,
+} from 'react-native-permissions';
 import { MapPin, Navigation, Check, Unlock, X } from 'lucide-react-native';
 import { useToast } from '@hooks/useToast';
-import axios from 'axios';
+import { useConfirmDialog } from '@hooks/useConfirmDialog';
+import { geocodingApi } from '@api/endpoints/geocoding';
+import { config } from '@config';
 import { colors, palette } from '@theme/colors';
 import { spacing, radius }      from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { LeafletMapView, type LeafletMapViewHandle } from './LeafletMapView';
 
 interface Coords { latitude: number; longitude: number }
 
@@ -31,48 +64,38 @@ interface Props {
   onInteractionChange?: (active: boolean) => void;
 }
 
-const NOMINATIM = 'https://nominatim.openstreetmap.org/reverse';
-// ---------------------------------------------------------------------------
-//  Leaflet HTML
-// ---------------------------------------------------------------------------
-function buildLeafletHTML(lat?: number, lng?: number): string {
-  const hasPin    = lat != null && lng != null;
-  const centerLat = hasPin ? lat  : 46.6034;
-  const centerLng = hasPin ? lng  : 1.8883;
-  const zoom      = hasPin ? 14   : 6;
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  html,body,#map{width:100%;height:100%;background:#071e38;}
-  .leaflet-control-attribution{display:none!important;}
-  .leaflet-control-zoom a{background:#0d2a45!important;color:#bc933b!important;border-color:#1e2d45!important;transition:background .15s,color .15s;}
-  .leaflet-control-zoom a:hover{background:#1a3d5e!important;color:#d4a84b!important;}
-  .leaflet-tile{transition:opacity .25s ease!important;}
-  .leaflet-marker-icon{transition:transform .18s cubic-bezier(.25,.8,.25,1)!important;}
+/** Foreground location permission for the active platform. */
+const LOCATION_PERMISSION: Permission = Platform.select({
+  ios:     PERMISSIONS.IOS.LOCATION_WHEN_IN_USE,
+  android: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
+  default: PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION,
+});
+
+// ---------------------------------------------------------------------------
+//  Leaflet body script (runs once Leaflet + the map instance are ready)
+// ---------------------------------------------------------------------------
+const PICKER_EXTRA_STYLE = `
   .pin-outer{width:40px;height:40px;position:relative;display:flex;align-items:center;justify-content:center;}
   .pin-circle{width:36px;height:36px;background:linear-gradient(135deg,#d4a84b,#bc933b);border-radius:50%;border:3px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.5),0 0 0 4px rgba(188,147,59,.25);}
   .pin-circle svg{pointer-events:none;}
   @keyframes ripple{from{transform:scale(.6);opacity:.7;}to{transform:scale(2.2);opacity:0;}}
   .pin-ripple{position:absolute;width:36px;height:36px;border-radius:50%;background:rgba(188,147,59,.35);animation:ripple .55s ease-out forwards;pointer-events:none;}
-</style>
-</head>
-<body>
-<div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-(function(){
-  var map=L.map('map',{
-    zoomControl:false,
-    inertia:true,inertiaDeceleration:2000,easeLinearity:.20,
-    zoomAnimation:true,markerZoomAnimation:true,fadeAnimation:true,
-  }).setView([${centerLat},${centerLng}],${zoom});
+  .leaflet-tile{transition:opacity .25s ease!important;}
+  .leaflet-marker-icon{transition:transform .18s cubic-bezier(.25,.8,.25,1)!important;}
+`;
+
+function buildPickerBodyScript(
+  lat: number | undefined,
+  lng: number | undefined,
+  tileUrl: string,
+): string {
+  const hasPin = lat != null && lng != null;
+
+  return `
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'',keepBuffer:4}).addTo(map);
+  L.tileLayer('${tileUrl}',{maxZoom:19,attribution:'',keepBuffer:4}).addTo(map);
+
   function makeIcon(r){
     var svg='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
     return L.divIcon({
@@ -100,12 +123,10 @@ function buildLeafletHTML(lat?: number, lng?: number): string {
     if(marker){ setTimeout(place,350); } else { setTimeout(function(){ marker=L.marker([lt,ln],{icon:makeIcon(true),draggable:true}).addTo(map); attachDrag(marker); setTimeout(function(){marker.setIcon(makeIcon(false));},600); },350); }
     send('coords',{lat:lt,lng:ln});
   };
-  send('ready');
-})();
-</script>
-</body>
-</html>`;
+  signalReady();
+  `;
 }
+
 // ---------------------------------------------------------------------------
 //  Component
 // ---------------------------------------------------------------------------
@@ -114,8 +135,8 @@ export const MapLocationPicker: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation('map_picker');
   const toast    = useToast();
-  const webRef   = useRef<WebView>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const confirm  = useConfirmDialog();
+  const mapRef   = useRef<LeafletMapViewHandle>(null);
   const lockAnim = useRef(new Animated.Value(1)).current;
 
   const [marker,     setMarker]     = useState<Coords | null>(
@@ -131,40 +152,26 @@ export const MapLocationPicker: React.FC<Props> = ({
   const reverseGeocode = useCallback(async (lat: number, lon: number) => {
     setLoadingGeo(true); setAddress(null);
     try {
-      const res = await axios.get(NOMINATIM, {
-        params:  { lat, lon, format: 'json', 'accept-language': 'fr' },
-        headers: { 'User-Agent': 'SecurBook/1.0' },
-      });
-      const d = res.data?.address ?? {};
-      const parts = [
-        d.house_number && d.road ? `${d.house_number} ${d.road}` : d.road,
-        d.postcode,
-        d.city ?? d.town ?? d.village,
-      ].filter(Boolean);
-      setAddress(parts.join(', ') || res.data?.display_name?.split(',').slice(0,3).join(',') || null);
+      // Backend proxies the official IGN Géoplateforme / BAN reverse endpoint.
+      const res = await geocodingApi.reverseGeocode(lat, lon);
+      const r = res.data.data;
+      // Prefer the BAN short street-level name, fall back to the full label.
+      setAddress(r?.shortName || r?.displayName || null);
     } catch { setAddress(null); } finally { setLoadingGeo(false); }
   }, []);
 
+  // The shell already intercepts 'ready' for its own loading/error chrome;
+  // this onMessage only needs to handle this screen's own message type.
   const handleMessage = useCallback((event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
-      if (msg.type === 'ready') {
-        setMapReady(true);
-        Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-      } else if (msg.type === 'coords') {
+      if (msg.type === 'coords') {
         const coords = { latitude: msg.lat, longitude: msg.lng };
         setMarker(coords); setConfirmed(false);
         reverseGeocode(msg.lat, msg.lng);
       }
     } catch { /* ignore */ }
-  }, [fadeAnim, reverseGeocode]);
-
-  const handleLoad = useCallback(() => {
-    if (!mapReady) {
-      setMapReady(true);
-      Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start();
-    }
-  }, [fadeAnim, mapReady]);
+  }, [reverseGeocode]);
 
   const unlock = useCallback(() => {
     setLocked(false);
@@ -183,31 +190,14 @@ export const MapLocationPicker: React.FC<Props> = ({
     setConfirmed(true); onSelect(marker, address ?? undefined); lock();
   }, [marker, address, onSelect, lock]);
 
-  const handleLocateMe = useCallback(async () => {
-    if (!mapReady) return;
-
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-        {
-          title:   t('perm_title'),
-          message: t('perm_message'),
-          buttonPositive: t('perm_allow'),
-          buttonNegative: t('perm_cancel'),
-        },
-      );
-      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-        toast.warning(t('perm_settings_hint'), { title: t('perm_denied_title') });
-        return;
-      }
-    }
-
+  // ── [FIX H2] Read the current GPS fix once permission is confirmed granted ──
+  const runGeolocation = useCallback(() => {
     setLocating(true);
     Geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lt, longitude: ln } = pos.coords;
         setLocating(false);
-        webRef.current?.injectJavaScript(`window.setMarker(${lt},${ln});true;`);
+        mapRef.current?.inject(`window.setMarker(${lt},${ln});`);
       },
       (err) => {
         const msg =
@@ -219,8 +209,92 @@ export const MapLocationPicker: React.FC<Props> = ({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
     );
-  }, [mapReady, toast]);
-  const html = buildLeafletHTML(latitude, longitude);
+  }, [t, toast]);
+
+  // ── [FIX H2] Offer to deep-link into system Settings when blocked ──────────
+  const promptOpenSettings = useCallback(async () => {
+    const ok = await confirm({
+      title:        t('perm_blocked_title'),
+      message:      t('perm_blocked_body'),
+      confirmLabel: t('perm_open_settings'),
+      cancelLabel:  t('perm_cancel'),
+    });
+    if (ok) {
+      try { await openSettings(); } catch { /* some OEMs throw — best effort */ }
+    }
+  }, [confirm, t]);
+
+  // ── [FIX H2b] iOS-only pre-permission rationale, shown once before the
+  // system prompt fires. Returns true if the user wants to proceed to the
+  // OS dialog, false if they cancelled (in which case we stop — no request()
+  // call, so the one-shot iOS prompt is preserved for a moment the user
+  // actually expects it).
+  const promptRationale = useCallback(async () => {
+    const ok = await confirm({
+      title:        t('perm_title'),
+      message:      t('perm_message'),
+      confirmLabel: t('perm_allow'),
+      cancelLabel:  t('perm_cancel'),
+    });
+    return ok;
+  }, [confirm, t]);
+
+  const handleLocateMe = useCallback(async () => {
+    if (!mapReady) return;
+
+    try {
+      // 1. Check the current authorization status first.
+      let status: PermissionStatus = await check(LOCATION_PERMISSION);
+
+      // 2. If not yet decided, show our own rationale FIRST on iOS — the
+      //    system prompt only fires once per install, so we want the user's
+      //    one shot at it to land with context, not a surprise dialog.
+      //    Android's system dialog is already clear and re-askable, so we
+      //    skip straight to request() there (matches original H2 behaviour).
+      if (status === RESULTS.DENIED) {
+        if (Platform.OS === 'ios') {
+          const proceed = await promptRationale();
+          if (!proceed) return;
+        }
+        status = await request(LOCATION_PERMISSION);
+      }
+
+      // 3. Branch on the resolved status.
+      switch (status) {
+        case RESULTS.GRANTED:
+        case RESULTS.LIMITED:
+          runGeolocation();
+          return;
+
+        case RESULTS.BLOCKED:
+          // Permanently denied (Android "Don't ask again" / iOS Settings).
+          await promptOpenSettings();
+          return;
+
+        case RESULTS.UNAVAILABLE:
+          toast.warning(t('perm_unavailable'), { title: t('locate_failed_title') });
+          return;
+
+        case RESULTS.DENIED:
+        default:
+          // User dismissed the prompt this time — soft denial, no settings link.
+          toast.warning(t('perm_settings_hint'), { title: t('perm_denied_title') });
+          return;
+      }
+    } catch {
+      toast.error(t('timeout_retry'), { title: t('locate_failed_title') });
+    }
+  }, [mapReady, runGeolocation, promptOpenSettings, promptRationale, toast, t]);
+
+  const tileUrl = config.maps.tileUrlTemplate;
+  const bodyScript = useMemo(
+    () => buildPickerBodyScript(latitude, longitude, tileUrl),
+    [latitude, longitude, tileUrl],
+  );
+
+  const initialZoom = latitude != null && longitude != null ? 14 : 6;
+  const centerLat = latitude ?? 46.6034; // France centroid fallback
+  const centerLng = longitude ?? 1.8883;
 
   return (
     <View style={styles.wrapper}>
@@ -228,33 +302,24 @@ export const MapLocationPicker: React.FC<Props> = ({
       <Text style={styles.hint}>{t('hint')}</Text>
 
       <View style={styles.mapContainer}>
-        {!mapReady && (
-          <View style={styles.mapLoading}>
-            <ActivityIndicator color={colors.primary} size="large" />
-            <Text style={styles.mapLoadingText}>{t('loading')}</Text>
-          </View>
-        )}
-
-        <Animated.View style={[styles.webViewWrap, { opacity: fadeAnim }]}>
-          <WebView
-            ref={webRef}
-            source={{ html }}
-            style={styles.map}
+        <View
+          style={StyleSheet.absoluteFill}
+          pointerEvents={locked ? 'none' : 'auto'}
+        >
+          <LeafletMapView
+            ref={mapRef}
+            centerLat={centerLat}
+            centerLng={centerLng}
+            initialZoom={initialZoom}
+            zoomControl={false}
+            dragging
+            bodyScript={bodyScript}
+            extraStyle={PICKER_EXTRA_STYLE}
             onMessage={handleMessage}
-            onLoad={handleLoad}
-            javaScriptEnabled
-            domStorageEnabled
-            scrollEnabled={false}
-            bounces={false}
-            overScrollMode="never"
-            originWhitelist={['*']}
-            mixedContentMode="always"
-            allowUniversalAccessFromFileURLs
-            allowFileAccess
-            nestedScrollEnabled={false}
-            pointerEvents={locked ? 'none' : 'auto'}
+            onReady={() => setMapReady(true)}
+            onMapError={() => setMapReady(false)}
           />
-        </Animated.View>
+        </View>
 
         <Animated.View
           style={[styles.lockOverlay, { opacity: lockAnim }]}
@@ -322,11 +387,7 @@ const styles = StyleSheet.create({
   wrapper:          { marginBottom: spacing[3] },
   label:            { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   hint:             { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted, marginTop: spacing[1], marginBottom: spacing[2] },
-  mapContainer:     { height: 300, borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundElevated },
-  webViewWrap:      { flex: 1 },
-  map:              { flex: 1, backgroundColor: 'transparent' },
-  mapLoading:       { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: spacing[3], zIndex: 10, backgroundColor: colors.backgroundElevated },
-  mapLoadingText:   { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
+  mapContainer:     { height: 300, borderRadius: radius.xl, overflow: 'hidden', borderWidth: 1, borderColor: colors.border, backgroundColor: colors.backgroundElevated, position: 'relative' },
   lockOverlay:      { ...StyleSheet.absoluteFillObject, zIndex: 30 },
   lockOverlayInner: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: spacing[4] },
   lockPill: {

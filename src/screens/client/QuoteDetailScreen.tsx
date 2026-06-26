@@ -6,6 +6,15 @@
  * Now it fetches the mission to get booking lines, calls POST /quotes/calculate
  * (the backend upserts — replacing the expired quote with a fresh PENDING one),
  * then calls load() to display the renewed quote.
+ *
+ * FIX (payment blocked by unverified email): handlePay previously surfaced
+ * the backend's 403 only as a generic toast after the user had already gone
+ * through quote review + method selection + tap-to-pay. Now: (1) a proactive
+ * banner warns before the user reaches the pay button if their email is not
+ * verified yet (consistent with EmailVerificationBanner on HomeScreen), and
+ * (2) the 403 handler branches on the backend stable error key field
+ * (auth.errors.email_not_verified) to offer an inline resend instead of a
+ * dead-end error message.
  */
 import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
@@ -26,6 +35,11 @@ import { fontSize, fontFamily }    from '@theme/typography';
 import type { MissionStackParamList, Booking, Mission } from '@models/index';
 import { useTranslation } from '@i18n';
 import { useToast } from '@hooks/useToast';
+import { useConfirmDialog } from '@hooks/useConfirmDialog';
+import { useAuthStore } from '@store/authStore';
+import { authApi } from '@api/endpoints/auth';
+import { API_ERROR_KEYS } from '@constants/apiErrorKeys';
+import { EmailVerificationBanner } from '@components/domain/EmailVerificationBanner';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'QuoteDetail'>;
 
@@ -61,7 +75,10 @@ function buildBookingLines(bookings: Booking[]): Array<{
 export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }     = useTranslation('quote');
   const { t: tc } = useTranslation('common');
-  const toast     = useToast();
+  const toast      = useToast();
+  const confirm    = useConfirmDialog();
+  const { t: ta }  = useTranslation('auth');
+  const user       = useAuthStore((s) => s.user);
 
   const { missionId }                     = route.params;
   const { data: quote, loading, execute } = useApi(quotesApi.getByMission);
@@ -177,7 +194,30 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         intentType:    intent.type as 'payment_intent' | 'setup_intent',
       });
     } catch (err: unknown) {
-      toast.error((err as any)?.response?.data?.message ?? t('error_pay'), { title: tc('error') });
+      const errKey = (err as any)?.response?.data?.key;
+      const errMsg  = (err as any)?.response?.data?.message;
+
+      // FIX: branch on the stable error key (never on message text) to offer
+      // an inline resend instead of a dead-end toast when payment is blocked
+      // by an unverified email.
+      if (errKey === API_ERROR_KEYS.EMAIL_NOT_VERIFIED && user?.email) {
+        const wantsResend = await confirm({
+          title:        ta('emailVerification.blockedTitle'),
+          message:      ta('emailVerification.blockedBody'),
+          confirmLabel: ta('emailVerification.resendCta'),
+          cancelLabel:  ta('emailVerification.cancelCta'),
+        });
+        if (wantsResend) {
+          try {
+            await authApi.resendVerification({ email: user.email });
+            toast.success(ta('emailVerification.sentBody'), { title: ta('emailVerification.sentTitle') });
+          } catch {
+            toast.error(ta('emailVerification.errorBody'), { title: ta('emailVerification.errorTitle') });
+          }
+        }
+      } else {
+        toast.error(errMsg ?? t('error_pay'), { title: tc('error') });
+      }
     } finally {
       setPaying(false);
     }
@@ -197,6 +237,11 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <EmptyState Icon={FileText} title={t('empty_title')} subtitle={t('empty_subtitle')} />
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+          {/* FIX: proactive warning before the user reaches the pay button,
+              consistent with EmailVerificationBanner on HomeScreen. Renders
+              nothing once the email is verified. */}
+          <EmailVerificationBanner />
 
           {/* FIX: expired banner — button now calls handleRecalculate */}
           {isExpired && quote.status === 'PENDING' && (

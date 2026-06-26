@@ -1,6 +1,33 @@
 /**
  * formatters.ts — utilitaires de formatage SecurBook (client app)
+ *
+ * [FIX H5] Locale awareness. Every Intl formatter previously hardcoded 'fr-FR',
+ * so an English-language user still saw French-formatted dates, times and
+ * distances (including the LiveTracking "last seen" label and distance badges).
+ * We now resolve the active locale from i18n at call time via activeLocale(),
+ * falling back to 'fr-FR' when i18n is unavailable (e.g. unit tests). Currency
+ * stays EUR regardless of language because the business operates in euros.
  */
+import i18n from '@i18n';
+
+/** Map the active i18n language ('fr' | 'en' | …) to a BCP-47 locale tag. */
+const LOCALE_BY_LANG: Record<string, string> = {
+  fr: 'fr-FR',
+  en: 'en-GB',
+};
+
+/**
+ * Resolve the BCP-47 locale for Intl from the active i18n language.
+ * Defensive: i18n may not be initialised in some test contexts.
+ */
+const activeLocale = (): string => {
+  try {
+    const lang = (i18n?.language ?? 'fr').split('-')[0];
+    return LOCALE_BY_LANG[lang] ?? 'fr-FR';
+  } catch {
+    return 'fr-FR';
+  }
+};
 
 /**
  * Coerce a value to a finite number, or `null` if not coercible.
@@ -17,14 +44,14 @@ const toFinite = (v: unknown): number | null => {
 };
 
 /** Formate un montant en centimes → "1 250,00 €". Returns "—" for non-finite input. */
-export const formatCurrency = (cents: number, currency = 'EUR', locale = 'fr-FR'): string => {
+export const formatCurrency = (cents: number, currency = 'EUR', locale = activeLocale()): string => {
   const n = toFinite(cents);
   if (n === null) return '—';
   return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 2 }).format(n / 100);
 };
 
 /** Formate directement des euros → "125,50 €" (pour les montants déjà en €, ex: quotes, payouts). Returns "—" for non-finite input. */
-export const formatEuros = (euros: number, locale = 'fr-FR'): string => {
+export const formatEuros = (euros: number, locale = activeLocale()): string => {
   const n = toFinite(euros);
   if (n === null) return '—';
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 }).format(n);
@@ -34,7 +61,7 @@ export const formatEuros = (euros: number, locale = 'fr-FR'): string => {
 export const formatRate = (euroPerHour: number): string => {
   const n = toFinite(euroPerHour);
   if (n === null) return '—';
-  return `${new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €/h`;
+  return `${new Intl.NumberFormat(activeLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)} €/h`;
 };
 
 const safeDate = (v: string | Date | number | null | undefined): Date | null => {
@@ -47,28 +74,29 @@ const safeDate = (v: string | Date | number | null | undefined): Date | null => 
 export const formatDate = (v: string | Date | null | undefined): string => {
   const d = safeDate(v);
   return d
-    ? new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+    ? new Intl.DateTimeFormat(activeLocale(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
     : '—';
 };
 
 /** Date ISO → "26/03/2026" */
 export const formatDateShort = (v: string | Date | null | undefined): string => {
   const d = safeDate(v);
-  return d ? new Intl.DateTimeFormat('fr-FR').format(d) : '—';
+  return d ? new Intl.DateTimeFormat(activeLocale()).format(d) : '—';
 };
 
 /** Heure ISO, Date ou timestamp → "14:30" */
 export const formatTime = (v: string | Date | number | null | undefined): string => {
   const d = safeDate(v);
-  return d ? new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(d) : '—';
+  return d ? new Intl.DateTimeFormat(activeLocale(), { hour: '2-digit', minute: '2-digit' }).format(d) : '—';
 };
 
 /** "26/03 · 08:00 → 16:00" */
 export const formatMissionRange = (startAt: string, endAt: string): string => {
   const s = new Date(startAt), e = new Date(endAt);
-  const date = new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit' }).format(s);
-  const st   = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(s);
-  const en   = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(e);
+  const loc = activeLocale();
+  const date = new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit' }).format(s);
+  const st   = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(s);
+  const en   = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(e);
   return `${date} · ${st} → ${en}`;
 };
 
@@ -88,4 +116,4 @@ export const getInitials = (fullName: string | null | undefined): string => {
 
 /** Distance en km → "4,2 km" */
 export const formatDistance = (km: number): string =>
-  `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(km)} km`;
+  `${new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 1 }).format(km)} km`;

@@ -26,10 +26,7 @@ const shared = {
   appName: 'Provalk',
   appVersion: '1.0.0',
   maps: {
-    nominatimUrl: 'https://nominatim.openstreetmap.org/search',
     tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    geocodeCountryCodes: 'fr',
-    nominatimUserAgent: 'Provalk/1.0 (+https://securbooking.com)',
   },
   cache: {
     staleShortMs: 2 * 60 * 1000,

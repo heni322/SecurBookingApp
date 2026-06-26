@@ -26,14 +26,9 @@ export interface ApiConfig {
 }
 
 export interface MapsConfig {
-  /** OSM Nominatim geocoding/search endpoint. */
-  readonly nominatimUrl: string;
   /** Raster tile template, {z}/{x}/{y}. */
   readonly tileUrlTemplate: string;
   /** Default country restriction for address search (ISO-3166 alpha-2). */
-  readonly geocodeCountryCodes: string;
-  /** User-Agent string Nominatim's usage policy requires. */
-  readonly nominatimUserAgent: string;
 }
 
 /** Cache freshness windows (ms) consumed by the React Query client. */

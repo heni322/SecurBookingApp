@@ -81,6 +81,10 @@ const auth: AuthNS = {
     sentBody: "A new confirmation link has just been sent to you. Remember to check your spam folder.",
     errorTitle: "Could not send",
     errorBody: "We couldn't send the email right now. Please try again in a moment.",
+    blockedTitle: "Email verification required",
+    blockedBody: "You need to confirm your email address before you can pay. Resend the confirmation link?",
+    resendCta: "Resend email",
+    cancelCta: "Not now",
   },
   phoneVerification: {
     cardTitle: "Verify your phone number",

@@ -14,6 +14,8 @@ export { Separator }          from './Separator';
 export { AddressSearch }      from './AddressSearch';
 export { MapLocationPicker }  from './MapLocationPicker';
 export { MissionMapView }     from './MissionMapView';
+export { LeafletMapView }     from './LeafletMapView';
+export type { LeafletMapViewHandle, LeafletMapViewProps } from './LeafletMapView';
 export { DateTimePicker }     from './DateTimePicker';
 export { SearchBar }          from './SearchBar';
 export { FilterBar }          from './FilterBar';

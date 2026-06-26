@@ -29,10 +29,10 @@ describe('@config', () => {
     expect(config.cache.staleMediumMs).toBeLessThan(config.cache.staleLongMs);
   });
 
-  it('exposes maps endpoints and a descriptive Nominatim User-Agent', () => {
-    expect(config.maps.nominatimUrl).toMatch(/^https:\/\//);
+  it('exposes the OSM tile URL template', () => {
+    // Geocoding moved to the backend (BAN/Géoplateforme); the app only keeps the
+    // tile URL template for the Leaflet map layer.
     expect(config.maps.tileUrlTemplate).toContain('{z}/{x}/{y}');
-    expect(config.maps.nominatimUserAgent.length).toBeGreaterThan(0);
   });
 
   it('is deeply frozen (immutable at the top level)', () => {

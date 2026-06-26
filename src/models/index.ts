@@ -15,6 +15,15 @@ export interface ApiError {
   message:    string;
   statusCode: number;
   errors?:    Record<string, string[]>;
+  /**
+   * [FIX] Stable, locale-independent error identifier the backend sends
+   * alongside the already-localised `message` (e.g.
+   * 'auth.errors.email_not_verified'). Branch on this, not on `message` text,
+   * when the client needs to react differently to a specific error condition
+   * (e.g. offering to resend a verification email) rather than just display it.
+   */
+  key?:       string;
+  args?:      Record<string, unknown>;
 }
 
 // -----------------------------------------------------------------------------

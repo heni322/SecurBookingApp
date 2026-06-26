@@ -1,4 +1,4 @@
-/**
+﻿/**
  * locales/types.ts — Complete namespace shape definitions.
  * Both EN and FR implement these interfaces — no literal-type cross-lock.
  */
@@ -84,6 +84,7 @@ export interface AuthNS {
   emailVerification: {
     bannerTitle: string; bannerBody: string; resendButton: string;
     sentTitle: string; sentBody: string; errorTitle: string; errorBody: string;
+    blockedTitle: string; blockedBody: string; resendCta: string; cancelCta: string;
   };
   phoneVerification: {
     cardTitle: string; cardBody: string; verifyButton: string;
@@ -463,7 +464,10 @@ export interface AccountNS {
   edit: {
     title: string; avatar_hint: string; full_name_label: string; phone_label: string;
     full_name_placeholder: string; phone_placeholder: string;
+    first_name_label: string; last_name_label: string;
+    first_name_placeholder: string; last_name_placeholder: string;
     name_required_title: string; name_required_body: string;
+    phone_invalid_title: string; phone_invalid_body: string;
     save: string; saved: string; error: string;
   };
   delete: {
@@ -551,8 +555,10 @@ export interface TrackingNS {
   map_loading: string;
   in_zone: string; out_of_zone: string;
   follow_agent_btn: string; view_site_btn: string; sync_btn: string;
-  last_seen: string; attribution: string;
+  last_seen: string; updated_ago_s: string; zone_unknown: string; attribution: string;
   recenter_a11y: string; close_a11y: string;
+  en_route: string; track_btn: string;
+  eta_label: string; eta_arriving: string; eta_calculating: string;
 }
 
 export interface ConversationNS {
@@ -580,6 +586,8 @@ export interface MapPickerNS {
   perm_title: string; perm_message: string; perm_allow: string; perm_cancel: string;
   perm_settings_hint: string; perm_denied_title: string; perm_denied: string;
   position_unavailable: string; timeout_retry: string; locate_failed_title: string;
+  perm_blocked_title: string; perm_blocked_body: string; perm_open_settings: string;
+  perm_unavailable: string;
 }
 
 export interface AnalyticsNS {

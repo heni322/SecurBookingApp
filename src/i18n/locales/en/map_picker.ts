@@ -17,6 +17,10 @@ const map_picker: MapPickerNS = {
   position_unavailable: 'Position not found. Check that GPS is enabled.',
   timeout_retry:        'Request timed out. Please try again.',
   locate_failed_title:  'Location failed',
+  perm_blocked_title:   'Location is turned off',
+  perm_blocked_body:    'Location access is disabled for Provalk. Open Settings to enable it, then try again.',
+  perm_open_settings:   'Open settings',
+  perm_unavailable:     'Location services are not available on this device.',
 };
 
 export default map_picker;

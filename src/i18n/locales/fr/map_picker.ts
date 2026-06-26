@@ -17,6 +17,10 @@ const map_picker: MapPickerNS = {
   position_unavailable: 'Position introuvable. Vérifiez que le GPS est activé.',
   timeout_retry:        'Délai dépassé. Réessayez.',
   locate_failed_title:  'Localisation impossible',
+  perm_blocked_title:   'Localisation désactivée',
+  perm_blocked_body:    "L'accès à la localisation est désactivé pour Provalk. Ouvrez les réglages pour l'activer, puis réessayez.",
+  perm_open_settings:   'Ouvrir les réglages',
+  perm_unavailable:     "Les services de localisation ne sont pas disponibles sur cet appareil.",
 };
 
 export default map_picker;
