@@ -9,7 +9,7 @@ import { resetToRoot }   from '@services/navigationRef';
 const API_BASE_URL = config.api.baseUrl;
 const DEBUG = config.features.debugLogging;
 
-// ─── Dev Logger ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Dev Logger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const TAG = '[API]';
 const log = {
   request: (cfg: InternalAxiosRequestConfig) => {
@@ -17,8 +17,8 @@ const log = {
     const method = cfg.method?.toUpperCase() ?? 'GET';
     const url    = `${cfg.baseURL ?? ''}${cfg.url ?? ''}`;
     const hasAuth = !!cfg.headers?.Authorization;
-    console.log(`\n${TAG} ➤ ${method} ${url}`);
-    console.log(`${TAG}   auth   : ${hasAuth ? '✅ Bearer token present' : '❌ no token'}`);
+    console.log(`\n${TAG} âž¤ ${method} ${url}`);
+    console.log(`${TAG}   auth   : ${hasAuth ? 'âœ… Bearer token present' : 'âŒ no token'}`);
     if (cfg.params)  console.log(`${TAG}   params : ${JSON.stringify(cfg.params)}`);
     if (cfg.data)    console.log(`${TAG}   body   : ${JSON.stringify(cfg.data)}`);
   },
@@ -26,7 +26,7 @@ const log = {
     if (!DEBUG) return;
     const method = res.config.method?.toUpperCase() ?? 'GET';
     const url    = `${res.config.baseURL ?? ''}${res.config.url ?? ''}`;
-    console.log(`\n${TAG} ✅ ${res.status} ${method} ${url}`);
+    console.log(`\n${TAG} âœ… ${res.status} ${method} ${url}`);
     console.log(`${TAG}   data   : ${JSON.stringify(res.data)}`);
   },
   error: (err: AxiosError) => {
@@ -35,17 +35,17 @@ const log = {
     const url     = `${err.config?.baseURL ?? ''}${err.config?.url ?? ''}`;
     const status  = err.response?.status ?? 'NO_RESPONSE';
     const message = (err.response?.data as any)?.message ?? err.message;
-    console.error(`\n${TAG} ❌ ${status} ${method} ${url}`);
+    console.error(`\n${TAG} âŒ ${status} ${method} ${url}`);
     console.error(`${TAG}   message: ${message}`);
     console.error(`${TAG}   data   : ${JSON.stringify(err.response?.data ?? null)}`);
     if (!err.response) {
-      console.error(`${TAG}   ⚠️  No response — check network, IP, or server is running`);
+      console.error(`${TAG}   âš ï¸  No response â€” check network, IP, or server is running`);
       console.error(`${TAG}   baseURL: ${err.config?.baseURL}`);
     }
   },
 };
 
-// ─── Axios Instance ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Axios Instance â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: config.api.timeoutMs,
@@ -55,7 +55,7 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// ─── Request interceptor — inject Bearer token + log ─────────────────────────
+// â”€â”€â”€ Request interceptor â€” inject Bearer token + log â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 apiClient.interceptors.request.use(
   (cfg: InternalAxiosRequestConfig) => {
     const token = tokenStorage.getAccessToken();
@@ -64,12 +64,12 @@ apiClient.interceptors.request.use(
     return cfg;
   },
   (err) => {
-    console.error(`${TAG} ❌ Request setup error:`, err);
+    console.error(`${TAG} âŒ Request setup error:`, err);
     return Promise.reject(err);
   },
 );
 
-// ─── Response interceptor — log + automatic token refresh on 401 ─────────────
+// â”€â”€â”€ Response interceptor â€” log + automatic token refresh on 401 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (token: string) => void;
@@ -83,10 +83,10 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
-// ─── Endpoints where a 401 is a DOMAIN error, not an expired session ─────────
+// â”€â”€â”€ Endpoints where a 401 is a DOMAIN error, not an expired session â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // For these, a 401 means "bad credentials / invalid or absent token" (login,
-// register, refresh, password reset, 2FA verify, availability checks) — NOT an
-// expired access token to silently recover from. Running the refresh→logout
+// register, refresh, password reset, 2FA verify, availability checks) â€” NOT an
+// expired access token to silently recover from. Running the refreshâ†’logout
 // cascade here would turn a simple wrong password into a forced logout.
 const NO_REFRESH_PATHS = [
   '/auth/login',
@@ -130,7 +130,7 @@ apiClient.interceptors.response.use(
 
       original._retry = true;
       isRefreshing    = true;
-      if (DEBUG) console.log(`${TAG} 🔄 Access token expired — attempting refresh...`);
+      if (DEBUG) console.log(`${TAG} ðŸ”„ Access token expired â€” attempting refresh...`);
 
       try {
         const refreshToken = tokenStorage.getRefreshToken();
@@ -155,15 +155,15 @@ apiClient.interceptors.response.use(
 
         // 4. Reconnect WebSocket with the fresh token.
         //    The socket connected during rehydrate() with the expired token
-        //    → the gateway's JwtService.verify() failed → `io server disconnect`.
+        //    â†’ the gateway's JwtService.verify() failed â†’ `io server disconnect`.
         //    Now we transparently reconnect with a valid JWT.
-        if (DEBUG) console.log(`${TAG} 🔌 Reconnecting WebSocket with fresh token...`);
+        if (DEBUG) console.log(`${TAG} ðŸ”Œ Reconnecting WebSocket with fresh token...`);
         socketService.reconnect(accessToken);
 
-        if (DEBUG) console.log(`${TAG} ✅ Token refreshed — retrying original request`);
+        if (DEBUG) console.log(`${TAG} âœ… Token refreshed â€” retrying original request`);
         return apiClient(original);
       } catch (refreshErr) {
-        console.error(`${TAG} ❌ Token refresh failed — logging out`, refreshErr);
+        console.error(`${TAG} âŒ Token refresh failed â€” logging out`, refreshErr);
         processQueue(refreshErr, null);
         useAuthStore.getState().logout();
         resetToRoot('Auth');
@@ -178,3 +178,36 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient;
+
+
+// =============================================================================
+// EXPORTED REFRESH HELPER  (added during enterprise migration)
+// =============================================================================
+// The axios interceptor above handles 401 refresh transparently for `apiClient`
+// requests. The uploadService, however, uses raw XHR for streaming multipart
+// uploads â€” it bypasses the interceptor and needs to refresh tokens directly
+// when an upload returns 401. This thin helper does *just* the HTTP call and
+// token-persistence dance â€” no queue draining, no socket reconnect â€” and lets
+// the uploader retry the request itself.
+//
+// Single-flight is provided by the calling site (uploadService keeps a
+// `didAuthRetry` flag); concurrent normal-request refreshes are still
+// serialised by the interceptor's `isRefreshing` gate.
+
+export async function refreshAccessToken(): Promise<string> {
+  const refreshToken = tokenStorage.getRefreshToken();
+  if (!refreshToken) {
+    throw new Error('No refresh token available');
+  }
+  const { data } = await axios.post(
+    `${API_BASE_URL}/auth/refresh`,
+    { refreshToken },
+    { headers: { Authorization: `Bearer ${refreshToken}` } },
+  );
+  const payload = (data as { data?: { accessToken: string; refreshToken: string } }).data
+                ?? (data as { accessToken: string; refreshToken: string });
+  const { accessToken, refreshToken: newRT } = payload;
+  tokenStorage.setTokens({ accessToken, refreshToken: newRT });
+  useAuthStore.setState({ accessToken });
+  return accessToken;
+}

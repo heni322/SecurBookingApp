@@ -1,5 +1,5 @@
 /**
- * RootNavigator — routeur principal basé sur l'état d'auth + onboarding.
+ * RootNavigator â€” routeur principal basÃ© sur l'Ã©tat d'auth + onboarding.
  */
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer }        from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { fcmService }      from '@services/fcmService';
 import { flushPendingNotification } from '@services/notificationRouter';
 import { AuthNavigator }   from './AuthNavigator';
 import { MainNavigator }   from './MainNavigator';
+import { PartnerNavigator } from './PartnerNavigator';
 import { LoadingState }    from '@components/ui/LoadingState';
 import i18n from '@i18n';
 import { OnboardingScreen, checkOnboardingDone } from '@screens/auth/OnboardingScreen';
@@ -19,7 +20,7 @@ import type { RootStackParamList } from '@models/index';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator: React.FC = () => {
-  const { isLoggedIn, isLoading } = useAuthStore();
+  const { isLoggedIn, isLoading, user } = useAuthStore();
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export const RootNavigator: React.FC = () => {
               {() => <OnboardingScreen onDone={() => setOnboardingDone(true)} />}
             </Stack.Screen>
           ) : isLoggedIn ? (
-            <Stack.Screen name="Main" component={MainNavigator} />
+            <Stack.Screen name="Main" component={user?.role === 'PARTNER' ? PartnerNavigator : MainNavigator} />
           ) : (
             <Stack.Screen name="Auth" component={AuthNavigator} />
           )}

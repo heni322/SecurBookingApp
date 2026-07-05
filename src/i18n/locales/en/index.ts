@@ -17,11 +17,13 @@ import services      from './services';
 import map_picker    from './map_picker';
 import analytics     from './analytics';
 import offline_banner from './offline_banner';
+import partner       from './partner';
 
 const en = {
   common, auth, home, missions, profile, navigation, notifications,
   quote, payment, account,
   booking, rating, dispute, tracking, conversation, services,
   map_picker, analytics, offline_banner,
+  partner,
 } as const;
 export default en;

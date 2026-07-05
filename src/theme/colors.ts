@@ -1,10 +1,10 @@
 /**
- * SecurBook Design System — Color Palette
+ * SecurBook Design System â€” Color Palette
  *
  * Token philosophy
- * ─────────────────
+ * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
  * Each status (success / danger / info / warning) has THREE roles:
- *   X            : the vivid foreground tone — readable on dark bg
+ *   X            : the vivid foreground tone â€” readable on dark bg
  *                   AND dark enough to read on the tinted X-Surface bg.
  *   X-Surface    : translucent tinted background for banners/cards.
  *   X-Dot        : the saturated solid fill for tiny indicators
@@ -38,9 +38,9 @@ export const palette = {
   uiRed:    '#e11d48',
 
   // -- Status text/icon tints (mid-saturation, readable on both dark + tinted) -
-  txtGreen:  '#34d399',  // emerald-400 — readable on dark AND on green tinted bg
+  txtGreen:  '#34d399',  // emerald-400 â€” readable on dark AND on green tinted bg
   txtPurple: '#a78bfa',  // violet-400
-  txtBlue:   '#60a5fa',  // blue-400 — same as uiBlue, intentional
+  txtBlue:   '#60a5fa',  // blue-400 â€” same as uiBlue, intentional
   txtRed:    '#f87171',  // red-400
 
   // -- Status background tints (translucent, for banners/cards) ----------------
@@ -49,6 +49,7 @@ export const palette = {
   bgBlue:    'rgba(96, 165, 250, 0.13)',
   bgRed:     'rgba(248, 113, 113, 0.13)',
   bgGold:    'rgba(188, 147, 59, 0.13)',
+  amberDim:    'rgba(188, 147, 59, 0.13)',
 
   // -- Status borders for tinted bgs -------------------------------------------
   borderGreen:  'rgba(52, 211, 153, 0.45)',
@@ -104,21 +105,27 @@ export const colors = {
   textInverse:   palette.bg,
   text:          palette.fg,
 
-  // -- Primary — Gold ------------------------------------------------------------
+  // -- Primary â€” Gold ------------------------------------------------------------
   primary:        palette.gold,
   primaryLight:   palette.goldTxt,
   primaryDark:    palette.goldDark,
   primarySurface: palette.bgGold,
   primaryGlow:    'rgba(188, 147, 59, 0.25)',
 
+  // -- Accent (alias of `info` â€” used by ported partner status helpers) ---------
+  // Mission/Booking/Payout PUBLISHED|OPEN|SCHEDULED states render in cool blue.
+  accent:         palette.txtBlue,
+  /** Tinted surface paired with `accent` text — for status banners. */
+  accentSurface:  palette.bgGold,
+
   // -- Status (success / danger / info / warning) -------------------------------
-  // text/icon foreground — readable on dark AND on the tinted surface
+  // text/icon foreground â€” readable on dark AND on the tinted surface
   success:        palette.txtGreen,
   danger:         palette.txtRed,
   info:           palette.txtBlue,
   warning:        palette.goldTxt,
 
-  // translucent bg for banners/badges — text uses success/danger/info/warning ON TOP
+  // translucent bg for banners/badges â€” text uses success/danger/info/warning ON TOP
   successSurface: palette.bgGreen,
   dangerSurface:  palette.bgRed,
   infoSurface:    palette.bgBlue,
@@ -130,7 +137,7 @@ export const colors = {
   infoBorder:     palette.borderBlue,
   warningBorder:  palette.borderGold,
 
-  // saturated solid fills — for tiny indicators (status dots, glow rings, online pulse)
+  // saturated solid fills â€” for tiny indicators (status dots, glow rings, online pulse)
   successDot:     palette.uiGreen,
   dangerDot:      palette.uiRed,
   infoDot:        palette.uiBlue,

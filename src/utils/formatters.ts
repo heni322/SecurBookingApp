@@ -117,3 +117,21 @@ export const getInitials = (fullName: string | null | undefined): string => {
 /** Distance en km → "4,2 km" */
 export const formatDistance = (km: number): string =>
   `${new Intl.NumberFormat(activeLocale(), { maximumFractionDigits: 1 }).format(km)} km`;
+
+
+// =============================================================================
+// toNumber — Decimal-safe numeric coercion (added during enterprise migration).
+// =============================================================================
+// Prisma's Decimal type serialises as a JSON string by default. The partner
+// + employment payloads pile up dozens of such fields (hourlyBrut, totalBrut,
+// employerCharges, payslip lines …). Run every Decimal field through
+// toNumber() before maths/formatting; never `Number(str)` because that fails
+// open on null and NaN.
+export const toNumber = (v: unknown): number => {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : 0;
+  if (typeof v === 'string') {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+};

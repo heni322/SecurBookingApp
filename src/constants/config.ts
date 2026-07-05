@@ -39,3 +39,10 @@ export const APP_NAME = config.appName;
 
 /** @deprecated use `config.appVersion` */
 export const APP_VERSION = config.appVersion;
+
+
+// -- Document upload limits (added during enterprise migration) ----------------
+// Used by useDocumentUpload + the upload service to reject oversized files
+// client-side before they hit the network. Synced with the backend's
+// PartnerDocumentsModule and KycModule max payload size.
+export const MAX_DOCUMENT_SIZE_BYTES = 10 * 1024 * 1024;  // 10 MB

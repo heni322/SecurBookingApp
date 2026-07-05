@@ -1,4 +1,4 @@
-// ── i18n must be the very first import so resources are registered
+// â”€â”€ i18n must be the very first import so resources are registered
 // before any component tree renders.
 import '@i18n';
 import './src/i18n/types'; // TypeScript augmentation (no runtime cost)
@@ -20,6 +20,7 @@ import { ErrorBoundary }           from '@components/ui/ErrorBoundary';
 import { OfflineBanner }           from '@components/ui/OfflineBanner';
 import { ToastHost }               from '@components/ui/ToastHost';
 import { ConfirmDialogHost }        from '@components/ui/ConfirmDialog';
+import { AlertProvider }            from '@components/ui/AlertModal';
 import AsyncStorage                from '@react-native-async-storage/async-storage';
 import i18n                        from '@i18n';
 
@@ -38,7 +39,7 @@ function App(): React.JSX.Element {
 
     // CRITICAL FIX: tokenStorage.hydrate() populates the in-memory token
     // cache (_accessToken / _refreshToken) from AsyncStorage.
-    // rehydrate() calls tokenStorage.getAccessToken() synchronously — so it
+    // rehydrate() calls tokenStorage.getAccessToken() synchronously â€” so it
     // MUST run only AFTER hydrate() resolves.  Previously both were chained
     // with a bare .then() which did not guarantee ordering: if the JS
     // microtask queue yielded between the two, rehydrate() would read null
@@ -50,9 +51,9 @@ function App(): React.JSX.Element {
     tokenStorage
       .hydrate()
       .catch(() => {
-        // AsyncStorage unavailable — in-memory cache stays null.
+        // AsyncStorage unavailable â€” in-memory cache stays null.
         // rehydrate() will handle the no-token path gracefully.
-        if (__DEV__) console.warn('[App] tokenStorage.hydrate() failed — proceeding without cache');
+        if (__DEV__) console.warn('[App] tokenStorage.hydrate() failed â€” proceeding without cache');
       })
       .then(() => rehydrate());
 
@@ -62,10 +63,10 @@ function App(): React.JSX.Element {
           i18n.changeLanguage(lang);
         }
       })
-      .catch(() => {/* AsyncStorage unavailable — stay on 'fr' */});
+      .catch(() => {/* AsyncStorage unavailable â€” stay on 'fr' */});
 
     const unsubFcm = fcmService.onForegroundMessage((type, title, body) => {
-      if (config.features.debugLogging) console.log(`[FCM] ${type}: ${title} — ${body}`);
+      if (config.features.debugLogging) console.log(`[FCM] ${type}: ${title} â€” ${body}`);
       increment();
     });
 
@@ -81,12 +82,14 @@ function App(): React.JSX.Element {
         >
           <SafeAreaProvider>
             <StatusBar barStyle="light-content" backgroundColor="#05172b" />
-            <View style={{ flex: 1 }}>
+            <AlertProvider>
+              <View style={{ flex: 1 }}>
               <OfflineBanner />
               <RootNavigator />
               <ToastHost />
               <ConfirmDialogHost />
-            </View>
+              </View>
+            </AlertProvider>
           </SafeAreaProvider>
         </StripeProvider>
       </QueryClientProvider>

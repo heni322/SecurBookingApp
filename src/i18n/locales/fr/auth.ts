@@ -14,7 +14,7 @@ const auth: AuthNS = {
   register: {
     title: 'Créer un compte', subtitle: 'Rejoignez Provalk en quelques secondes',
     perks: { verified: 'Agents vérifiés & assurés', quote: 'Devis instantané en ligne', payment: 'Paiement 100% sécurisé' },
-    account_type: 'TYPE DE COMPTE', individual: 'Particulier', individual_sub: 'Usage personnel', company: 'Entreprise', company_sub: 'Facturation B2B',
+    account_type: 'TYPE DE COMPTE', individual: 'Particulier', individual_sub: 'Usage personnel', company: 'Entreprise', company_sub: 'Facturation B2B', partner: 'Partenaire', partner_sub: 'Société de sécurité',
     first_name_label: 'Prénom', first_name_placeholder: 'Jean', last_name_label: 'Nom', last_name_placeholder: 'Dupont',
     email_label: 'Adresse email', email_placeholder: 'vous@exemple.com', email_available: 'Adresse disponible',
     phone_label: 'Téléphone (optionnel)', phone_placeholder: '+33 6 00 00 00 00', phone_hint: 'Requis pour la 2FA par SMS', phone_available: 'Numéro disponible',

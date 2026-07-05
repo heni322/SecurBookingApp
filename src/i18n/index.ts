@@ -7,7 +7,7 @@ import fr from './locales/fr';
 export const SUPPORTED_LANGUAGES = ['en', 'fr'] as const;
 export type  SupportedLanguage   = typeof SUPPORTED_LANGUAGES[number];
 export const DEFAULT_NS = 'common' as const;
-export const NAMESPACES = ['common','auth','home','missions','profile','navigation','notifications','quote','payment','account','booking','rating','dispute','tracking','conversation','services','map_picker','analytics','offline_banner'] as const;
+export const NAMESPACES = ['common','auth','home','missions','profile','navigation','notifications','quote','payment','account','booking','rating','dispute','tracking','conversation','services','map_picker','analytics','offline_banner','partner'] as const;
 
 /**
  * WHY no async languageDetector:

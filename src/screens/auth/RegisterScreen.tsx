@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
-  ArrowLeft, User, Building2, Mail,
+  ArrowLeft, User, Building2, Shield, Mail,
   Lock, Eye, EyeOff, ShieldCheck, ArrowRight, CheckCircle2,
   Hash, Check,
 } from 'lucide-react-native';
@@ -77,7 +77,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   const phoneReqToken = useRef(0);
   const [password,    setPassword]    = useState('');
   const [showPass,    setShowPass]    = useState(false);
-  const [clientType,  setClientType]  = useState<'INDIVIDUAL' | 'COMPANY'>('INDIVIDUAL');
+  const [accountType, setAccountType] = useState<'INDIVIDUAL' | 'COMPANY' | 'PARTNER'>('INDIVIDUAL');
   const [companyName, setCompanyName] = useState('');
   const [siret,       setSiret]       = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -169,7 +169,10 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     else if (!/[A-Z]/.test(password) || !/\d/.test(password))
       e.password = t('register.errors.password_complexity');
 
-    if (clientType === 'COMPANY') {
+    // Company fields required for both CLIENT-COMPANY and PARTNER. The
+    // backend's RegisterDto enforces the same rule via @ValidateIf — we just
+    // mirror it for fast client-side feedback. PARTNER never uses INDIVIDUAL.
+    if (accountType !== 'INDIVIDUAL') {
       if (!companyName.trim() || companyName.trim().length < 2)
         e.companyName = t('register.errors.company_name_required');
       if (!siret.trim() || !isValidSiret(siret))
@@ -210,17 +213,23 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
       // Best-effort device token so the backend can exclude THIS device from
       // any concurrent-session "Session terminee" notice. Never blocks signup.
       const deviceToken = await fcmService.getDeviceToken().catch(() => null);
+      // Map the 3-option UI to the backend RegisterDto:
+      //   INDIVIDUAL -> { role: CLIENT, clientType: INDIVIDUAL }
+      //   COMPANY    -> { role: CLIENT, clientType: COMPANY, +companyName/siret }
+      //   PARTNER    -> { role: PARTNER, +companyName/siret } (clientType omitted)
+      const isPartner = accountType === 'PARTNER';
+      const hasCompany = accountType !== 'INDIVIDUAL';
       const payload: RegisterPayload = {
         firstName:   firstName.trim().replace(/\s+/g, ' '),
         lastName:    lastName.trim().replace(/\s+/g, ' '),
         email:       email.trim().toLowerCase(),
         password,
         phone:       phone.trim() ? normalizePhone(phone) : undefined,
-        role:        'CLIENT',
-        clientType,
+        role:        isPartner ? 'PARTNER' : 'CLIENT',
+        ...(isPartner ? {} : { clientType: accountType }),
         acceptTerms: true,
         ...(deviceToken ? { deviceToken } : {}),
-        ...(clientType === 'COMPANY' && {
+        ...(hasCompany && {
           companyName: companyName.trim(),
           siret:       siret.replace(/\s/g, ''),
         }),
@@ -245,9 +254,12 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // ── UI building blocks ────────────────────────────────────────────────────
-  const TYPE_OPTIONS: Array<{ type: 'INDIVIDUAL' | 'COMPANY'; label: string; sub: string; Icon: typeof User }> = [
+  // 3-option role selector (no separate Partner screen — backend dispatches by role).
+  // Particulier / Société client / Partenaire sécurité.
+  const TYPE_OPTIONS: Array<{ type: 'INDIVIDUAL' | 'COMPANY' | 'PARTNER'; label: string; sub: string; Icon: typeof User }> = [
     { type: 'INDIVIDUAL', label: t('register.individual'), sub: t('register.individual_sub'), Icon: User      },
     { type: 'COMPANY',    label: t('register.company'),    sub: t('register.company_sub'),    Icon: Building2 },
+    { type: 'PARTNER',    label: t('register.partner'),    sub: t('register.partner_sub'),    Icon: Shield    },
   ];
 
   const PERKS = [
@@ -300,12 +312,12 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionLabel}>{t('register.account_type')}</Text>
           <View style={styles.typeRow}>
             {TYPE_OPTIONS.map(({ type, label, sub, Icon }) => {
-              const active = clientType === type;
+              const active = accountType === type;
               return (
                 <TouchableOpacity
                   key={type}
                   style={[styles.typeCard, active && styles.typeCardActive]}
-                  onPress={() => setClientType(type)}
+                  onPress={() => setAccountType(type)}
                   activeOpacity={0.78}
                 >
                   <View style={[styles.typeIconWrap, { backgroundColor: active ? colors.primarySurface : colors.surface }]}>
@@ -369,7 +381,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
           />
 
           {/* ── Conditional COMPANY fields ─────────────────────────────── */}
-          {clientType === 'COMPANY' && (
+          {accountType !== 'INDIVIDUAL' && (
             <>
               <Input
                 label={t('register.company_name_label')}
