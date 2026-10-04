@@ -1,0 +1,64 @@
+name: CI
+
+# The mobile app had no CI at all (audit 2026-08, P1-6): nothing ran on push,
+# and 45 screens were covered by 3 test files. This is the minimum useful gate.
+#
+# It deliberately does NOT build the Android/iOS binaries — that needs signing
+# material and a much longer runtime. It catches the failures that actually
+# reach main: type errors, lint regressions, and unshippable release config.
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  check:
+    name: Typecheck · Lint · Test · Release config
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # patch-package runs on postinstall and needs the patches/ directory,
+      # which checkout already provides.
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      # NON-BLOCKING, deliberately. `npm run lint` is `--max-warnings 0`, and
+      # src currently carries ~340 warnings (mostly no-explicit-any and
+      # exhaustive-deps), so that script has never passed. Failing the build on
+      # a pre-existing backlog would train everyone to ignore CI on day one.
+      #
+      # The one hard ERROR (consistent-type-imports in serviceCatalog.tsx) was
+      # fixed, so src is error-clean today. Once the warning backlog is worked
+      # down, delete continue-on-error and this becomes a real gate.
+      - name: Lint (advisory until the warning backlog is cleared)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Unit tests
+        run: npm test -- --ci
+
+      # Fails the build when the shipped profile still carries placeholders, a
+      # non-live Stripe key, a development API host, or crashReporting enabled
+      # with no Sentry DSN. The runtime validator in src/config/env.ts only
+      # console.errors in release builds by design, so this is the real gate.
+      #
+      # NOTE: this WILL fail until the production and staging profiles in
+      # src/config/environments.ts are filled in with real values. That is the
+      # intended behaviour — those builds are not shippable today.
+      - name: Release config (production profile)
+        run: npm run validate:release
+
+      - name: Release config (staging profile)
+        run: npm run validate:release:staging

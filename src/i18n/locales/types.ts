@@ -1,6 +1,6 @@
 /**
- * locales/types.ts â€” Complete namespace shape definitions.
- * Both EN and FR implement these interfaces â€” no literal-type cross-lock.
+ * locales/types.ts — Complete namespace shape definitions.
+ * Both EN and FR implement these interfaces — no literal-type cross-lock.
  */
 
 export interface CommonNS {
@@ -20,7 +20,12 @@ export interface CommonNS {
   search_address: string; phone_too_short: string; phone_invalid: string;
   biometric_confirm: string; biometric_fingerprint: string; biometric_default: string;
   generic_error: string;
-  datetime_select_label: string; datetime_confirm_prefix: string; datetime_select_date_first: string; datetime_at_sep: string; back: string; send: string; search: string; back_home: string; add_agent: string; map_unavailable: string; check_connection: string; mission_zone: string; mission_cancelled: string; }
+  datetime_select_label: string; datetime_confirm_prefix: string; datetime_select_date_first: string; datetime_at_sep: string; back: string; send: string; search: string; back_home: string; add_agent: string; map_unavailable: string; check_connection: string; mission_zone: string; mission_cancelled: string;
+  /** StarRating accessibility labels (audit 2026-08, UX-1). */
+  star_rating_value: string; star_rating_set: string;
+  /** Blocking update screen (audit 2026-10-02, H9). */
+  update_required_title: string; update_required_body: string; update_required_version: string;
+  update_required_button_android: string; update_required_button_ios: string; update_required_no_store: string; }
 
 export interface AuthNS {
   login: {
@@ -68,7 +73,7 @@ export interface AuthNS {
     header: string; title: string; subtitle: string;
     email_label: string; email_placeholder: string;
     submit: string; submitting: string; back_to_login: string;
-    sent_title: string; sent_body: string; resend: string; open_mail: string; enter_code: string;
+    sent_title: string; sent_body: string; resend: string; open_mail: string; enter_code: string; have_code: string;
     errors: { email_required: string; email_invalid: string; generic: string; };
   };
   reset_password: {
@@ -83,7 +88,8 @@ export interface AuthNS {
     errors: { token_required: string; password_length: string; password_complexity: string; mismatch: string; invalid_token: string; generic: string; };
   };
   emailVerification: {
-    bannerTitle: string; bannerBody: string; resendButton: string;
+    bannerTitle: string; bannerTitleShort: string; bannerBody: string; inlineBody: string;
+    resendButton: string; resendShort: string; cooldown: string; dismiss: string;
     sentTitle: string; sentBody: string; errorTitle: string; errorBody: string;
     blockedTitle: string; blockedBody: string; resendCta: string; cancelCta: string;
   };
@@ -181,7 +187,7 @@ export interface MissionsNS {
     step_one_title: string; duration_hours: string; step_two_title: string; agent_label: string;
     amplitude_max: string; weekly_cap: string; rest_between: string; rest_after_cap: string;
 
-    // â”€â”€ Multi-slot scheduling â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Multi-slot scheduling ─────────────────────────────────────────────
     slot_mode_single: string;
     slot_mode_multi:  string;
     slot_mode_hint:   string;
@@ -209,7 +215,7 @@ export interface MissionsNS {
     slot_lines_reset:    string;
     slot_lines_required: string;
 
-    // â”€â”€ Redesigned 3-step wizard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Redesigned 3-step wizard ─────────────────────────────────────────
     step_where:  string;
     step_when:   string;
     step_review: string;
@@ -232,7 +238,7 @@ export interface MissionsNS {
     slots_count:           string;
     optional_section: string;
 
-    // â”€â”€ Per-slot customization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Per-slot customization ─────────────────────────────────────────
     customize_for_slot:        string;
     slot_uniform_label:        string;
     slot_line_excluded_note:   string;
@@ -240,10 +246,10 @@ export interface MissionsNS {
     custom_label:              string;
     summary_services_default:  string;
 
-    // â”€â”€ Copy-from-slot feature â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Copy-from-slot feature ─────────────────────────────────────────
     slot_copy_from:     string;
 
-    // â”€â”€ Slot header date summary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Slot header date summary ───────────────────────────────────────
     slot_date_summary:  string;
     slot_date_pending:  string;
 
@@ -252,11 +258,11 @@ export interface MissionsNS {
     footer_ready:         string;
     slots_total_short:    string;
 
-    // â”€â”€ Review step enrichments â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Review step enrichments ────────────────────────────────────────
     review_agent_hours:     string;
     review_slot_summary:    string;
 
-    // â”€â”€ ENTERPRISE UX: draft autosave / restore â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ENTERPRISE UX: draft autosave / restore ─────────────────────────
     draft_restore_title:    string;
     draft_restore_subtitle: string;
     draft_restore_btn:      string;
@@ -265,34 +271,34 @@ export interface MissionsNS {
     draft_discard_confirm_message: string;
     draft_discard_confirm_btn:     string;
 
-    // â”€â”€ ENTERPRISE UX: smarter footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    /** Smart CTA: "Continuer Â· Quand â†’" / "Continuer Â· RÃ©cap â†’". */
+    // ── ENTERPRISE UX: smarter footer ───────────────────────────────────
+    /** Smart CTA: "Continuer · Quand →" / "Continuer · Récap →". */
     next_to_when:    string;
     next_to_review:  string;
-    /** Footer "PrÃ©cÃ©dent" affordance text. */
+    /** Footer "Précédent" affordance text. */
     footer_back:     string;
 
-    // â”€â”€ ENTERPRISE UX: cross-slot error banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ENTERPRISE UX: cross-slot error banner ──────────────────────────
     cross_slot_error_title:   string;
     cross_slot_error_subtitle:string;
     cross_slot_error_jump:    string;
 
-    // â”€â”€ ENTERPRISE UX: multi-slot escape â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    /** "Revenir Ã  une plage unique" â€” return to single-slot mode. */
+    // ── ENTERPRISE UX: multi-slot escape ────────────────────────────────
+    /** "Revenir à une plage unique" — return to single-slot mode. */
     exit_multi_slot:           string;
     exit_multi_slot_confirm_title:   string;
     exit_multi_slot_confirm_message: string;
     exit_multi_slot_confirm_btn:     string;
 
-    // â”€â”€ ENTERPRISE UX: review price estimate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ENTERPRISE UX: review price estimate ────────────────────────────
     /** "Estimation HT" header above the indicative price. */
     review_estimate_label:  string;
-    /** "â‰ˆ {{amount}} HT" â€” approximate cost rendered in the review. */
+    /** "≈ {{amount}} HT" — approximate cost rendered in the review. */
     review_estimate_amount: string;
     /** Disclaimer rendered below the estimate. */
     review_estimate_note:   string;
 
-    // â”€â”€ ENTERPRISE UX: structured submit error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── ENTERPRISE UX: structured submit error ──────────────────────────
     /** Banner title shown when /missions/create returns validation errors. */
     step_where_2:        string;
     step_staff_2:        string;
@@ -315,6 +321,14 @@ export interface MissionsNS {
     submit_error_jump_to:  string;
     /** Generic submit error subtitle (network / server). */
     submit_error_network:  string;
+    /**
+     * Shown when the mission committed but the downstream quote calculation
+     * failed - a different situation from a failed creation, and the reason
+     * clients used to resubmit and create duplicate missions.
+     */
+    submit_error_title_quote:  string;
+    submit_quote_retry:        string;
+    submit_quote_open_mission: string;
   };
 }
 
@@ -328,6 +342,7 @@ export interface ProfileNS {
     language_fr: string; language_en: string;
     email: string; phone: string;
     member_since: string; version: string; privacy_policy: string; terms: string;
+    sales_terms: string; legal_notice: string; support: string;
   };
   hero: { verified: string; since: string; phone_not_set: string; };
   language_picker: { title: string; subtitle: string; };
@@ -390,9 +405,10 @@ export interface PaymentNS {
   title_card: string; title_sepa: string; secured_by: string;
   incomplete_card: string; sepa_failed: string; card_failed: string;
   sepa_success: string; card_success: string;
+  card_held: string; card_held_body: string;
   sepa_success_body: string; card_success_body: string;
   home: string;
-  stripe_info_sepa: string; stripe_info_card: string; sepa_legal: string; amount_sub: string; invoice_ref: string; invoice_count: string; invoice_open_error: string;
+  stripe_info_sepa: string; stripe_info_card: string; sepa_legal: string; amount_sub: string; invoice_ref: string; invoice_count: string; invoice_open_error: string; invoice_unavailable: string; invoice_download_a11y: string;
   errors: {
     card_declined: string; expired_card: string; incorrect_number: string;
     invalid_expiry_year: string; processing_error: string; do_not_honor: string;
@@ -421,6 +437,11 @@ export interface PaymentNS {
     cta_processing: string; cta_sepa: string; cta_pay: string;
     footer_cgv: string;
     err_generic: string;
+    /** Shown under a disabled CTA so a blocked button always states its cause. */
+    reason_enter_iban: string;
+    reason_iban_invalid: string;
+    reason_complete_card: string;
+    reason_card_unavailable: string;
   };
   add: {
     header_method: string;
@@ -469,7 +490,7 @@ export interface AccountNS {
     first_name_placeholder: string; last_name_placeholder: string;
     name_required_title: string; name_required_body: string;
     phone_invalid_title: string; phone_invalid_body: string;
-    save: string; saved: string; error: string;
+    save: string; saved: string; error: string; avatar_uploading: string;
   };
   delete: {
     title: string; screen_title: string;
@@ -513,7 +534,7 @@ export interface BookingNS {
   };
   checkins: { section_title: string; date_label: string; checkin_label: string; checkout_label: string; };
   photos: { section_title: string; verified_badge: string; no_photos_title: string; caption: string; zoom_a11y: string; empty_in_progress: string; empty_completed: string; };
-  incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; };
+  incidents: { section_title: string; report_title: string; placeholder: string; reported_title: string; reported_body: string; report_error: string; too_short: string; kinds: { INTRUSION: string; BLESSURE: string; AGRESSION: string; INCENDIE: string; EVACUATION: string; MATERIEL: string; AUTRE: string; }; };
   actions: { rate_agent: string; already_rated: string; open_dispute: string; };
   uniforms: { STANDARD: string; CIVIL: string; EVENEMENTIEL: string; SSIAP: string; CYNOPHILE: string; };
   statuses: { open: string; assigned: string; in_progress: string; completed: string; cancelled: string; abandoned: string; };
@@ -641,6 +662,13 @@ export interface PartnerNS {
       createMissionSub: string;
       myMissions: string;
       myMissionsSub: string;
+      timesheets: string;
+      timesheetsSub: string;
+    };
+    errors: {
+      title: string;
+      body: string;
+      retry: string;
     };
   };
   team: {
@@ -678,6 +706,11 @@ export interface PartnerNS {
       noResultsBySearch: string;
       noResultsByFilter: string;
     };
+    errors: {
+      title: string;
+      body: string;
+      retry: string;
+    };
   };
   agentDetail: {
     title: string;
@@ -712,6 +745,9 @@ export interface PartnerNS {
     };
     errors: {
       notFound: string;
+      title: string;
+      body: string;
+      retry: string;
     };
   };
   financials: {
@@ -810,6 +846,24 @@ export interface PartnerNS {
       load: string;
     };
   };
+  timesheets: {
+    title: string;
+    subtitle: string;
+    notice: string;
+    tabs: { pending: string; approved: string };
+    empty: string;
+    loading: string;
+    hours: string;
+    planned: string;
+    autoOn: string;
+    offline: string;
+    incidents: string;
+    approve: string;
+    approved: string;
+    confirmTitle: string;
+    confirmBody: string;
+    errors: { load: string; approve: string };
+  };
   compliance: {
     title: string;
     hero: {
@@ -854,6 +908,10 @@ export interface PartnerNS {
     actions: {
       checkStatus: string;
       addDocument: string;
+    };
+    errors: {
+      title: string;
+      body: string;
     };
   };
   documents: {
@@ -1029,6 +1087,9 @@ export interface PartnerNS {
       address: string;
       contact: string;
       billing: string;
+      legal: string;
+      banking: string;
+      insurance: string;
     };
     fields: {
       companyName: {
@@ -1043,6 +1104,16 @@ export interface PartnerNS {
         label: string;
         placeholder: string;
       };
+      siren: { label: string; placeholder: string };
+      apeCode: { label: string; placeholder: string };
+      tradeName: { label: string; placeholder: string };
+      legalRepName: { label: string; placeholder: string };
+      legalRepRole: { label: string; placeholder: string };
+      iban: { label: string; placeholder: string };
+      bic: { label: string; placeholder: string };
+      rcProInsurer: { label: string; placeholder: string };
+      rcProPolicyNumber: { label: string; placeholder: string };
+      rcProExpiresAt: { label: string; placeholder: string };
       billingAddress: {
         label: string;
         placeholder: string;
@@ -1085,6 +1156,7 @@ export interface PartnerNS {
       zipInvalid: string;
       vatInvalid: string;
       siretValid: string;
+      dateInvalid: string;
     };
     errors: {
       loadFailed: string;
@@ -1282,6 +1354,11 @@ export interface PartnerNS {
           successBody: string;
           failed: string;
         };
+        errors: {
+          title: string;
+          body: string;
+          retry: string;
+        };
       };
       create: {
         title: string;
@@ -1401,7 +1478,56 @@ export interface PartnerNS {
   };
 }
 
-/** Union of all namespaces â€” drives i18next CustomTypeOptions. */
+/** Union of all namespaces — drives i18next CustomTypeOptions. */
+/**
+ * Consignes de site (lot 3, audit 2026-08).
+ *
+ * Aucune clé ne concerne la VALEUR d'un code d'accès : les codes sont chiffrés
+ * côté serveur et ne sont jamais réaffichés dans cette application.
+ */
+export interface SitesNS {
+  save: string;
+  saving: string;
+  title: string;
+  loading: string;
+  add: string;
+  new_title: string;
+  edit_title: string;
+  saved_title: string;
+  saved_body: string;
+  save_error: string;
+  secret_error: string;
+  create_first: string;
+  empty: { title: string; message: string };
+  counts: {
+    posts: string; posts_other: string;
+    contacts: string; contacts_other: string;
+    secrets: string; secrets_other: string;
+  };
+  sections: {
+    identity: string; access: string; expectations: string;
+    codes: string; posts: string; contacts: string;
+  };
+  fields: { label: string; address: string; city: string; zipCode: string };
+  access_hint: string;
+  access_placeholder: string;
+  expectations_placeholder: string;
+  briefing_change_warning: string;
+  codes_hint: string;
+  secret_label_placeholder: string;
+  secret_value_placeholder: string;
+  add_code: string;
+  stale_rotation: string;
+  kinds: {
+    BOITE_CLES: string; ALARME: string; CADENAS: string;
+    BADGE: string; INTERPHONE: string; AUTRE: string;
+  };
+  roles: {
+    REMISE_CLES: string; RETOUR_CLES: string; ASTREINTE: string;
+    HIERARCHIE: string; DONNEUR_ORDRES: string; TECHNIQUE: string; AUTRE: string;
+  };
+}
+
 export interface LocaleResources {
   common:        CommonNS;
   auth:          AuthNS;
@@ -1419,4 +1545,5 @@ export interface LocaleResources {
   tracking:      TrackingNS;
   conversation: ConversationNS; services: ServicesNS; map_picker: MapPickerNS; analytics: AnalyticsNS; offline_banner: OfflineBannerNS;
   partner: PartnerNS;
+  sites: SitesNS;
 }

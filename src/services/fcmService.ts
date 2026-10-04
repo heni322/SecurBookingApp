@@ -83,15 +83,20 @@ class FcmService {
     try {
       const token = await this.requestPermissionAndGetToken();
       if (!token) return;
-      await apiClient.post('/notifications/fcm-token', { fcmToken: token });
+      await apiClient.post('/notifications/register-fcm-token', { fcmToken: token });
 
       // Listen for token rotation
       const m = getMessaging();
       m?.onTokenRefresh(async (t: string) => {
-        try { await apiClient.post('/notifications/fcm-token', { fcmToken: t }); }
+        try { await apiClient.post('/notifications/register-fcm-token', { fcmToken: t }); }
         catch { /* silent */ }
       });
-    } catch { /* silent — Firebase not configured or placeholder credentials */ }
+    } catch (e) {
+      // Firebase not configured, or the API refused the token. Log it: this
+      // failure used to be silent, which hid a wrong endpoint path for months
+      // (audit 2026-09, C7 — clients and partners received no push at all).
+      if (__DEV__) console.warn('[fcm] registerToken failed', e);
+    }
   }
 
   onForegroundMessage(cb: (type: string, title: string, body: string) => void): () => void {

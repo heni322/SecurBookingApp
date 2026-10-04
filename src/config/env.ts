@@ -61,10 +61,35 @@ function resolveEnv(): AppEnv {
  */
 function validate(cfg: AppConfig): void {
   const problems: string[] = [];
+  // Non-fatal: logged loudly in EVERY environment, but never throws. A payments
+  // placeholder must not stop someone working on an unrelated screen from
+  // booting the app — it must simply be impossible to miss. The payment screens
+  // additionally surface these via @utils/stripeDiagnostics.
+  const warnings: string[] = [];
 
   if (!/^https?:\/\//.test(cfg.api.baseUrl)) {
     problems.push(`api.baseUrl is not a valid URL: "${cfg.api.baseUrl}"`);
   }
+
+  // NOTE — this check used to live inside the `production` branch below, which
+  // meant the single most useful development-time check never ran in
+  // development. The result (2026-09-12): the app booted clean with
+  // 'pk_test_REMPLACER_...', Stripe silently failed to initialise, and the pay
+  // button sat disabled forever with no message anywhere. A validator whose
+  // docblock promises to "fail fast in development" must actually run there.
+  if (cfg.stripe.publishableKey.includes('REMPLACER')) {
+    warnings.push(
+      `stripe.publishableKey is still the placeholder for env="${cfg.env}" ` +
+        '— card payments cannot work until it is replaced ' +
+        '(src/config/environments.ts)',
+    );
+  } else if (!/^pk_(test|live)_/.test(cfg.stripe.publishableKey)) {
+    warnings.push(
+      `stripe.publishableKey does not look like a publishable key ` +
+        `(expected pk_test_… or pk_live_…) for env="${cfg.env}"`,
+    );
+  }
+
   if (cfg.env === 'production') {
     if (!cfg.api.baseUrl.startsWith('https://')) {
       problems.push('production api.baseUrl must use https://');
@@ -75,9 +100,21 @@ function validate(cfg: AppConfig): void {
     if (cfg.stripe.publishableKey.includes('REMPLACER')) {
       problems.push('production Stripe publishableKey is still a placeholder');
     }
+    // Legal pages (audit 2026-09-30, P0-9): must be real HTTPS pages.
+    const { privacyUrl, termsUrl, salesTermsUrl, legalNoticeUrl } = cfg.legal;
+    for (const [name, url] of Object.entries({ privacyUrl, termsUrl, salesTermsUrl, legalNoticeUrl })) {
+      if (!/^https:\/\//.test(url)) problems.push(`production legal.${name} must be an https:// URL`);
+    }
   }
   if (cfg.env !== 'production' && cfg.stripe.publishableKey.startsWith('pk_live_')) {
     problems.push(`${cfg.env} must not use a LIVE Stripe key`);
+  }
+
+  if (warnings.length > 0) {
+    console.error(
+      `[config] Configuration warnings for env="${cfg.env}":\n` +
+        warnings.map(w => `  • ${w}`).join('\n'),
+    );
   }
 
   if (problems.length === 0) return;

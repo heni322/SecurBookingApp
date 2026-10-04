@@ -191,8 +191,25 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
     const status = err?.response?.status;
     const data   = err?.response?.data;
     const msg    = Array.isArray(data?.message) ? data.message[0] : data?.message;
+    // The API returns a stable i18n key alongside the localized message
+    // (see I18nExceptionFilter: `{ statusCode, message, key, args }`).
+    const key    = typeof data?.key === 'string' ? data.key : '';
 
+    // A 409 is NOT always the email. The backend distinguishes email, phone and
+    // SIRET conflicts (auth.service P2002 handler), and its own comment records
+    // that reporting every unique-constraint violation as "email already used"
+    // was a bug it had already fixed server-side. This screen still collapsed
+    // them all onto the email field, so a user whose PHONE was taken was told
+    // their email was — and editing the email never cleared it.
     if (status === 409) {
+      if (key.includes('phone_already_used')) {
+        setErrors(prev => ({ ...prev, phone: t('register.errors.phone_taken') }));
+        return t('register.errors.phone_taken');
+      }
+      if (key.includes('siret')) {
+        setErrors(prev => ({ ...prev, siret: msg ?? t('register.errors.generic') }));
+        return msg ?? t('register.errors.generic');
+      }
       setErrors(prev => ({ ...prev, email: t('register.errors.email_taken') }));
       return t('register.errors.email_taken');
     }
@@ -244,7 +261,7 @@ export const RegisterScreen: React.FC<Props> = ({ navigation }) => {
         throw new Error('Invalid response: missing tokens');
       }
 
-      hydrate(user, tokens);
+      await hydrate(user, tokens);
     } catch (err: unknown) {
       const message = mapBackendError(err);
       toast.error(message, { title: t('register.alert.title'), duration: 5000 });

@@ -18,7 +18,8 @@
 
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { missionsApi }           from '@api/endpoints/missions';
-import { queryClient, queryKeys } from '@lib/queryClient';
+import { queryClient }          from '@lib/queryClient';
+import { qk }                   from '@api/queryKeys';
 import { STALE_TIME }             from '@constants/config';
 import type { CreateMissionPayload, UpdateMissionPayload } from '@models/index';
 
@@ -26,7 +27,7 @@ import type { CreateMissionPayload, UpdateMissionPayload } from '@models/index';
 
 export function useMyMissions() {
   return useQuery({
-    queryKey:  queryKeys.missions(),
+    queryKey:  qk.missions.mine(),
     queryFn:   async () => {
       const res = await missionsApi.getMyMissions();
       return res.data.data ?? [];
@@ -40,7 +41,7 @@ export function useMyMissions() {
 
 export function useMissionDetail(missionId: string) {
   return useQuery({
-    queryKey:  queryKeys.missionDetail(missionId),
+    queryKey:  qk.missions.detail(missionId),
     queryFn:   async () => {
       const res = await missionsApi.getById(missionId);
       return res.data.data;
@@ -58,7 +59,7 @@ export function useCreateMission() {
       missionsApi.create(payload).then((r) => r.data.data),
     onSuccess: () => {
       // Invalidate the list so the next read fetches fresh data
-      queryClient.invalidateQueries({ queryKey: queryKeys.missions() });
+      queryClient.invalidateQueries({ queryKey: qk.missions.all });
     },
   });
 }
@@ -71,9 +72,9 @@ export function useUpdateMission(missionId: string) {
       missionsApi.update(missionId, payload).then((r) => r.data.data),
     onSuccess: (updated) => {
       // Optimistically update the detail cache
-      queryClient.setQueryData(queryKeys.missionDetail(missionId), updated);
+      queryClient.setQueryData(qk.missions.detail(missionId), updated);
       // Invalidate the list to reflect status changes
-      queryClient.invalidateQueries({ queryKey: queryKeys.missions() });
+      queryClient.invalidateQueries({ queryKey: qk.missions.all });
     },
   });
 }
@@ -85,8 +86,8 @@ export function useCancelMission() {
     mutationFn: (missionId: string) =>
       missionsApi.cancel(missionId).then((r) => r.data.data),
     onSuccess: (_updated, missionId) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.missionDetail(missionId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.missions() });
+      queryClient.invalidateQueries({ queryKey: qk.missions.detail(missionId) });
+      queryClient.invalidateQueries({ queryKey: qk.missions.all });
     },
   });
 }

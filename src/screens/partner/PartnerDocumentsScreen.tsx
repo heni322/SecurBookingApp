@@ -96,7 +96,7 @@ export const PartnerDocumentsScreen: React.FC = () => {
         { text: t('documents.actions.delete'), style: 'destructive', onPress: () => handleDelete(doc.id) },
       );
     }
-    actions.push({ text: 'Annuler', style: 'cancel' });
+    actions.push({ text: t('common:cancel'), style: 'cancel' });
     showAlert(
       labelForDocument(doc.type),
       isApproved ? t('documents.alerts.approvedBody') : t('documents.alerts.notApprovedBody'),
@@ -109,7 +109,7 @@ export const PartnerDocumentsScreen: React.FC = () => {
       t('documents.alerts.delete.title'),
       t('documents.alerts.delete.body'),
       [
-        { text: 'Annuler', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
           text: t('documents.actions.delete'), style: 'destructive',
           onPress: async () => {
@@ -181,7 +181,7 @@ export const PartnerDocumentsScreen: React.FC = () => {
             <FileX size={16} color={colors.danger} strokeWidth={2} />
           </View>
           <Text style={[styles.bannerBody, { flex: 1, color: colors.danger }]}>
-            {t(rejected === 1 ? 'agent:documents.rejectedBanner_one' : 'agent:documents.rejectedBanner_other', { count: rejected })}
+            {t(rejected === 1 ? 'compliance.alert.body_one' : 'compliance.alert.body_other', { count: rejected })}
           </Text>
         </View>
       )}

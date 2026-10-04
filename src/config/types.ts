@@ -51,8 +51,29 @@ export interface FeatureFlags {
   readonly crashReporting: boolean;
 }
 
+/**
+ * Public legal pages (audit 2026-09-30, P0-9). French law (LCEN, Code de la
+ * consommation, RGPD) and both app stores require them to be reachable from
+ * inside the app. They are web pages, not in-app copy, so the legal text can
+ * be updated without an app release.
+ */
+export interface LegalConfig {
+  /** Politique de confidentialité (RGPD). */
+  readonly privacyUrl: string;
+  /** Conditions générales d'utilisation. */
+  readonly termsUrl: string;
+  /** Conditions générales de vente (incl. annulation / remboursement). */
+  readonly salesTermsUrl: string;
+  /** Mentions légales (LCEN art. 6). */
+  readonly legalNoticeUrl: string;
+  /** Support contact (mailto: or https:). */
+  readonly supportUrl: string;
+}
+
 export interface AppConfig {
   readonly env: AppEnv;
+  /** Legal pages opened from Profile › Légal and the payment footer. */
+  readonly legal: LegalConfig;
   /** Human display name (App Store / launcher label is native; this is in-app). */
   readonly appName: string;
   /** Marketing version, mirrors native CFBundleShortVersionString / versionName. */

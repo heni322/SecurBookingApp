@@ -21,6 +21,7 @@ import {
   MANDATORY_DOC_DESC, COMPLIANCE_STATUS_COLOR,
 } from '@utils/statusHelpers';
 import { labelForDocument } from '@constants/documentRequirements';
+import { EmptyState } from '@components/ui/EmptyState';
 import type { PartnerComplianceStatus, ComplianceDocItem, PartnerStackParamList } from '@models/index';
 
 type Nav = NativeStackNavigationProp<PartnerStackParamList>;
@@ -41,15 +42,25 @@ export const PartnerComplianceScreen: React.FC = () => {
   const [compliance, setCompliance] = useState<PartnerComplianceStatus | null>(null);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]           = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
+    setError(null);
     try {
       const res = await partnerDocumentsApi.getComplianceStatus();
       setCompliance((res.data as any)?.data ?? res.data);
-    } catch { /* show error UI */ }
+    } catch (err: any) {
+      // Was previously a silent catch whose comment claimed to "show error UI"
+      // but never actually set any error state -- a failed load silently fell
+      // through to compliance === null, which the header then rendered as
+      // "Incomplete" status. That's misleading either way: it could hide a
+      // REJECTED document behind a milder-looking state, or make a partner
+      // think they're missing paperwork when it was just a network error.
+      setError(err?.response?.data?.message ?? t('compliance.errors.body'));
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -77,6 +88,21 @@ export const PartnerComplianceScreen: React.FC = () => {
     };
     return map[status] ?? t('compliance.docStatus.missing');
   };
+
+  if (error && !compliance) {
+    return (
+      <View style={styles.screen}>
+        <View style={styles.errorWrap}>
+          <EmptyState Icon={XCircle}
+            title={t('compliance.errors.title')}
+            subtitle={error}
+            actionLabel={t('compliance.actions.checkStatus')}
+            onAction={() => load()}
+          />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
@@ -230,6 +256,7 @@ const ProgressStat: React.FC<{ value: number; label: string; color: string }> = 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: layout.screenPaddingH },
   scroll: { paddingBottom: 96 },
   hero: { alignItems: 'center', paddingTop: 48, paddingBottom: 24, paddingHorizontal: 20, gap: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
   heroIconWrap: { width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },

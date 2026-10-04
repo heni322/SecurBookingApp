@@ -12,11 +12,13 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePartnerT } from './_partnerI18n';
 import {
   Users, Briefcase, Plus, CircleCheckBig, Clock, Pencil,
-  TrendingUp, Wallet, ChevronRight, Building2, ShieldCheck, FileText,
+  TrendingUp, Wallet, ChevronRight, Building2, ShieldCheck, FileText, XCircle,
+  ClipboardCheck,
 } from 'lucide-react-native';
 import { partnerApi }    from '@api/endpoints/partner';
 import { useAuthStore }  from '@store/authStore';
 import { ScreenHeader }  from '@components/ui/ScreenHeader';
+import { EmptyState }    from '@components/ui/EmptyState';
 import { EmailVerificationBanner } from '@components/domain/EmailVerificationBanner';
 import { Card }          from '@components/ui/Card';
 import { Separator }     from '@components/ui/Separator';
@@ -45,15 +47,22 @@ export const PartnerDashboardScreen: React.FC = () => {
   const [data,      setData]      = useState<PartnerDashboard | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [refreshing,setRefreshing]= useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
+    setLoadError(null);
     try {
       const res = await partnerApi.getDashboard();
       setData((res.data as any)?.data ?? res.data);
-    } catch { /* silent */ }
+    } catch (err: any) {
+      // Was a silent catch — a failed load rendered as an all-zero dashboard
+      // (0 agents, EUR 0.00 payouts) with no indication anything went wrong,
+      // which reads as real data rather than an error.
+      setLoadError(err?.response?.data?.message ?? t('dashboard.errors.body'));
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -75,6 +84,22 @@ export const PartnerDashboardScreen: React.FC = () => {
     );
   }
 
+  if (loadError && !data) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title={t('dashboard.title')} />
+        <View style={styles.loadingWrap}>
+          <EmptyState Icon={XCircle}
+            title={t('dashboard.errors.title')}
+            subtitle={loadError}
+            actionLabel={t('dashboard.errors.retry')}
+            onAction={() => load()}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <ScreenHeader title={data?.company?.companyName ?? t('dashboard.greeting.fallback')} />
@@ -84,7 +109,6 @@ export const PartnerDashboardScreen: React.FC = () => {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />}
       >
-        <EmailVerificationBanner />
         {/* Greeting */}
         <View style={styles.hero}>
           <View style={styles.heroIconWrap}>
@@ -96,6 +120,11 @@ export const PartnerDashboardScreen: React.FC = () => {
             {data?.company?.city && <Text style={styles.companyCity}>{data.company.city}</Text>}
           </View>
         </View>
+
+        {/* Account reminder sits below the greeting, not above it: the first
+            thing a partner sees on open should be their own dashboard.
+            marginBottom is zeroed because `content` already applies a gap. */}
+        <EmailVerificationBanner variant="strip" style={styles.verifyStrip} />
 
         {/* Team KPIs */}
         <Text style={styles.sectionTitle}>{t('dashboard.sections.team')}</Text>
@@ -152,6 +181,8 @@ export const PartnerDashboardScreen: React.FC = () => {
           <Separator marginV={spacing[2]} />
           <ActionRow Icon={Wallet}      label={t('dashboard.actions.billing')}    sub={t('dashboard.actions.billingSub')}     onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerBilling' })} />
           <Separator marginV={spacing[2]} />
+          <ActionRow Icon={ClipboardCheck} label={t('dashboard.actions.timesheets')} sub={t('dashboard.actions.timesheetsSub')} onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerTimesheets' })} />
+          <Separator marginV={spacing[2]} />
           <ActionRow Icon={ShieldCheck} label={t('dashboard.actions.compliance')} sub={t('dashboard.actions.complianceSub')} onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerCompliance' })} />
           <Separator marginV={spacing[2]} />
           <ActionRow Icon={FileText}    label={t('dashboard.actions.documents')}  sub={t('dashboard.actions.documentsSub')}  onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerDocuments' })} />
@@ -199,6 +230,7 @@ const styles = StyleSheet.create({
   screen:      { flex: 1, backgroundColor: colors.background },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content:     { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[8], gap: spacing[4] },
+  verifyStrip: { marginBottom: 0 },
   hero:         { flexDirection: 'row', alignItems: 'center', gap: spacing[4], backgroundColor: colors.primarySurface, borderRadius: radius.xl, padding: spacing[4], borderWidth: 1, borderColor: colors.borderPrimary },
   heroIconWrap: { width: 48, height: 48, borderRadius: radius.lg, backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' },
   greeting:     { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },

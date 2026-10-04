@@ -19,7 +19,7 @@ import { PaymentListSkeleton } from '@components/ui/SkeletonLoader';
 import { colors }    from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import { formatEuros, formatDateShort } from '@utils/formatters';
+import { formatEuros, formatDateShort, toNumber } from '@utils/formatters';
 import { PaymentStatus }      from '@constants/enums';
 import type { Payment, ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
@@ -44,7 +44,7 @@ function groupByMonth(payments: Payment[]) {
 
 export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
   const { data: payments, loading, execute } = useApi(paymentsApi.getMyPayments);
-    const { t } = useTranslation(['payment', 'common']);
+    const { t } = useTranslation(['payment', 'common']);
     const toast = useToast();
   const STATUS_META: Record<string, { color: string; Icon: React.FC<any>; label: string }> = useMemo(() => ({
     [PaymentStatus.PAID]:       { color: colors.success, Icon: CheckCircle, label: t('history.status.paid')        },
@@ -61,23 +61,28 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
     [payments],
   );
 
+  // FIX (audit 2026-09-30): `amount` is a Prisma Decimal serialised as a
+  // STRING, so `acc + p.amount` concatenated text ("0120.5079.50") instead of
+  // summing. Coerce every amount before adding.
   const totalSpent = useMemo(
     () => (payments ?? [])
       .filter(p => p.status === PaymentStatus.PAID)
-      .reduce((acc, p) => acc + p.amount, 0),
+      .reduce((acc, p) => acc + toNumber(p.amount), 0),
     [payments],
   );
 
+  // FIX (audit 2026-09-30): `invoicePdfUrl` now stores the storage OBJECT KEY
+  // ("invoices/F-….pdf"), not a URL — opening it directly failed for every
+  // client who had an invoice. Always ask the API for a fresh signed URL.
   const handleDownload = useCallback(async (p: Payment) => {
-    if (p.invoicePdfUrl) {
-      await Linking.openURL(p.invoicePdfUrl);
-      return;
-    }
     try {
       const { data: res } = await paymentsApi.getInvoiceUrl(p.id);
-      const url = (res as any).data?.url ?? (res as any).url;
-      if (url) await Linking.openURL(url);
-      else toast.info('Invoice not available for this payment.', { title: 'Invoice' });
+      const url = (res as any)?.data?.url ?? (res as any)?.url;
+      if (url && /^https?:\/\//i.test(url)) {
+        await Linking.openURL(url);
+      } else {
+        toast.info(t('invoice_unavailable'), { title: t('history.title') });
+      }
     } catch {
       toast.error(t('invoice_open_error'), { title: t('common:error') });
     }
@@ -122,7 +127,7 @@ export const PaymentHistoryScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => handleDownload(item)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityRole="button"
-              accessibilityLabel="Telecharger la facture"
+              accessibilityLabel={t('invoice_download_a11y')}
             >
               <Download size={13} color={colors.primary} strokeWidth={2} />
             </TouchableOpacity>

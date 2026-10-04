@@ -1,5 +1,5 @@
 /**
- * PartnerProfileScreen â€” Profil société partenaire.
+ * PartnerProfileScreen — Profil société partenaire.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -123,10 +123,10 @@ export const PartnerProfileScreen: React.FC = () => {
               : <Building2 size={32} color={colors.primary} strokeWidth={1.6} />
             }
           </View>
-          <Text style={styles.companyName} numberOfLines={1}>{company?.companyName ?? 'â€”'}</Text>
+          <Text style={styles.companyName} numberOfLines={1}>{company?.companyName ?? '\u2014'}</Text>
           <View style={styles.heroMeta}>
             {company?.siret  && <MetaRow Icon={Hash}   label={t('profile.company.siret')}   value={company.siret} mono />}
-            {company?.city   && <MetaRow Icon={MapPin}  label={t('profile.company.address')} value={[company.address, company.zipCode, company.city].filter(Boolean).join(' Â· ')} />}
+            {company?.city   && <MetaRow Icon={MapPin}  label={t('profile.company.address')} value={[company.address, company.zipCode, company.city].filter(Boolean).join(' \u00b7 ')} />}
             {user?.email     && <MetaRow Icon={Mail}    label={t('profile.company.contact')} value={user.email} />}
           </View>
         </Card>

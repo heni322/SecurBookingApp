@@ -72,6 +72,38 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+// ── Release signing (launch blocker B1, audit 2026-10-02) ───────────────────
+// Release builds were signed with the public debug key, which the Play Store
+// refuses and which anyone can use to sign a look-alike update. The upload key
+// now comes from, in order:
+//   1. environment variables ANDROID_UPLOAD_STORE_FILE / _STORE_PASSWORD /
+//      _KEY_ALIAS / _KEY_PASSWORD (CI), or
+//   2. android/keystore.properties (local, git-ignored; see the .example).
+// A release build without them FAILS instead of silently using the debug key.
+def releaseKeystoreProps = new Properties()
+def releaseKeystorePropsFile = rootProject.file("keystore.properties")
+if (releaseKeystorePropsFile.exists()) {
+    releaseKeystorePropsFile.withInputStream { releaseKeystoreProps.load(it) }
+}
+def releaseSigning = { String key ->
+    System.getenv("ANDROID_UPLOAD_" + key) ?: releaseKeystoreProps.getProperty(key)
+}
+def hasReleaseSigning = ["STORE_FILE", "STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD"].every { releaseSigning(it) }
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseTask = graph.allTasks.find { it.name ==~ /(assemble|bundle|install|package)\w*Release/ }
+    if (releaseTask != null && !hasReleaseSigning) {
+        throw new GradleException(
+            "Release signing is not configured (task ${releaseTask.name}). Provide " +
+            "android/keystore.properties or the ANDROID_UPLOAD_* environment variables. " +
+            "See RELEASE-SIGNING.md. Release builds are never signed with the debug key."
+        )
+    }
+}
+// Default versionName = package.json `version`, the same value the JS bundle
+// sends as x-app-version (audit 2026-10-02, H9). Override with -PversionName.
+def packageJsonVersion = new groovy.json.JsonSlurper().parse(file("../../package.json")).version
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -82,8 +114,8 @@ android {
         applicationId "com.securbookingapp"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode((project.findProperty("versionCode") ?: "1").toInteger())
+        versionName(project.findProperty("versionName") ?: packageJsonVersion)
     }
     signingConfigs {
         debug {
@@ -92,15 +124,21 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseSigning("STORE_FILE"))
+                storePassword releaseSigning("STORE_PASSWORD")
+                keyAlias releaseSigning("KEY_ALIAS")
+                keyPassword releaseSigning("KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : null
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

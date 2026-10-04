@@ -36,6 +36,16 @@ const common: CommonNS = {
   check_connection: 'Vérifiez votre connexion internet',
   mission_zone:     'Zone de mission',
   mission_cancelled:'Mission annulée',
+  // Libellés d'accessibilité de StarRating — lus par les lecteurs d'écran, les
+  // étoiles elles-mêmes étant purement décoratives (audit 2026-08, UX-1).
+  star_rating_value: 'Note : {{value}} sur {{max}}',
+  star_rating_set:   'Donner la note de {{value}} sur {{max}}',
+  update_required_title:          'Mise à jour nécessaire',
+  update_required_body:           'Cette version de l’application n’est plus prise en charge. Installez la dernière version pour continuer à commander et suivre vos missions.',
+  update_required_version:        'Version installée : {{current}} · minimum requis : {{min}}',
+  update_required_button_android: 'Mettre à jour sur Google Play',
+  update_required_button_ios:     'Mettre à jour sur l’App Store',
+  update_required_no_store:       'Mettez l’application à jour depuis votre magasin d’applications.',
 };
 
 export default common;

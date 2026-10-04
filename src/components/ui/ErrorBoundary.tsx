@@ -10,6 +10,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react-native';
 import { colors } from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
+import { captureHandledError } from '@services/sentry';
 
 interface State { hasError: boolean; message: string }
 
@@ -24,6 +25,11 @@ export class ErrorBoundary extends React.Component<
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, message: error?.message ?? 'Erreur inconnue' };
+  }
+
+  // A render crash is the error a user is most likely to see: report it.
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    captureHandledError(error, { componentStack: info.componentStack });
   }
 
   handleRetry = () => {

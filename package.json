@@ -11,6 +11,8 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "validate:release": "node scripts/validate-release-config.js",
+    "validate:release:staging": "node scripts/validate-release-config.js --env staging",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
     "postinstall": "patch-package",
@@ -28,9 +30,10 @@
     "@react-navigation/bottom-tabs": "^7.15.8",
     "@react-navigation/native": "^7.2.1",
     "@react-navigation/native-stack": "^7.14.9",
+    "@sentry/react-native": "~8.11.1",
     "@shopify/flash-list": "^2.3.1",
     "@storybook/react-native": "^10.4.4",
-    "@stripe/stripe-react-native": "^0.40.0",
+    "@stripe/stripe-react-native": "^0.76.0",
     "@tanstack/react-query": "^5.100.11",
     "axios": "^1.7.9",
     "i18next": "^26.0.4",
@@ -91,20 +94,33 @@
       "node_modules/(?!(react-native|@react-native|@react-navigation|zustand|@stripe|@react-native-community)/)"
     ],
     "moduleNameMapper": {
+      "^@api$": "<rootDir>/src/api/index.ts",
       "^@api/(.*)$": "<rootDir>/src/api/$1",
       "^@config$": "<rootDir>/src/config/index.ts",
       "^@config/(.*)$": "<rootDir>/src/config/$1",
+      "^@constants$": "<rootDir>/src/constants/index.ts",
       "^@constants/(.*)$": "<rootDir>/src/constants/$1",
+      "^@models$": "<rootDir>/src/models/index.ts",
       "^@models/(.*)$": "<rootDir>/src/models/$1",
       "^@services/(.*)$": "<rootDir>/src/services/$1",
       "^@store/(.*)$": "<rootDir>/src/store/$1",
       "^@screens/(.*)$": "<rootDir>/src/screens/$1",
+      "^@components$": "<rootDir>/src/components/index.ts",
       "^@components/(.*)$": "<rootDir>/src/components/$1",
+      "^@hooks$": "<rootDir>/src/hooks/index.ts",
       "^@hooks/(.*)$": "<rootDir>/src/hooks/$1",
+      "^@utils$": "<rootDir>/src/utils/index.ts",
       "^@utils/(.*)$": "<rootDir>/src/utils/$1",
+      "^@theme$": "<rootDir>/src/theme/index.ts",
       "^@theme/(.*)$": "<rootDir>/src/theme/$1",
       "^@navigation/(.*)$": "<rootDir>/src/navigation/$1",
-      "^@lib/(.*)$": "<rootDir>/src/lib/$1"
-    }
+      "^@lib$": "<rootDir>/src/lib/index.ts",
+      "^@lib/(.*)$": "<rootDir>/src/lib/$1",
+      "^@i18n$": "<rootDir>/src/i18n/index.ts",
+      "^@i18n/(.*)$": "<rootDir>/src/i18n/$1"
+    },
+    "setupFiles": [
+      "<rootDir>/jest.setup.ts"
+    ]
   }
 }

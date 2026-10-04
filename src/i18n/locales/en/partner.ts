@@ -36,8 +36,8 @@ const partner: PartnerNS = {
       "teamSub": "Manage and track agents",
       "finances": "Finances & payroll",
       "financesSub": "Summary and per-agent breakdown",
-      "billing": "Team billing",
-      "billingSub": "Generate PDF summary",
+      "billing": "Provalk settlements",
+      "billingSub": "Statement of amounts owed to your company",
       "compliance": "Company compliance",
       "complianceSub": "Kbis, CNAPS, URSSAF, tax, liability",
       "documents": "Company documents",
@@ -47,7 +47,14 @@ const partner: PartnerNS = {
       "createMission": "Post a mission",
       "createMissionSub": "Publish a new assignment",
       "myMissions": "My missions",
-      "myMissionsSub": "Track and manage posted missions"
+      "myMissionsSub": "Track and manage posted missions",
+      "timesheets": "Timesheets",
+      "timesheetsSub": "Approve your agents' hours"
+    },
+    "errors": {
+      "title": "Unable to load",
+      "body": "Unable to load the dashboard.",
+      "retry": "Retry"
     }
   },
   "team": {
@@ -85,6 +92,12 @@ const partner: PartnerNS = {
       "noResultsBySearch": "No agents match «{{search}}».",
       "noResultsByFilter": "No agents in this category."
     }
+    ,
+    "errors": {
+      "title": "Unable to load",
+      "body": "Unable to load the team.",
+      "retry": "Retry"
+    }
   },
   "agentDetail": {
     "title": "Agent detail",
@@ -118,12 +131,15 @@ const partner: PartnerNS = {
       "empty": "No documents submitted."
     },
     "errors": {
-      "notFound": "Agent not found."
+      "notFound": "Agent not found.",
+      "title": "Unable to load",
+      "body": "Unable to load the agent's profile.",
+      "retry": "Retry"
     }
   },
   "financials": {
-    "title": "Team finances",
-    "subtitle": "Payroll & payouts",
+    "title": "Provalk settlements",
+    "subtitle": "Amounts owed to your company (excl. VAT)",
     "loading": "Loading finances…",
     "period": {
       "label": "Selected period",
@@ -133,9 +149,9 @@ const partner: PartnerNS = {
       "all_periods": "All"
     },
     "totals": {
-      "paid": "Paid",
-      "pending": "Pending",
-      "missions": "Missions"
+      "paid": "Settled",
+      "pending": "Due",
+      "missions": "Shifts"
     },
     "search": {
       "placeholder": "Search an agent…"
@@ -147,9 +163,9 @@ const partner: PartnerNS = {
     },
     "payout": {
       "status": {
-        "paid": "Paid",
-        "failed": "Failed",
-        "scheduled": "Scheduled"
+        "paid": "Settled",
+        "failed": "Cancelled",
+        "scheduled": "Due"
       },
       "pending": "+{{amount}} pending",
       "mission_one": "{{count}} mission",
@@ -179,9 +195,9 @@ const partner: PartnerNS = {
     }
   },
   "billing": {
-    "title": "Team billing",
-    "subtitle": "PDF summary — spec §2.3",
-    "notice": "Generate a PDF payroll summary for the team over a given period. This document complies with legal obligations (private security collective agreement).",
+    "title": "Settlement statement",
+    "subtitle": "Amounts Provalk owes your company",
+    "notice": "Your company employs and pays its agents. Provalk settles your company for every shift worked: the quoted hourly cost × approved hours, plus the legal night, Sunday and public-holiday premiums. An amount becomes payable once the timesheet is approved. Invoice Provalk on the basis of this statement.",
     "steps": {
       "period": "1 — Select period",
       "preview": "2 — Preview",
@@ -192,16 +208,16 @@ const partner: PartnerNS = {
       "pickTitle": "Choose period"
     },
     "preview": {
-      "totalPaid": "Total paid",
-      "pending": "Pending",
-      "missions": "Missions covered",
+      "totalPaid": "Settled by Provalk (excl. VAT)",
+      "pending": "Due (excl. VAT)",
+      "missions": "Shifts covered",
       "agents": "Agents included",
       "empty": "Select a period to display the preview.",
       "loading": "Calculating totals…"
     },
     "generate": {
-      "title": "PDF summary",
-      "subtitle": "Includes: agent name, missions, amounts, payout status",
+      "title": "PDF statement",
+      "subtitle": "Per agent and per shift, amounts settled and due (excl. VAT)",
       "cta": "📄  Generate and download PDF",
       "loading": "Generating…",
       "disabledHint": "Select a specific period to enable generation."
@@ -216,6 +232,24 @@ const partner: PartnerNS = {
     "errors": {
       "load": "Loading error"
     }
+  },
+  "timesheets": {
+    "title": "Timesheets",
+    "subtitle": "Your agents' hours to approve",
+    "notice": "Approve the hours your agents clocked. Without objection they are approved automatically 48 h after the shift ends, unless there is an incident or a dispute. An approved timesheet makes the settlement payable.",
+    "tabs": { "pending": "To approve", "approved": "Approved" },
+    "empty": "No timesheet to review.",
+    "loading": "Loading timesheets…",
+    "hours": "{{hours}} h paid",
+    "planned": "planned {{hours}} h",
+    "autoOn": "Auto-approval on {{date}}",
+    "offline": "Offline check: times dated by the phone, check before approving",
+    "incidents": "{{count}} open incident(s) — check",
+    "approve": "Approve",
+    "approved": "Approved",
+    "confirmTitle": "Approve these hours?",
+    "confirmBody": "{{agent}} — {{hours}} h. Approval makes this shift's settlement payable.",
+    "errors": { "load": "Could not load timesheets.", "approve": "Approval failed." }
   },
   "compliance": {
     "title": "Company compliance",
@@ -261,6 +295,11 @@ const partner: PartnerNS = {
     "actions": {
       "checkStatus": "Check status",
       "addDocument": "Add a document"
+    }
+    ,
+    "errors": {
+      "title": "Unable to load",
+      "body": "Unable to load compliance status."
     }
   },
   "documents": {
@@ -435,7 +474,10 @@ const partner: PartnerNS = {
       "legalInfo": "Legal information",
       "address": "Address",
       "contact": "Contact",
-      "billing": "Billing"
+      "billing": "Billing",
+      "legal": "Legal information",
+      "banking": "Banking details",
+      "insurance": "Professional liability insurance"
     },
     "fields": {
       "companyName": {
@@ -450,6 +492,16 @@ const partner: PartnerNS = {
         "label": "VAT number",
         "placeholder": "GB123456789"
       },
+      "siren": { "label": "SIREN", "placeholder": "552140215" },
+      "apeCode": { "label": "APE code", "placeholder": "8010Z" },
+      "tradeName": { "label": "Trade name", "placeholder": "SecuriPro" },
+      "legalRepName": { "label": "Legal representative", "placeholder": "John Smith" },
+      "legalRepRole": { "label": "Title", "placeholder": "President" },
+      "iban": { "label": "IBAN", "placeholder": "FR76 3000 6000 0112 3456 7890 189" },
+      "bic": { "label": "BIC / SWIFT", "placeholder": "AGRIFRPP" },
+      "rcProInsurer": { "label": "Insurer", "placeholder": "AXA Assurances" },
+      "rcProPolicyNumber": { "label": "Policy number", "placeholder": "RCP-2026-00123" },
+      "rcProExpiresAt": { "label": "Expiry (YYYY-MM-DD)", "placeholder": "2027-01-01" },
       "billingAddress": {
         "label": "Billing address",
         "placeholder": "25 Republic Avenue"
@@ -491,6 +543,7 @@ const partner: PartnerNS = {
       "siretInvalid": "Invalid SIRET \u2014 14 digits with a valid checksum required",
       "zipInvalid": "Invalid postal code (5 digits)",
       "vatInvalid": "Invalid VAT number (e.g. FR12345678901)",
+      "dateInvalid": "Invalid date (format YYYY-MM-DD)",
       "siretValid": "Valid SIRET"
     },
     "errors": {
@@ -688,6 +741,11 @@ const partner: PartnerNS = {
           "successTitle": "Contract cancelled",
           "successBody": "The contract has been cancelled and the agent will be notified.",
           "failed": "Cancellation failed. Please try again."
+        },
+        "errors": {
+          "title": "Unable to load",
+          "body": "Unable to load the contract.",
+          "retry": "Retry"
         }
       },
       "create": {

@@ -16,9 +16,9 @@ import {
   CalendarDays, MessageSquare, FileText, Zap, 
   Check, Hourglass, Users, PlayCircle, CheckCheck, XCircle, Pencil,
 } from 'lucide-react-native';
-import { missionsApi }          from '@api/endpoints/missions';
+
 import { quotesApi }            from '@api/endpoints/quotes';
-import { useApi }               from '@hooks/useApi';
+import { useMissionDetail, useCancelMission } from '@hooks/queries/useMissionQueries';
 import { AgentApproachBanner }  from '@components/domain/AgentApproachBanner';
 import { BookingCard }          from '@components/domain/BookingCard';
 import { Button }               from '@components/ui/Button';
@@ -191,11 +191,18 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const toast         = useToast();
   const confirm       = useConfirmDialogStore((s) => s.confirm);
   const { missionId } = route.params;
-  const { data: mission, loading, execute, error } = useApi(missionsApi.getById);
+  const { data: mission, isLoading: loading, isFetching, error, refetch } =
+    useMissionDetail(missionId);
+  const cancelMission = useCancelMission();
   const [gettingQuote, setGettingQuote] = useState(false);
 
-  const load = useCallback(() => execute(missionId), [execute, missionId]);
-  useEffect(() => { load(); }, [load]);
+  // TanStack fetches on mount and refetches on invalidation, so the manual
+  // load-on-mount effect is gone. load survives as the pull-to-refresh and
+  // retry handler - and the screen now actually receives the invalidations
+  // that api/queries/quotes.ts and payments.ts emit on qk.missions.detail(id).
+  // While this screen sat on useApi those three call sites were dead: they
+  // invalidated a cache entry nothing was reading.
+  const load = useCallback(() => { void refetch(); }, [refetch]);
 
   const handleCancel = useCallback(async () => {
     const ok = await confirm({
@@ -205,12 +212,16 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     });
     if (!ok) return;
     try {
-      await missionsApi.cancel(missionId);
-      load();
+      // useCancelMission invalidates qk.missions.detail(id) AND
+      // qk.missions.all, so the Missions list drops the cancelled mission
+      // too. The previous direct call + load() refreshed this screen only,
+      // leaving the list showing a cancelled mission as active for up to
+      // five minutes.
+      await cancelMission.mutateAsync(missionId);
     } catch (e: unknown) {
       toast.error((e as any)?.response?.data?.message ?? t('detail.cancel_error'), { title: t('detail.cancel_title') });
     }
-  }, [t, missionId, load, confirm, toast]);
+  }, [t, missionId, cancelMission, confirm, toast]);
 
   /**
    * FIX: "Obtenir un devis" CTA handler.
@@ -348,7 +359,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       />
 
       <ScrollView style={styles.flex} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={load} tintColor={colors.primary} />}
       >
         <JourneyStepper status={mission.status as MissionStatus} />
 

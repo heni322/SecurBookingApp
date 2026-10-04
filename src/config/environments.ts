@@ -20,11 +20,14 @@
  * fields from process.env there and these literals become the fallback.
  */
 import type { AppConfig, AppEnv } from './types';
+import { version as PACKAGE_VERSION } from '../../package.json';
 
 // ── Shared, environment-independent defaults ──────────────────────────────────
 const shared = {
   appName: 'Provalk',
-  appVersion: '1.0.0',
+  // package.json `version`: also Android's default versionName and the
+  // x-app-version header the API checks (audit 2026-10-02, H9).
+  appVersion: PACKAGE_VERSION,
   maps: {
     tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   },
@@ -35,6 +38,15 @@ const shared = {
   },
   checkinRadiusMeters: 30,
   defaultPageSize: 20,
+  // ⚠️ TO CONFIRM before release: these pages must exist and be published
+  // (audit 2026-09-30, P0-9). Same pages for every environment.
+  legal: {
+    privacyUrl:     'https://www.provalk.com/confidentialite',
+    termsUrl:       'https://www.provalk.com/cgu',
+    salesTermsUrl:  'https://www.provalk.com/cgv',
+    legalNoticeUrl: 'https://www.provalk.com/mentions-legales',
+    supportUrl:     'mailto:support@provalk.fr',
+  },
 } as const;
 
 /**
@@ -44,7 +56,7 @@ const shared = {
  *   • Emulator:   Android emulator loopback      → '10.0.2.2'
  * Must also be whitelisted in android network_security_config.xml (debug).
  */
-const DEV_HOST = '192.168.45.94';
+const DEV_HOST = '192.168.100.5';
 
 // ── Profiles ──────────────────────────────────────────────────────────────────
 export const ENVIRONMENTS: Record<AppEnv, AppConfig> = {
@@ -57,7 +69,7 @@ export const ENVIRONMENTS: Record<AppEnv, AppConfig> = {
     },
     stripe: {
       // Replace with your real Stripe TEST publishable key.
-      publishableKey: 'pk_test_REMPLACER_PAR_VOTRE_CLE_TEST_STRIPE',
+      publishableKey: 'pk_test_51TiGDA2cdfTzA9B2s2mML7nDpibyX90D3vAXFmbI57fEwU329TKJWALPGt4jGhttpu1LQl3doec95pnyqGJaowAm00qY3vEQXA',
       merchantIdentifier: '',
     },
     features: {
@@ -79,7 +91,7 @@ export const ENVIRONMENTS: Record<AppEnv, AppConfig> = {
     },
     stripe: {
       // Staging uses TEST keys so no real charges occur.
-      publishableKey: 'pk_test_REMPLACER_PAR_VOTRE_CLE_TEST_STRIPE',
+      publishableKey: 'pk_test_51TiGDA2cdfTzA9B2s2mML7nDpibyX90D3vAXFmbI57fEwU329TKJWALPGt4jGhttpu1LQl3doec95pnyqGJaowAm00qY3vEQXA',
       merchantIdentifier: '',
     },
     features: {

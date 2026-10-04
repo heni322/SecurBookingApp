@@ -68,3 +68,7 @@ Thumbs.db
 # ─── Build ────────────────────────────────────────────────────────────────────
 *.tsbuildinfo
 android/app/.cxx/
+
+# Release signing (RELEASE-SIGNING.md) — never commit the upload key or its passwords
+android/keystore.properties
+*.jks

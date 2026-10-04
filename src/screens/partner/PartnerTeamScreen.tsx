@@ -130,15 +130,22 @@ export const PartnerTeamScreen: React.FC = () => {
   const [refreshing,setRefreshing]= useState(false);
   const [search,    setSearch]    = useState('');
   const [tab,       setTab]       = useState<FilterTab>('all');
+  const [error,     setError]     = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
+    setError(null);
     try {
       const res = await partnerApi.getAgents();
       setAgents((res.data as any)?.data ?? res.data ?? []);
-    } catch { /* silent */ }
+    } catch (err: any) {
+      // Was a silent catch -- a failed load left "agents" at [], which
+      // rendered as "No agents" (implying an empty team) rather than a
+      // load failure.
+      setError(err?.response?.data?.message ?? t('team.errors.body'));
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -217,7 +224,14 @@ export const PartnerTeamScreen: React.FC = () => {
         ))}
       </View>
 
-      {agents.length === 0 ? (
+      {error && agents.length === 0 ? (
+        <EmptyState Icon={XCircle}
+          title={t('team.errors.title')}
+          subtitle={error}
+          actionLabel={t('team.errors.retry')}
+          onAction={() => load()}
+        />
+      ) : agents.length === 0 ? (
         <EmptyState Icon={Users} title={t('team.empty.noAgentsTitle')} subtitle={t('team.empty.noAgentsSubtitle')} />
       ) : filtered.length === 0 ? (
         <View style={styles.emptyFiltered}>

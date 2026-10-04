@@ -20,7 +20,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, Linking, TouchableOpacity as HeaderBtn } from 'react-native';
 import { usePartnerT } from './_partnerI18n';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ShieldCheck, Briefcase, CalendarClock, Coins, PenLine, CircleCheckBig, Clock, FileCheck2, Download } from 'lucide-react-native';
+import { ShieldCheck, Briefcase, CalendarClock, Coins, PenLine, CircleCheckBig, Clock, FileCheck2, Download, XCircle } from 'lucide-react-native';
 
 import {
   useContract,
@@ -35,6 +35,7 @@ import { Button }       from '@components/ui/Button';
 import { Badge }        from '@components/ui/Badge';
 import { Separator }    from '@components/ui/Separator';
 import { LoadingState } from '@components/ui/LoadingState';
+import { EmptyState }   from '@components/ui/EmptyState';
 import { showAlert }    from '@components/ui/AlertModal';
 import { colors, palette }          from '@theme/colors';
 import { spacing, layout, radius }  from '@theme/spacing';
@@ -135,11 +136,31 @@ export const PartnerContractDetailScreen: React.FC<Props> = ({ route, navigation
     );
   }, [contract, cancelMut, navigation, t]);
 
-  if (contractQ.isLoading || !contract) {
+  if (contractQ.isLoading) {
     return (
       <View style={styles.screen}>
         <ScreenHeader title={t('partner:employment.contract.detail.title')} onBack={() => navigation.goBack()} showBack />
         <LoadingState message={t('partner:employment.contract.detail.loading')} />
+      </View>
+    );
+  }
+
+  // Was: `if (contractQ.isLoading || !contract)` with no isError branch -- a
+  // failed fetch left isLoading=false and contract=undefined, so this
+  // condition stayed true forever and the screen was stuck on the loading
+  // spinner indefinitely with no error message and no way to retry.
+  if (contractQ.isError || !contract) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title={t('partner:employment.contract.detail.title')} onBack={() => navigation.goBack()} showBack />
+        <View style={styles.errorWrap}>
+          <EmptyState Icon={XCircle}
+            title={t('partner:employment.contract.detail.errors.title')}
+            subtitle={(contractQ.error as any)?.response?.data?.message ?? t('partner:employment.contract.detail.errors.body')}
+            actionLabel={t('partner:employment.contract.detail.errors.retry')}
+            onAction={() => contractQ.refetch()}
+          />
+        </View>
       </View>
     );
   }
@@ -356,6 +377,7 @@ const SignatureRow: React.FC<{
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: colors.background },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: layout.screenPaddingH },
   content: { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], gap: spacing[4] },
 
   statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

@@ -3,6 +3,7 @@
   "compilerOptions": {
     "types": ["jest"],
     "baseUrl": ".",
+    "resolveJsonModule": true,
     "paths": {
       "@api":          ["src/api/index.ts"],
       "@api/*":        ["src/api/*"],

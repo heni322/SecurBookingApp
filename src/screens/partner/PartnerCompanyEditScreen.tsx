@@ -9,12 +9,13 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePartnerT } from './_partnerI18n';
-import { Building2, Hash, MapPin, CircleCheckBig, CircleAlert } from 'lucide-react-native';
+import { Building2, Hash, MapPin, CircleCheckBig, CircleAlert, XCircle } from 'lucide-react-native';
 import { partnerApi }   from '@api/endpoints/partner';
 import { ScreenHeader } from '@components/ui/ScreenHeader';
 import { Card }         from '@components/ui/Card';
 import { Button }       from '@components/ui/Button';
 import { Separator }    from '@components/ui/Separator';
+import { EmptyState }   from '@components/ui/EmptyState';
 import { showAlert }    from '@components/ui/AlertModal';
 import { colors, palette } from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
@@ -89,31 +90,61 @@ export const PartnerCompanyEditScreen: React.FC = () => {
   const [billingCity,    setBillingCity]    = useState('');
   const [billingZipCode, setBillingZipCode] = useState('');
   const [vatNumber,      setVatNumber]      = useState('');
+  const [siren,        setSiren]        = useState('');
+  const [apeCode,      setApeCode]      = useState('');
+  const [tradeName,    setTradeName]    = useState('');
+  const [legalRepName, setLegalRepName] = useState('');
+  const [legalRepRole, setLegalRepRole] = useState('');
+  const [iban,         setIban]         = useState('');
+  const [bic,          setBic]          = useState('');
+  const [rcProInsurer,      setRcProInsurer]      = useState('');
+  const [rcProPolicyNumber, setRcProPolicyNumber] = useState('');
+  const [rcProExpiresAt,    setRcProExpiresAt]    = useState('');
   const [loading,  setLoading]  = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving,   setSaving]   = useState(false);
   const [saved,    setSaved]    = useState(false);
   const [errors,   setErrors]   = useState<Partial<Record<string, string>>>({});
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await partnerApi.getCompany();
-        const company: Company | null = (((res.data as any)?.data ?? res.data) as Company | null);
-        if (company) {
-          setCompanyName(company.companyName ?? '');
-          setSiret(company.siret ?? '');
-          setAddress(company.address ?? '');
-          setCity(company.city ?? '');
-          setZipCode(company.zipCode ?? '');
-          setBillingAddress(company.billingAddress ?? '');
-          setBillingCity(company.billingCity ?? '');
-          setBillingZipCode(company.billingZipCode ?? '');
-          setVatNumber(company.vatNumber ?? '');
-        }
-      } catch { /* silent */ }
-      finally { setLoading(false); }
-    })();
-  }, []);
+  // M11 audit fix: prefill fetch used to fail silently (catch { /* silent */ }),
+  // leaving a blank form with no indication the load had failed. Now surfaces
+  // a distinct error state with a retry action (same pattern as the other
+  // partner screens' errorBanner/EmptyState usage).
+  const loadCompany = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await partnerApi.getCompany();
+      const company: Company | null = (((res.data as any)?.data ?? res.data) as Company | null);
+      if (company) {
+        setCompanyName(company.companyName ?? '');
+        setSiret(company.siret ?? '');
+        setAddress(company.address ?? '');
+        setCity(company.city ?? '');
+        setZipCode(company.zipCode ?? '');
+        setBillingAddress(company.billingAddress ?? '');
+        setBillingCity(company.billingCity ?? '');
+        setBillingZipCode(company.billingZipCode ?? '');
+        setVatNumber(company.vatNumber ?? '');
+        setSiren(company.siren ?? '');
+        setApeCode(company.apeCode ?? '');
+        setTradeName(company.tradeName ?? '');
+        setLegalRepName(company.legalRepName ?? '');
+        setLegalRepRole(company.legalRepRole ?? '');
+        setIban(company.iban ?? '');
+        setBic(company.bic ?? '');
+        setRcProInsurer(company.rcProInsurer ?? '');
+        setRcProPolicyNumber(company.rcProPolicyNumber ?? '');
+        setRcProExpiresAt(company.rcProExpiresAt ? company.rcProExpiresAt.slice(0, 10) : '');
+      }
+    } catch (err: any) {
+      setLoadError(err?.response?.data?.message ?? t('companyEdit.errors.loadFailed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => { loadCompany(); }, [loadCompany]);
 
   const validate = (): boolean => {
     const e: Partial<Record<string, string>> = {};
@@ -122,6 +153,7 @@ export const PartnerCompanyEditScreen: React.FC = () => {
     if (zipCode.trim() && !/^\d{5}$/.test(zipCode)) e.zipCode = t('companyEdit.validation.zipInvalid');
     if (billingZipCode.trim() && !/^\d{5}$/.test(billingZipCode)) e.billingZipCode = t('companyEdit.validation.zipInvalid');
     if (vatNumber.trim() && /^FR/i.test(vatNumber.trim()) && !/^FR[0-9A-Za-z]{2}\d{9}$/.test(vatNumber.replace(/\s/g, '').toUpperCase())) e.vatNumber = t('companyEdit.validation.vatInvalid');
+    if (rcProExpiresAt.trim() && !/^\d{4}-\d{2}-\d{2}$/.test(rcProExpiresAt.trim())) e.rcProExpiresAt = t('companyEdit.validation.dateInvalid');
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -130,7 +162,7 @@ export const PartnerCompanyEditScreen: React.FC = () => {
     if (!validate()) return;
     setSaving(true); setSaved(false);
     try {
-      await partnerApi.updateCompany({ companyName: companyName.trim(), siret: siret.replace(/\s/g, ''), address: address.trim() || undefined, city: city.trim() || undefined, zipCode: zipCode.trim() || undefined, billingAddress: billingAddress.trim() || undefined, billingCity: billingCity.trim() || undefined, billingZipCode: billingZipCode.trim() || undefined, vatNumber: vatNumber.trim().toUpperCase() || undefined });
+      await partnerApi.updateCompany({ companyName: companyName.trim(), siret: siret.replace(/\s/g, ''), address: address.trim() || undefined, city: city.trim() || undefined, zipCode: zipCode.trim() || undefined, billingAddress: billingAddress.trim() || undefined, billingCity: billingCity.trim() || undefined, billingZipCode: billingZipCode.trim() || undefined, vatNumber: vatNumber.trim().toUpperCase() || undefined, siren: siren.trim() || undefined, apeCode: apeCode.trim().toUpperCase() || undefined, tradeName: tradeName.trim() || undefined, legalRepName: legalRepName.trim() || undefined, legalRepRole: legalRepRole.trim() || undefined, iban: iban.replace(/\s/g, '').toUpperCase() || undefined, bic: bic.trim().toUpperCase() || undefined, rcProInsurer: rcProInsurer.trim() || undefined, rcProPolicyNumber: rcProPolicyNumber.trim() || undefined, rcProExpiresAt: rcProExpiresAt.trim() || undefined });
       setSaved(true);
       setTimeout(() => setSaved(false), 3_000);
     } catch (err: any) {
@@ -147,6 +179,21 @@ export const PartnerCompanyEditScreen: React.FC = () => {
     );
   }
 
+  if (loadError) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title={t('companyEdit.title')} onBack={() => navigation.goBack()} />
+        <View style={styles.loadingWrap}>
+          <EmptyState Icon={XCircle}
+            title={t('missionsList.error.title')}
+            subtitle={loadError}
+            actionLabel={t('missionsList.error.retry')}
+            onAction={loadCompany}
+          />
+        </View>
+      </View>
+    );
+  }
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.screen}>
@@ -264,6 +311,102 @@ export const PartnerCompanyEditScreen: React.FC = () => {
             />
           </Card>
 
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('companyEdit.sections.legal')}</Text>
+            <View style={styles.cityRow}>
+              <View style={{ flex: 1 }}>
+                <Field
+                  label={t('companyEdit.fields.siren.label')}
+                  value={siren} onChangeText={setSiren}
+                  placeholder={t('companyEdit.fields.siren.placeholder')}
+                  icon={<Hash size={14} color={colors.textMuted} strokeWidth={1.8} />}
+                  keyboardType="numeric" maxLength={9} autoCapitalize="none"
+                />
+              </View>
+              <View style={{ width: 110 }}>
+                <Field
+                  label={t('companyEdit.fields.apeCode.label')}
+                  value={apeCode} onChangeText={setApeCode}
+                  placeholder={t('companyEdit.fields.apeCode.placeholder')}
+                  icon={<Hash size={14} color={colors.textMuted} strokeWidth={1.8} />}
+                  maxLength={6} autoCapitalize="none"
+                />
+              </View>
+            </View>
+            <Separator marginV={spacing[3]} />
+            <Field
+              label={t('companyEdit.fields.tradeName.label')}
+              value={tradeName} onChangeText={setTradeName}
+              placeholder={t('companyEdit.fields.tradeName.placeholder')}
+              icon={<Building2 size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            />
+            <Separator marginV={spacing[3]} />
+            <View style={styles.cityRow}>
+              <View style={{ flex: 1 }}>
+                <Field
+                  label={t('companyEdit.fields.legalRepName.label')}
+                  value={legalRepName} onChangeText={setLegalRepName}
+                  placeholder={t('companyEdit.fields.legalRepName.placeholder')}
+                  icon={<Building2 size={14} color={colors.textMuted} strokeWidth={1.8} />}
+                />
+              </View>
+              <View style={{ width: 130 }}>
+                <Field
+                  label={t('companyEdit.fields.legalRepRole.label')}
+                  value={legalRepRole} onChangeText={setLegalRepRole}
+                  placeholder={t('companyEdit.fields.legalRepRole.placeholder')}
+                  icon={<Hash size={14} color={colors.textMuted} strokeWidth={1.8} />}
+                />
+              </View>
+            </View>
+          </Card>
+
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('companyEdit.sections.banking')}</Text>
+            <Field
+              label={t('companyEdit.fields.iban.label')}
+              value={iban} onChangeText={setIban}
+              placeholder={t('companyEdit.fields.iban.placeholder')}
+              icon={<Hash size={16} color={colors.textMuted} strokeWidth={1.8} />}
+              autoCapitalize="none"
+            />
+            <Separator marginV={spacing[3]} />
+            <Field
+              label={t('companyEdit.fields.bic.label')}
+              value={bic} onChangeText={setBic}
+              placeholder={t('companyEdit.fields.bic.placeholder')}
+              icon={<Hash size={16} color={colors.textMuted} strokeWidth={1.8} />}
+              maxLength={11} autoCapitalize="none"
+            />
+          </Card>
+
+          <Card style={styles.section}>
+            <Text style={styles.sectionTitle}>{t('companyEdit.sections.insurance')}</Text>
+            <Field
+              label={t('companyEdit.fields.rcProInsurer.label')}
+              value={rcProInsurer} onChangeText={setRcProInsurer}
+              placeholder={t('companyEdit.fields.rcProInsurer.placeholder')}
+              icon={<Building2 size={16} color={colors.textMuted} strokeWidth={1.8} />}
+            />
+            <Separator marginV={spacing[3]} />
+            <Field
+              label={t('companyEdit.fields.rcProPolicyNumber.label')}
+              value={rcProPolicyNumber} onChangeText={setRcProPolicyNumber}
+              placeholder={t('companyEdit.fields.rcProPolicyNumber.placeholder')}
+              icon={<Hash size={16} color={colors.textMuted} strokeWidth={1.8} />}
+              autoCapitalize="none"
+            />
+            <Separator marginV={spacing[3]} />
+            <Field
+              label={t('companyEdit.fields.rcProExpiresAt.label')}
+              value={rcProExpiresAt}
+              onChangeText={v => { setRcProExpiresAt(v); setErrors(e => ({ ...e, rcProExpiresAt: undefined })); }}
+              placeholder={t('companyEdit.fields.rcProExpiresAt.placeholder')}
+              icon={<Hash size={16} color={colors.textMuted} strokeWidth={1.8} />}
+              error={errors.rcProExpiresAt}
+              maxLength={10} autoCapitalize="none"
+            />
+          </Card>
           <Button
             label={saving ? t('companyEdit.actions.saving') : t('companyEdit.actions.save')}
             onPress={handleSave}

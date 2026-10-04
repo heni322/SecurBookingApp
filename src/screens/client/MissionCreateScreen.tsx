@@ -1,38 +1,38 @@
 /**
- * MissionCreateScreen â€” Enterprise 2-step mission creation.
+ * MissionCreateScreen — Enterprise 2-step mission creation.
  *
  * Flow (redesigned):
- *   MissionList / Home â†’ MissionCreate (2 steps) â†’ QuoteDetail
+ *   MissionList / Home → MissionCreate (2 steps) → QuoteDetail
  *
- *     Step 1 Â· WHERE        Address with auto-fill + map confirmation
- *     Step 2 Â· WHEN & WHO   Per-slot scheduling AND staffing, together.
- *                           Each crÃ©neau carries its OWN services / agent
- *                           counts / uniforms â€” fully independent per slot.
+ *     Step 1 · WHERE        Address with auto-fill + map confirmation
+ *     Step 2 · WHEN & WHO   Per-slot scheduling AND staffing, together.
+ *                           Each créneau carries its OWN services / agent
+ *                           counts / uniforms — fully independent per slot.
  *                           This is the last step: indicative price, optional
  *                           title/notes and the "Create" CTA are folded in.
  *
  * What changed vs. the old flow
- *   â”€ The standalone ServicePicker screen is gone. Service/agent selection now
+ *   ─ The standalone ServicePicker screen is gone. Service/agent selection now
  *     lives inside each time slot on step 2 ("merge fully, per-slot").
- *   â”€ Single-slot vs multi-slot is no longer a mode switch: there is always a
+ *   ─ Single-slot vs multi-slot is no longer a mode switch: there is always a
  *     list of >=1 slots, each with its own staffing. A 1-slot mission submits as
- *     SINGLE, a many-slot mission submits as MULTI â€” payloads unchanged.
+ *     SINGLE, a many-slot mission submits as MULTI — payloads unchanged.
  *
  * Enterprise UX features:
- *   â”€ Draft autosave (per-user, 7-day TTL) + restore banner on mount
- *   â”€ Smart footer: Back Â· Continue/Create with step-preview labels
- *   â”€ Cross-slot validation summary banner (overlap / legal duration)
- *   â”€ Per-slot "copy schedule + staffing from slot N" shortcut
- *   â”€ Indicative price estimate folded into the final step
- *   â”€ Structured submit-error banner with "Modifier" jump-back per field
+ *   ─ Draft autosave (per-user, 7-day TTL) + restore banner on mount
+ *   ─ Smart footer: Back · Continue/Create with step-preview labels
+ *   ─ Cross-slot validation summary banner (overlap / legal duration)
+ *   ─ Per-slot "copy schedule + staffing from slot N" shortcut
+ *   ─ Indicative price estimate folded into the final step
+ *   ─ Structured submit-error banner with "Modifier" jump-back per field
  *
  * Backend payload (unified slots[]):
- *   â”€ ALL missions     -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
- *   â”€ Single-slot      -> same shape, 1 entry in slots array
+ *   ─ ALL missions     -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
+ *   ─ Single-slot      -> same shape, 1 entry in slots array
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
-  View, Text, ScrollView, KeyboardAvoidingView,
+  View, Text, ScrollView, KeyboardAvoidingView, Keyboard,
   Platform, StyleSheet, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
 import type { TFunction } from 'i18next';
@@ -49,6 +49,8 @@ import { useConfirmDialog }  from '@hooks/useConfirmDialog';
 import { useApi }            from '@hooks/useApi';
 import { useAuthStore }      from '@store/authStore';
 import { missionsApi }       from '@api/endpoints/missions';
+import { queryClient }       from '@lib/queryClient';
+import { qk }                from '@api/queryKeys';
 import { quotesApi }         from '@api/endpoints/quotes';
 import { serviceTypesApi }   from '@api/endpoints/serviceTypes';
 import { missionDraftStorage, isDraftMeaningful } from '@services/missionDraftStorage';
@@ -77,16 +79,29 @@ type Step      = 1 | 2;
 
 const TOTAL_STEPS = 2;
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/**
+ * Commercial gate (2026-09) - the indicative estimate is NOT surfaced during
+ * creation. It renders a bare HT figure, stripped of night / week-end
+ * surcharges and VAT, at the exact moment the client has not yet seen what
+ * they get for it: the number reads as THE price and discourages the sale.
+ * The definitive, fully-justified price lives on the quote screen, which is
+ * built to present it.
+ *
+ * The computation below is deliberately KEPT rather than deleted, so the
+ * block can be restored by flipping this single flag.
+ */
+const SHOW_INDICATIVE_ESTIMATE: boolean = false;
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Local types
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 /** One service-type need within a single slot. Fully self-contained. */
 interface SlotServiceLine {
   serviceTypeId: string;
   name:          string;
   accent:        string;
-  /** Indicative rate from the catalog. NOT sent to the API â€” estimate only. */
+  /** Indicative rate from the catalog. NOT sent to the API — estimate only. */
   ratePerHour:   number;
   agentCount:    number;     // 1..20
   uniform:       UniformValue;
@@ -98,7 +113,7 @@ interface SlotDraft {
   key:        string;
   startAt:    string;
   endAt:      string;
-  /** Per-slot staffing â€” each slot is independent. */
+  /** Per-slot staffing — each slot is independent. */
   lines:      SlotServiceLine[];
   /** Whether the "add a service" catalog is expanded for this slot. */
   pickerOpen: boolean;
@@ -126,9 +141,9 @@ const INITIAL_FORM: FormData = {
   latitude: null, longitude: null,
 };
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Constants
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const MIN_FUTURE_HOURS = 1;
 const MIN_DURATION_H   = 6;
@@ -136,12 +151,12 @@ const MAX_DURATION_H   = 12;   // Must match backend SLOT_MAX_HOURS (legal R2: m
 const MAX_SLOTS        = 30;
 const MAX_AGENTS       = 20;
 
-/** Autosave debounce â€” we don't need keystroke-level persistence. */
+/** Autosave debounce — we don't need keystroke-level persistence. */
 const AUTOSAVE_DEBOUNCE_MS = 700;
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Helpers
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 let _slotKey = 0;
 const nextKey = () => `slot_${Date.now()}_${_slotKey++}`;
@@ -178,11 +193,11 @@ function formatSlotDateShort(startIso: string, endIso: string): string {
   if (!startIso || !endIso) return '';
   const s = new Date(startIso), e = new Date(endIso);
   const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
-  return `${s.toLocaleString('fr-FR', opts)} â†’ ${e.toLocaleString('fr-FR', opts)}`;
+  return `${s.toLocaleString('fr-FR', opts)} → ${e.toLocaleString('fr-FR', opts)}`;
 }
 
 function formatDateShort(iso: string): string {
-  if (!iso) return 'â€”';
+  if (!iso) return '—';
   return new Date(iso).toLocaleString('fr-FR', {
     day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
   });
@@ -210,9 +225,9 @@ function slotApiLines(slot: SlotDraft) {
     }));
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Schedule presets (applied to the first slot when there's a single slot)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 type PresetKey = 'tonight' | 'tomorrow' | 'weekend';
 
@@ -273,9 +288,9 @@ function detectActivePreset(startAt: string, endAt: string): PresetKey | null {
   return null;
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Screen
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t }   = useTranslation('missions');
@@ -296,7 +311,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const isEditMode    = !!editMissionId;
   const [hydrating, setHydrating] = useState<boolean>(isEditMode);
 
-  // Service catalog â€” fetched here now that ServicePicker is gone.
+  // Service catalog — fetched here now that ServicePicker is gone.
   const { data: services, loading: servicesLoading, execute: loadServices } =
     useApi(serviceTypesApi.findAll);
   const serviceTypes = (services as ServiceType[] | null) ?? [];
@@ -425,15 +440,15 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     [slots],
   );
 
-  // â”€â”€ Draft restore â€” null = not checked yet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Draft restore — null = not checked yet ──────────────────────────────
   const [draftCandidate, setDraftCandidate] = useState<{
     payload: MissionDraftPayload; savedAt: number;
   } | null>(null);
   const autosaveReady = useRef(false);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Draft autosave / restore
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     if (isEditMode) { autosaveReady.current = true; return; }
@@ -520,9 +535,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     setDraftCandidate(null);
   }, [draftCandidate, userId, confirm, t]);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Address auto-fill
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const handleAddressSelect = useCallback((r: NominatimResult) => {
     const a = r.address;
     const road = a.road ?? '', num = a.house_number ?? '';
@@ -542,9 +557,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     setErrors(e => ({ ...e, latitude: undefined }));
   }, []);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Schedule presets (single slot only) â€” re-tap clears
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
+  // Schedule presets (single slot only) — re-tap clears
+  // ──────────────────────────────────────────────────────────────────────────
   const applyPreset = useCallback((preset: SchedulePreset) => {
     setSlots(prev => {
       if (prev.length !== 1) return prev;
@@ -563,9 +578,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     });
   }, []);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Slot mutations
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const clearSlotErrors = useCallback((key: string) => {
     setErrors(prev => {
       const next = { ...prev };
@@ -582,7 +597,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const addSlot = useCallback(() => {
     setSlots(prev => {
       if (prev.length >= MAX_SLOTS) return prev;
-      // Seed the new slot's staffing from the last slot â€” saves re-entry while
+      // Seed the new slot's staffing from the last slot — saves re-entry while
       // staying fully editable (the core "flexible" win).
       const last = prev[prev.length - 1];
       const seeded = last.lines.map(l => ({ ...l }));
@@ -659,9 +674,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       : s));
   }, []);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Cross-slot error aggregation
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const crossSlotErrorSlots = useMemo(() => {
     if (!isMultiSlot) return [];
     const offenders: Array<{ idx: number; key: string }> = [];
@@ -673,9 +688,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     return offenders;
   }, [isMultiSlot, slots, errors]);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Validation
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const validate = (target: Step): boolean => {
     const e: Record<string, string | undefined> = {};
 
@@ -724,10 +739,25 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     navigation.goBack();
   };
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Submit
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const submittingRef = useRef(false);
+  /**
+   * Id of the mission this screen has ALREADY created, if any.
+   *
+   * handleSubmit does two writes: create the mission, then ask the backend to
+   * compute its quote. When the second one fails the first has already
+   * committed - the comment in the catch block is explicit that we must NOT
+   * roll it back. But the user is shown a creation-failure banner, so they
+   * press the button again, and the old code went straight back into
+   * missionsApi.create(): one extra mission in the database per retry.
+   *
+   * A ref, not state: it must survive re-renders without triggering one, and
+   * it is read inside an async handler where a stale closure over state would
+   * defeat the whole point.
+   */
+  const createdMissionIdRef = useRef<string | null>(null);
   const handleSubmit = async () => {
     if (submittingRef.current) return; // guard double-tap
     submittingRef.current = true;
@@ -767,11 +797,32 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       if (isEditMode && editMissionId) {
         const { data: mRes } = await missionsApi.update(editMissionId, missionPayload as any);
         mission = (mRes as any).data;
+      } else if (createdMissionIdRef.current) {
+        // Retry after a failed quote calculation: the mission exists. Skip
+        // creation entirely and fall through to quotesApi.calculate below.
+        mission = { id: createdMissionIdRef.current };
+        createdMissionId = createdMissionIdRef.current;
       } else {
         const { data: mRes } = await missionsApi.create(missionPayload);
         mission = (mRes as any).data;
         createdMissionId = mission.id;
+        createdMissionIdRef.current = mission.id;
       }
+
+      // The missions list is a TanStack query with a 5-minute staleTime, and
+      // this screen writes through the raw API client rather than through
+      // useCreateMission - so nothing ever told the cache the world changed.
+      // Net effect for the client: they create a mission, land on the quote,
+      // go back to Missions, and it is NOT THERE. refetchOnMount is true but
+      // only refetches STALE data, so the list stays frozen for up to five
+      // minutes until a pull-to-refresh. The mission looked like it had
+      // vanished; it had simply never been fetched.
+      //
+      // Invalidation matches by PREFIX, so qk.missions.all = ['missions']
+      // covers the list (mine()) and every detail entry (detail(id)) in one
+      // call. Do not narrow this to mine() - a fresh mission also affects any
+      // detail entry the user may already have cached.
+      queryClient.invalidateQueries({ queryKey: qk.missions.all });
 
       // Backend derives quote lines from existing Booking rows (created in the
       // mission transaction above). Only missionId is needed.
@@ -810,15 +861,29 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       const joined = details.join(' ').toLowerCase();
       const jumpTo: Step | null =
         /(address|city|zipcode|latitude|longitude|adresse|ville)/.test(joined) ? 1
-        : /(start|end|duration|slot|durÃ©e|creneau|crÃ©neau|heure|agent|service|tenue)/.test(joined) ? 2
+        : /(start|end|duration|slot|durée|creneau|créneau|heure|agent|service|tenue)/.test(joined) ? 2
         : null;
 
-      setSubmitError({ title: t('create.submit_error_title'), details, jumpTo });
+      // When createdMissionId is set, the mission DID commit and only the
+      // downstream quote calculation failed. Telling the user 'Unable to
+      // create the mission' there is simply false, and it is exactly what
+      // pushed people into pressing the button again - see the note on
+      // createdMissionIdRef for the duplicate rows that used to produce.
+      setSubmitError({
+        title: createdMissionId
+          ? t('create.submit_error_title_quote')
+          : t('create.submit_error_title'),
+        details,
+        jumpTo,
+      });
 
       if (createdMissionId) {
-        toast.info(t('detail.cta_get_quote'), {
+        // The message and the action label used to be the SAME i18n key, so
+        // the toast body and its button both read 'Get a quote' and nothing
+        // told the user their mission had actually been saved.
+        toast.info(t('create.submit_quote_retry'), {
           action: {
-            label:   t('detail.cta_get_quote'),
+            label:   t('create.submit_quote_open_mission'),
             onPress: () => navigation.replace('MissionDetail', { missionId: createdMissionId! }),
           },
           duration: 8000,
@@ -837,9 +902,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     setSubmitError(null);
   }, [submitError]);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   // Render
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ──────────────────────────────────────────────────────────────────────────
   const headerTitles: Record<Step, string> = isPartner
     ? {
         // Partner: single title — partner i18n does not split per-step.
@@ -857,6 +922,35 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // While loading an existing draft in edit mode, show a centered spinner so we
   // never flash empty create-mode fields before hydration completes.
+  // -- Keyboard handling ---------------------------------------------------
+  // AndroidManifest declares adjustResize, so the window shrinks when the
+  // keyboard opens - but React Native does NOT scroll the focused TextInput
+  // into the shortened viewport, and KeyboardAvoidingView is a no-op on
+  // Android when no ehavior is set. The Notes / instructions field sits at
+  // the very bottom of step 2, so it ended up UNDER the keyboard and the user
+  // was typing blind. Two things fix it: scroll the tail of the form into
+  // view on focus, and drop the footer (~110px of an already-shortened
+  // viewport) for as long as the keyboard is up.
+  const scrollRef = useRef<ScrollView>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, () => setKeyboardOpen(true));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardOpen(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
+  /**
+   * Focus handler for the trailing free-text fields. The delay lets the
+   * Android resize land first - scrolling before it does puts the viewport
+   * straight back where it started.
+   */
+  const scrollToTail = useCallback(() => {
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+  }, []);
+
   if (hydrating) {
     return (
       <View style={styles.flex}>
@@ -876,6 +970,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       <StepProgress current={step} t={t} />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -938,12 +1033,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             onRemoveLine={removeLineFromSlot}
             onChangeLineCount={changeLineCount}
             onSetLineUniform={setLineUniform}
+            onFieldFocus={scrollToTail}
             t={t}
           />
         )}
       </ScrollView>
 
-      {/* â”€â”€ Smart footer: Back + Continue/Create â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      {/* ── Smart footer: Back + Continue/Create ────────────────────── */}
+      {!keyboardOpen && (
       <View style={styles.footer}>
         <View style={styles.footerMeta}>
           <Text style={styles.footerMetaText}>
@@ -953,7 +1050,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
           {step >= 2 && totalSlotHours(slots) > 0 && (
             <Text style={styles.footerMetaText}>
-              {' Â· '}{t('create.slots_total_short', { count: slots.length, hours: totalSlotHours(slots).toFixed(1) })}
+              {' · '}{t('create.slots_total_short', { count: slots.length, hours: totalSlotHours(slots).toFixed(1) })}
             </Text>
           )}
         </View>
@@ -980,13 +1077,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         </View>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // DraftRestoreBanner
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const DraftRestoreBanner: React.FC<{
   savedAt:   number;
@@ -1041,9 +1139,9 @@ const draftBannerS = StyleSheet.create({
   discardText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.textMuted, textDecorationLine: 'underline' },
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // SubmitErrorBanner
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const SubmitErrorBanner: React.FC<{
   error:     SubmitError;
@@ -1060,7 +1158,7 @@ const SubmitErrorBanner: React.FC<{
       </TouchableOpacity>
     </View>
     {error.details.slice(0, 4).map((d, i) => (
-      <Text key={i} style={submitErrS.detail}>â€¢ {d}</Text>
+      <Text key={i} style={submitErrS.detail}>• {d}</Text>
     ))}
     {onJump && (
       <TouchableOpacity style={submitErrS.jumpBtn} onPress={onJump} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('create.submit_error_jump_to')}>
@@ -1087,9 +1185,9 @@ const submitErrS = StyleSheet.create({
   jumpText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.danger },
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // CrossSlotErrorBanner
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const CrossSlotErrorBanner: React.FC<{
   offenders: Array<{ idx: number; key: string }>;
@@ -1127,9 +1225,9 @@ const crossSlotErrS = StyleSheet.create({
   chipText: { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.danger },
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // StepProgress (2 steps)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const StepProgress: React.FC<{ current: Step; t: MissionsT }> = ({ current, t }) => {
   const labels: Record<Step, string> = {
@@ -1183,9 +1281,9 @@ const progressS = StyleSheet.create({
   lineDone:      { backgroundColor: colors.primary },
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // StepHero / DurationBadge
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const StepHero: React.FC<{
   Icon:     React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -1233,9 +1331,9 @@ const DurationBadge: React.FC<{
   </View>
 );
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // StepWhere
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface StepWhereProps {
   form:             FormData;
@@ -1293,9 +1391,9 @@ const StepWhere: React.FC<StepWhereProps> = ({
   </View>
 );
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// StepWhenWho â€” merged scheduling + staffing (the last step)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
+// StepWhenWho — merged scheduling + staffing (the last step)
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface StepWhenWhoProps {
   form:              FormData;
@@ -1316,13 +1414,16 @@ interface StepWhenWhoProps {
   onRemoveLine:      (key: string, serviceTypeId: string) => void;
   onChangeLineCount: (key: string, serviceTypeId: string, delta: number) => void;
   onSetLineUniform:  (key: string, serviceTypeId: string, uniform: UniformValue) => void;
+  /** Scrolls the form tail above the keyboard when a trailing field is focused. */
+  onFieldFocus:      () => void;
   t:                 MissionsT;
 }
 
 const StepWhenWho: React.FC<StepWhenWhoProps> = ({
   form, slots, errors, activePreset, serviceTypes, servicesLoading, agentsTotal,
   onApplyPreset, onSetField, onAddSlot, onRemoveSlot, onUpdateSlotDates,
-  onCopyFromSlot, onTogglePicker, onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform, t,
+  onCopyFromSlot, onTogglePicker, onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform,
+  onFieldFocus, t,
 }) => {
   const minDate    = new Date(Date.now() + MIN_FUTURE_HOURS * 3_600_000);
   const totalH     = totalSlotHours(slots);
@@ -1339,7 +1440,9 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
     slots.reduce((sum, s) => sum + slotAgents(s) * durationHours(s.startAt, s.endAt), 0),
   [slots]);
 
-  const showPrice = indicativePrice > 0 && slots.some(s => s.lines.some(l => (l.ratePerHour ?? 0) > 0));
+  const showPrice = SHOW_INDICATIVE_ESTIMATE
+    && indicativePrice > 0
+    && slots.some(s => s.lines.some(l => (l.ratePerHour ?? 0) > 0));
 
   return (
     <View style={styles.stepContent}>
@@ -1449,7 +1552,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
               <Clock size={12} color={colors.primary} strokeWidth={2} />
               <Text style={priceS.agentHoursText}>
                 {t('create.review_agent_hours', { hours: estimatedAgentHours.toFixed(1) })}
-                {'  Â·  '}
+                {'  ·  '}
                 {t('create.total_agents', { count: agentsTotal, lines: slots.length })}
               </Text>
             </View>
@@ -1468,6 +1571,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
           value={form.title}
           onChangeText={v => onSetField('title', v)}
           placeholder={t('create.title_placeholder')}
+          onFocus={onFieldFocus}
           leftIcon={<Pencil size={16} color={colors.textMuted} strokeWidth={1.8} />}
           maxLength={100}
         />
@@ -1476,6 +1580,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
           value={form.notes}
           onChangeText={v => onSetField('notes', v)}
           placeholder={t('create.instructions_placeholder')}
+          onFocus={onFieldFocus}
           multiline
           numberOfLines={3}
           style={styles.textArea}
@@ -1508,9 +1613,9 @@ const priceS = StyleSheet.create({
   note: { fontFamily: fontFamily.body, fontSize: 11, color: colors.textSecondary, lineHeight: 16, fontStyle: 'italic' },
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// SlotCard â€” one crÃ©neau: schedule + its own staffing
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
+// SlotCard — one créneau: schedule + its own staffing
+// ──────────────────────────────────────────────────────────────────────────────
 
 interface SlotCardProps {
   slot:              SlotDraft;
@@ -1617,7 +1722,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
 
       <View style={styles.slotServicesDivider} />
 
-      {/* Staffing â€” this slot's own services / agents / uniforms */}
+      {/* Staffing — this slot's own services / agents / uniforms */}
       <View style={styles.staffHeader}>
         <View style={styles.sectionHeader}>
           <Users size={13} color={colors.textMuted} strokeWidth={2} />
@@ -1764,9 +1869,9 @@ const SlotCard: React.FC<SlotCardProps> = ({
   );
 };
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 // Shared styles
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────────────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   flex:        { flex: 1, backgroundColor: colors.background },

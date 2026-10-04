@@ -1,5 +1,5 @@
 /**
- * RootNavigator â€” routeur principal basÃ© sur l'Ã©tat d'auth + onboarding.
+ * RootNavigator — routeur principal basé sur l'état d'auth + onboarding.
  */
 import React, { useEffect, useState } from 'react';
 import { NavigationContainer }        from '@react-navigation/native';

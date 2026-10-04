@@ -1,37 +1,37 @@
 /**
- * LiveTrackingScreen â€” Real-time agent tracking (CLIENT app).
+ * LiveTrackingScreen — Real-time agent tracking (CLIENT app).
  *
  * Map engine: WebView + Leaflet (zero Google dependency, zero API key)
- * Real-time updates: injectJavaScript() â†’ Leaflet JS API
+ * Real-time updates: injectJavaScript() → Leaflet JS API
  *
  * FIX HISTORY:
- *  v2 â€” html memoized with useMemo (was rebuilt every render â†’ WebView remounted
- *        every second â†’ tracking reset on every GPS update) [CRITICAL]
- *     â€” Removed dead react-native-svg imports
- *     â€” WebView readiness confirmed via postMessage ('ready') not just onLoad
- *     â€” inject() guard: skip if webRef null or not ready
- *     â€” leaveMission now emits socket event to stop server-side forwarding
- *  v3 â€” [BUG FIX] alertBanner elevation raised from 14 â†’ 30.
+ *  v2 — html memoized with useMemo (was rebuilt every render → WebView remounted
+ *        every second → tracking reset on every GPS update) [CRITICAL]
+ *     — Removed dead react-native-svg imports
+ *     — WebView readiness confirmed via postMessage ('ready') not just onLoad
+ *     — inject() guard: skip if webRef null or not ready
+ *     — leaveMission now emits socket event to stop server-side forwarding
+ *  v3 — [BUG FIX] alertBanner elevation raised from 14 → 30.
  *        On Android, elevation determines z-order inside a stacking context.
  *        The bottom card had elevation:24, which placed it ABOVE the alertBanner
  *        (elevation:14), hiding the out-of-zone error popup completely on Android.
- *     â€” [BUG FIX] Hardcoded French strings replaced with t() calls.
- *     â€” [BUG FIX] useSocketTracking now returns lastSeenAt (ISO string).
- *     â€” useTranslation import fixed: '@i18n' instead of 'react-i18next'.
- *  v4 â€” [BUG FIX] Alert banner âœ• close button completely unresponsive.
+ *     — [BUG FIX] Hardcoded French strings replaced with t() calls.
+ *     — [BUG FIX] useSocketTracking now returns lastSeenAt (ISO string).
+ *     — useTranslation import fixed: '@i18n' instead of 'react-i18next'.
+ *  v4 — [BUG FIX] Alert banner ✕ close button completely unresponsive.
  *
  *       ROOT CAUSES (all fixed):
  *
- *       1. pointerEvents race â€” Animated.View had pointerEvents={pendingAlert ?
+ *       1. pointerEvents race — Animated.View had pointerEvents={pendingAlert ?
  *          'auto' : 'none'}. The moment dismissAlert() was called, React set
  *          pendingAlert=null in the SAME synchronous frame, flipping pointerEvents
  *          to 'none' before the 220 ms slide-out animation had even started.
- *          Any tap on âœ• during that animation was silently swallowed.
+ *          Any tap on ✕ during that animation was silently swallowed.
  *          Fix: pointerEvents is now driven by a separate isVisible ref that
  *          is set to false only after the animation callback fires, not on
  *          state change.
  *
- *       2. Animation ownership conflict â€” useEffect watched pendingAlert to
+ *       2. Animation ownership conflict — useEffect watched pendingAlert to
  *          trigger both slide-in AND slide-out. When the socket fired a new
  *          alert during the slide-out, pendingAlert became non-null again,
  *          immediately calling spring() and fighting the running timing()
@@ -41,26 +41,26 @@
  *          slideIn() / slideOut() helpers. The useEffect only calls slideIn.
  *          dismissAlert() calls slideOut directly.
  *
- *       3. Alert queue clobbering â€” rapid successive geofence alerts from the
+ *       3. Alert queue clobbering — rapid successive geofence alerts from the
  *          socket called setPendingAlert(newAlert) and overwrote the null that
  *          dismiss had just written, re-showing the banner mid-animation.
  *          Fix: useSocketTracking v4 now maintains an internal queue; the
  *          screen always sees at most one alert at a time and the next queued
  *          alert surfaces only after dismissAlert() is acknowledged.
  *
- *       4. Inline initials computation â€” duplicated 3Ã— in the component.
+ *       4. Inline initials computation — duplicated 3× in the component.
  *          Replaced with getInitials() from formatters.ts.
  *
  *       5. handleDismissAlert was defined after the useEffect that referenced
  *          it via eslint-disable suppression, masking a stale-closure risk.
  *          All callbacks are now defined before the effects that use them.
- *  v5 â€” [BUG FIX C3] Missing/invalid mission coordinates no longer mount a
+ *  v5 — [BUG FIX C3] Missing/invalid mission coordinates no longer mount a
  *        broken Leaflet map. siteLat/siteLng are validated; when absent, out of
  *        range, or (0,0), an explicit "location unavailable" state is rendered
- *        instead of setView([undefined, undefined]) / a false 0Â°N 0Â°E breach.
- *  v6 â€” [FIX H3] Rebuilt on the shared <LeafletMapView> shell: Leaflet's
+ *        instead of setView([undefined, undefined]) / a false 0°N 0°E breach.
+ *  v6 — [FIX H3] Rebuilt on the shared <LeafletMapView> shell: Leaflet's
  *        JS/CSS are inlined from the bundle (no unpkg CDN fetch at runtime),
- *        and this screen now gets real error/retry UI for the first time â€”
+ *        and this screen now gets real error/retry UI for the first time —
  *        previously a stalled Leaflet load just left mapLoading=true forever
  *        with no way out, on the single highest-stakes map in the app (the
  *        live breach-alert screen). The local WebView ref, jsReadyRef, and
@@ -68,9 +68,9 @@
  *        and onReady replays the current agent position into a freshly
  *        (re)initialised map, same as before but keyed off the shell's
  *        callback instead of a raw postMessage 'ready' check.
- *  v7 â€” [FIX H4] Two gaps closed:
+ *  v7 — [FIX H4] Two gaps closed:
  *        (1) Position freshness was previously a binary signalLost flag with
- *        a 30s cliff â€” the status bar showed "Last seen HH:mm" continuously,
+ *        a 30s cliff — the status bar showed "Last seen HH:mm" continuously,
  *        which reads as a clock, not a freshness signal. Now: fresh positions
  *        (<10s old) show the already-existing-but-unused t('status_live')
  *        string; positions between 10s and the 30s signal-lost cutoff show a
@@ -78,7 +78,7 @@
  *        signal-lost/offline/waiting states are unchanged. A 1s interval only
  *        runs while there's an active, non-lost position to age.
  *        (2) No ETA was shown anywhere on this screen (distance only). Added
- *        the same rolling-speed ETA estimate used in AgentApproachBanner â€”
+ *        the same rolling-speed ETA estimate used in AgentApproachBanner —
  *        kept as a short ref-based fix history toward the site, displayed in
  *        the bottom card only while the agent is still approaching (!inZone);
  *        once on-site an ETA to "arrive" is meaningless, so it's hidden.
@@ -124,8 +124,8 @@ const ALERT_SLIDE_IN_CONFIG = { friction: 8, tension: 80, useNativeDriver: true 
 // as the current time, not as evidence of freshness.
 const LIVE_THRESHOLD_S = 10;
 
-// [FIX H4] ETA tuning â€” mirrors AgentApproachBanner's estimateEtaMinutes.
-/** Below this approach speed the agent is treated as stationary â†’ no ETA. */
+// [FIX H4] ETA tuning — mirrors AgentApproachBanner's estimateEtaMinutes.
+/** Below this approach speed the agent is treated as stationary → no ETA. */
 const MIN_APPROACH_MPS = 0.5;          // ~1.8 km/h
 /** Cap the ETA we'll display; beyond this it's not useful. */
 const MAX_ETA_MIN      = 180;
@@ -137,7 +137,7 @@ interface FixSample { lat: number; lng: number; t: number; }
 /**
  * Estimate ETA in whole minutes from a short history of fixes toward the site,
  * or null when it can't be reliably computed (too few fixes / stationary).
- * Identical approach to AgentApproachBanner.estimateEtaMinutes â€” kept as a
+ * Identical approach to AgentApproachBanner.estimateEtaMinutes — kept as a
  * separate copy rather than a shared import because the two screens have
  * different fix-history lifetimes (this one resets when the map remounts via
  * coordsValid; the banner's spans the whole approach phase) and pulling it
@@ -204,7 +204,7 @@ const TRACKING_EXTRA_STYLE = `
   .pulse-ring { animation: pulse 2s ease-in-out infinite; }
 `;
 
-// â”€â”€ Leaflet body script (runs once Leaflet + the map instance are ready) â”€â”€â”€â”€â”€â”€
+// ── Leaflet body script (runs once Leaflet + the map instance are ready) ──────
 function buildTrackingBodyScript(siteLat: number, siteLng: number, tileUrl: string): string {
   return `
   var SITE_LAT = ${siteLat};
@@ -312,7 +312,7 @@ function buildTrackingBodyScript(siteLat: number, siteLng: number, tileUrl: stri
   `;
 }
 
-// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Component ─────────────────────────────────────────────────────────────────
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const {
     missionId, bookingId, agentName,
@@ -324,9 +324,9 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   // [FIX C3] Mission coordinates can be null/undefined at runtime (draft mission,
   // failed geocoding, or a push deep-link with absent siteLat/siteLng). Without
   // this guard, the body script interpolates `undefined` into Leaflet's
-  // setView([undefined, undefined]) â€” a blank/broken map â€” or, via the
+  // setView([undefined, undefined]) — a blank/broken map — or, via the
   // notification router's `parseFloat(... ?? '0')` default, silently centres on
-  // 0Â°N 0Â°E and reports a permanent multi-thousand-km "out of zone" breach.
+  // 0°N 0°E and reports a permanent multi-thousand-km "out of zone" breach.
   // Hooks below must still run unconditionally (rules of hooks), so this only
   // gates the RENDER, not the hook calls.
   const coordsValid =
@@ -344,8 +344,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     distanceM, inZone, pendingAlert, dismissAlert,
   } = useSocketTracking({ missionId, bookingId, onMissionEnd: () => navigation.goBack() });
 
-  // â”€â”€ [FIX H4] Position-age ticker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Only ticks while there's an active, non-lost position to age â€” no point
+  // ── [FIX H4] Position-age ticker ────────────────────────────────────────────
+  // Only ticks while there's an active, non-lost position to age — no point
   // running a 1s interval while offline/waiting/signal-lost, where the
   // displayed text doesn't depend on the clock anyway.
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -361,28 +361,28 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     return Math.max(0, Math.round(ageMs / 1000));
   }, [lastSeenAt, nowMs]);
 
-  // â”€â”€ [FIX H4] ETA fix history â€” short rolling window toward the site â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── [FIX H4] ETA fix history — short rolling window toward the site ────────
   const etaHistoryRef = useRef<FixSample[]>([]);
   const [etaMin, setEtaMin] = useState<number | null>(null);
 
-  // â”€â”€ Alert banner animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Alert banner animation ────────────────────────────────────────────────
   const alertSlide     = useRef(new Animated.Value(-160)).current;
   /**
-   * isAlertVisible â€” ref (not state) so it can be read synchronously inside
+   * isAlertVisible — ref (not state) so it can be read synchronously inside
    * animation callbacks and set without triggering re-renders.
    * true  = banner is on screen (either sliding in, fully visible, or sliding out)
    * false = banner is completely off screen
    *
    * pointerEvents on the Animated.View is derived from this ref via the
    * [alertPointerEvents, setAlertPointerEvents] state pair below so React
-   * can still update the prop â€” but we only flip it to 'none' inside the
+   * can still update the prop — but we only flip it to 'none' inside the
    * slide-out completion callback, NOT on pendingAlert state change.
    */
   const isAlertVisible = useRef(false);
   const [alertPointerEvents, setAlertPointerEvents] = useState<'auto' | 'none'>('none');
 
   /**
-   * slideIn â€” starts the spring animation and enables touches immediately.
+   * slideIn — starts the spring animation and enables touches immediately.
    * Safe to call when already visible (spring will settle from current position).
    */
   const slideIn = useCallback(() => {
@@ -395,10 +395,10 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, [alertSlide]);
 
   /**
-   * slideOut â€” starts the timing animation. Only disables touches and calls
+   * slideOut — starts the timing animation. Only disables touches and calls
    * dismissAlert() AFTER the animation completes. This is the critical fix:
    * pointerEvents stays 'auto' for the full 220 ms of the animation so the
-   * user can always tap âœ•.
+   * user can always tap ✕.
    */
   const slideOut = useCallback(() => {
     Animated.timing(alertSlide, {
@@ -418,7 +418,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, [alertSlide, dismissAlert]);
 
   /**
-   * handleDismissAlert â€” public handler wired to the âœ• button and the
+   * handleDismissAlert — public handler wired to the ✕ button and the
    * auto-dismiss effect. Guards against double-tap: if the banner is already
    * sliding out (isAlertVisible = false) subsequent calls are ignored.
    */
@@ -444,18 +444,18 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, [inZone, handleDismissAlert]);
 
-  // â”€â”€ Map body script (memoized â€” must never change identity or WebView
+  // ── Map body script (memoized — must never change identity or WebView
   // remounts mid-session and tracking resets). Falls back to (0,0) only when
   // coords are invalid; in that case the map is never rendered (see the
   // coordsValid early-return below), so the bad centre is never shown to the
-  // user â€” this keeps the useMemo call unconditional. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // user — this keeps the useMemo call unconditional. ───────────────────────
   const tileUrl = config.maps.tileUrlTemplate;
   const bodyScript = useMemo(
     () => buildTrackingBodyScript(coordsValid ? siteLat : 0, coordsValid ? siteLng : 0, tileUrl),
     [siteLat, siteLng, coordsValid, tileUrl],
   );
 
-  // â”€â”€ WebView JS bridge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── WebView JS bridge ─────────────────────────────────────────────────────
   const inject = useCallback((js: string) => {
     mapRef.current?.inject(js);
   }, []);
@@ -502,7 +502,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, []);
 
   // [FIX H3] Replay current state into a freshly-(re)initialised Leaflet
-  // instance â€” fires on first load AND after a retry from the shell's error
+  // instance — fires on first load AND after a retry from the shell's error
   // state, covering the same "resume after reconnect" case the old raw
   // postMessage 'ready' handler covered.
   const handleMapReady = useCallback(() => {
@@ -531,7 +531,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     inject('window.flyToSite();');
   }, [inject]);
 
-  // â”€â”€ Derived display values â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Derived display values ────────────────────────────────────────────────
   const agentInitials = useMemo(() => getInitials(agentName), [agentName]);
 
   const distanceLabel = useMemo(() => {
@@ -540,7 +540,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }, [distanceM]);
 
   // [FIX UI] Derived three-state zone status. Before the first position
-  // (and distance) arrives the zone is genuinely UNKNOWN â€” the hook defaults
+  // (and distance) arrives the zone is genuinely UNKNOWN — the hook defaults
   // inZone=true, which previously made the bottom strip assert a green
   // "In zone (30 m)" while the status pill still said "Waiting for position"
   // and a stale "Out of zone" alert sat on top: three mutually contradictory
@@ -551,7 +551,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     return inZone ? 'in' : 'out';
   }, [agentPosition, distanceM, inZone]);
 
-  // [FIX H4] ETA display string â€” only while still approaching (!inZone);
+  // [FIX H4] ETA display string — only while still approaching (!inZone);
   // once on-site, "arriving in N min" no longer means anything.
   const etaLabel = useMemo(() => {
     if (inZone || etaMin === null) return null;
@@ -573,7 +573,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     return t('status_waiting');
   }, [connected, signalLost, agentPosition, positionAgeS, t]);
 
-  // â”€â”€ [FIX C3] Invalid coordinates â†’ explicit error state (no broken map) â”€â”€â”€â”€
+  // ── [FIX C3] Invalid coordinates → explicit error state (no broken map) ────
   if (!coordsValid) {
     return (
       <View style={styles.container}>
@@ -599,12 +599,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     );
   }
 
-  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <View style={styles.container}>
       <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
 
-      {/* â”€â”€ Map â”€â”€ */}
+      {/* ── Map ── */}
       <LeafletMapView
         ref={mapRef}
         centerLat={siteLat}
@@ -618,12 +618,12 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         onReady={handleMapReady}
       />
 
-      {/* â”€â”€ OSM Attribution â”€â”€ */}
+      {/* ── OSM Attribution ── */}
       <View style={styles.attribution} pointerEvents="none">
         <Text style={styles.attributionTxt}>{t('attribution')}</Text>
       </View>
 
-      {/* â”€â”€ Status bar â”€â”€ */}
+      {/* ── Status bar ── */}
       <View style={styles.statusBar}>
         {connected
           ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
@@ -640,13 +640,13 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         )}
       </View>
 
-      {/* â”€â”€ Geofence alert banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      {/* ── Geofence alert banner ─────────────────────────────────────────────
        *  pointerEvents is driven by alertPointerEvents state, which is only
-       *  set to 'none' inside the slide-out animation callback â€” NOT on
-       *  pendingAlert state change. This prevents the race where a tap on âœ•
+       *  set to 'none' inside the slide-out animation callback — NOT on
+       *  pendingAlert state change. This prevents the race where a tap on ✕
        *  was swallowed because React had already flipped pointerEvents to
        *  'none' in the same render that started the animation.
-       * â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+       * ─────────────────────────────────────────────────────────────────── */}
       <Animated.View
         style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
         pointerEvents={alertPointerEvents}
@@ -655,7 +655,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
         <View style={styles.alertTextBlock}>
           <Text style={styles.alertTitle}>{pendingAlert ? t('out_of_zone') : ''}</Text>
           <Text style={styles.alertBody} numberOfLines={1}>
-            {pendingAlert ? `${pendingAlert.agentName} â€” ${pendingAlert.distanceStr}` : ''}
+            {pendingAlert ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}` : ''}
           </Text>
         </View>
         <TouchableOpacity
@@ -666,18 +666,18 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('close_a11y')}
         >
-          <Text style={styles.alertClose}>âœ•</Text>
+          <Text style={styles.alertClose}>✕</Text>
         </TouchableOpacity>
       </Animated.View>
 
-      {/* â”€â”€ Re-center FAB â”€â”€ */}
+      {/* ── Re-center FAB ── */}
       {showFollowBtn && (
         <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('recenter_a11y')}>
           <Target size={20} color={colors.primary} strokeWidth={2} />
         </TouchableOpacity>
       )}
 
-      {/* â”€â”€ Bottom card â”€â”€ */}
+      {/* ── Bottom card ── */}
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <View style={styles.avatarBubble}>
@@ -710,7 +710,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 
         {/* [FIX UI] Zone strip is now three-state. While 'unknown' (no position
             yet) it shows a neutral waiting state instead of a false green
-            "In zone" â€” which previously contradicted the "Waiting for position"
+            "In zone" — which previously contradicted the "Waiting for position"
             pill and any stale out-of-zone alert. */}
         <View style={[
           styles.zoneStrip,
@@ -725,8 +725,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             {zoneState === 'unknown'
               ? t('zone_unknown')
               : zoneState === 'in'
-                ? `âœ“ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
-                : `âš  ${t('out_of_zone')}`}
+                ? `✓ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
+                : `⚠ ${t('out_of_zone')}`}
           </Text>
         </View>
 
@@ -765,7 +765,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   );
 }
 
-// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.navy },
 
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
   },
 
   statusBar: {
-    // [FIX UI] Centered, auto-width chip instead of a full-width bar â€” the
+    // [FIX UI] Centered, auto-width chip instead of a full-width bar — the
     // old left:16/right:16 span ran straight under the map's top-left +/-
     // zoom control and collided with it. Centering clears the control and
     // reads as a floating status pill.

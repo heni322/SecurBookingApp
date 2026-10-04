@@ -36,8 +36,8 @@ const partner: PartnerNS = {
       "teamSub": "Gérer et suivre les agents",
       "finances": "Finances & salaires",
       "financesSub": "Synthèse et ventilation par agent",
-      "billing": "Facturation équipe",
-      "billingSub": "Générer le récapitulatif PDF",
+      "billing": "Règlements Provalk",
+      "billingSub": "Relevé des sommes dues à votre société",
       "compliance": "Conformité société",
       "complianceSub": "Kbis, CNAPS, URSSAF, fiscale, RC pro",
       "documents": "Documents société",
@@ -47,7 +47,14 @@ const partner: PartnerNS = {
       "createMission": "Publier une mission",
       "createMissionSub": "Créer une nouvelle prestation",
       "myMissions": "Mes missions",
-      "myMissionsSub": "Suivre et gérer les missions publiées"
+      "myMissionsSub": "Suivre et gérer les missions publiées",
+      "timesheets": "Feuilles de temps",
+      "timesheetsSub": "Valider les heures de vos agents"
+    },
+    "errors": {
+      "title": "Chargement impossible",
+      "body": "Impossible de charger le tableau de bord.",
+      "retry": "R\u00e9essayer"
     }
   },
   "team": {
@@ -85,6 +92,12 @@ const partner: PartnerNS = {
       "noResultsBySearch": "Aucun agent ne correspond à «{{search}}».",
       "noResultsByFilter": "Aucun agent dans cette catégorie."
     }
+    ,
+    "errors": {
+      "title": "Chargement impossible",
+      "body": "Impossible de charger l'équipe.",
+      "retry": "R\u00e9essayer"
+    }
   },
   "agentDetail": {
     "title": "Détail agent",
@@ -118,12 +131,15 @@ const partner: PartnerNS = {
       "empty": "Aucun document soumis."
     },
     "errors": {
-      "notFound": "Agent introuvable."
+      "notFound": "Agent introuvable.",
+      "title": "Chargement impossible",
+      "body": "Impossible de charger le profil de l'agent.",
+      "retry": "R\u00e9essayer"
     }
   },
   "financials": {
-    "title": "Finances équipe",
-    "subtitle": "Salaires & virements",
+    "title": "Règlements Provalk",
+    "subtitle": "Sommes dues à votre société (HT)",
     "loading": "Chargement des finances…",
     "period": {
       "label": "Période sélectionnée",
@@ -133,9 +149,9 @@ const partner: PartnerNS = {
       "all_periods": "Tout"
     },
     "totals": {
-      "paid": "Versé",
-      "pending": "En attente",
-      "missions": "Missions"
+      "paid": "Réglé",
+      "pending": "Dû",
+      "missions": "Vacations"
     },
     "search": {
       "placeholder": "Rechercher un agent…"
@@ -147,9 +163,9 @@ const partner: PartnerNS = {
     },
     "payout": {
       "status": {
-        "paid": "Versé",
-        "failed": "Échoué",
-        "scheduled": "Planifié"
+        "paid": "Réglé",
+        "failed": "Annulé",
+        "scheduled": "Dû"
       },
       "pending": "+{{amount}} att.",
       "mission_one": "{{count}} mission",
@@ -179,9 +195,9 @@ const partner: PartnerNS = {
     }
   },
   "billing": {
-    "title": "Facturation équipe",
-    "subtitle": "Récapitulatif PDF — spec §2.3",
-    "notice": "Générez le récapitulatif PDF des salaires de l'équipe sur une période donnée. Ce document est conforme aux obligations légales (convention collective des entreprises de sécurité).",
+    "title": "Relevé de règlements",
+    "subtitle": "Sommes dues par Provalk à votre société",
+    "notice": "Votre société emploie et paie ses agents. Provalk règle votre société pour chaque vacation effectuée : coût horaire du devis × heures validées, plus les primes légales de nuit, dimanche et jour férié. Un montant devient payable quand la feuille de temps est validée. Émettez votre facture à Provalk à partir de ce relevé.",
     "steps": {
       "period": "1 — Sélectionner la période",
       "preview": "2 — Aperçu",
@@ -192,16 +208,16 @@ const partner: PartnerNS = {
       "pickTitle": "Choisir la période"
     },
     "preview": {
-      "totalPaid": "Total versé",
-      "pending": "En attente",
-      "missions": "Missions couvertes",
+      "totalPaid": "Réglé par Provalk (HT)",
+      "pending": "Dû (HT)",
+      "missions": "Vacations couvertes",
       "agents": "Agents concernés",
       "empty": "Sélectionnez une période pour afficher l'aperçu.",
       "loading": "Calcul des totaux…"
     },
     "generate": {
-      "title": "PDF récapitulatif",
-      "subtitle": "Inclut : nom de l'agent, missions, montants, statut des virements",
+      "title": "Relevé PDF",
+      "subtitle": "Détail par agent et par vacation, montants HT réglés et dus",
       "cta": "📄  Générer et télécharger le PDF",
       "loading": "Génération en cours…",
       "disabledHint": "Sélectionnez une période précise pour activer la génération."
@@ -216,6 +232,24 @@ const partner: PartnerNS = {
     "errors": {
       "load": "Erreur de chargement"
     }
+  },
+  "timesheets": {
+    "title": "Feuilles de temps",
+    "subtitle": "Heures de vos agents à valider",
+    "notice": "Validez les heures pointées par vos agents. Sans objection de votre part, elles sont validées automatiquement 48 h après la fin de vacation, sauf incident ou litige. Une feuille validée rend le règlement payable.",
+    "tabs": { "pending": "À valider", "approved": "Validées" },
+    "empty": "Aucune feuille de temps à traiter.",
+    "loading": "Chargement des feuilles de temps…",
+    "hours": "{{hours}} h payées",
+    "planned": "prévu {{hours}} h",
+    "autoOn": "Validation auto le {{date}}",
+    "offline": "Pointage hors ligne : heures datées par le téléphone, à vérifier avant validation",
+    "incidents": "{{count}} incident(s) ouvert(s) — à vérifier",
+    "approve": "Valider",
+    "approved": "Validée",
+    "confirmTitle": "Valider ces heures ?",
+    "confirmBody": "{{agent}} — {{hours}} h. La validation rend le règlement de cette vacation payable.",
+    "errors": { "load": "Impossible de charger les feuilles de temps.", "approve": "Validation impossible." }
   },
   "compliance": {
     "title": "Conformité société",
@@ -261,6 +295,11 @@ const partner: PartnerNS = {
     "actions": {
       "checkStatus": "Vérifier le statut",
       "addDocument": "Ajouter un document"
+    }
+    ,
+    "errors": {
+      "title": "Chargement impossible",
+      "body": "Impossible de charger le statut de conformité."
     }
   },
   "documents": {
@@ -435,7 +474,10 @@ const partner: PartnerNS = {
       "legalInfo": "Informations légales",
       "address": "Adresse",
       "contact": "Contact",
-      "billing": "Facturation"
+      "billing": "Facturation",
+      "legal": "Informations légales",
+      "banking": "Coordonnées bancaires",
+      "insurance": "Assurance RC Pro"
     },
     "fields": {
       "companyName": {
@@ -450,9 +492,19 @@ const partner: PartnerNS = {
         "label": "Numéro de TVA",
         "placeholder": "FR12345678901"
       },
+      "siren": { "label": "SIREN", "placeholder": "552140215" },
+      "apeCode": { "label": "Code APE", "placeholder": "8010Z" },
+      "tradeName": { "label": "Nom commercial", "placeholder": "SecuriPro" },
+      "legalRepName": { "label": "Représentant légal", "placeholder": "Jean Dupont" },
+      "legalRepRole": { "label": "Qualité", "placeholder": "Président" },
+      "iban": { "label": "IBAN", "placeholder": "FR76 3000 6000 0112 3456 7890 189" },
+      "bic": { "label": "BIC / SWIFT", "placeholder": "AGRIFRPP" },
+      "rcProInsurer": { "label": "Assureur RC Pro", "placeholder": "AXA Assurances" },
+      "rcProPolicyNumber": { "label": "N° de police", "placeholder": "RCP-2026-00123" },
+      "rcProExpiresAt": { "label": "Échéance (AAAA-MM-JJ)", "placeholder": "2027-01-01" },
       "billingAddress": {
         "label": "Adresse de facturation",
-        "placeholder": "25 avenue de la R\u00e9publique"
+        "placeholder": "25 avenue de la République"
       },
       "billingCity": {
         "label": "Ville de facturation",
@@ -491,6 +543,7 @@ const partner: PartnerNS = {
       "siretInvalid": "SIRET invalide \u2014 14 chiffres et cl\u00e9 de contr\u00f4le requis",
       "zipInvalid": "Code postal invalide (5 chiffres)",
       "vatInvalid": "Num\u00e9ro de TVA invalide (ex : FR12345678901)",
+      "dateInvalid": "Date invalide (format AAAA-MM-JJ)",
       "siretValid": "SIRET valide"
     },
     "errors": {
@@ -688,6 +741,11 @@ const partner: PartnerNS = {
           "successTitle": "Contrat annulé",
           "successBody": "Le contrat a été annulé et l'agent va être notifié.",
           "failed": "L'annulation a échoué. Veuillez réessayer."
+        },
+        "errors": {
+          "title": "Chargement impossible",
+          "body": "Impossible de charger le contrat.",
+          "retry": "R\u00e9essayer"
         }
       },
       "create": {

@@ -58,7 +58,9 @@ export const DeleteAccountScreen: React.FC<Props> = ({ navigation }) => {
       // A request without the exact phrase is rejected 400 before any DB
       // operation runs, even if called directly via curl/Postman.
       await usersApi.deleteMe(password, phrase);
-      logout();
+      // Awaited: the account is gone server-side, so the local credentials must
+      // be wiped before anything navigates away (P1-3).
+      await logout();
     } catch (err: any) {
       toast.error(
         err?.response?.data?.message ?? t('delete.error'),

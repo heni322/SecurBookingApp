@@ -337,6 +337,9 @@ const missions: MissionsNS = {
     submit_error_title:    'Impossible de créer la mission',
     submit_error_jump_to:  'Modifier',
     submit_error_network:  'Vérifiez votre connexion et réessayez.',
+    submit_error_title_quote:  'Mission créée — le calcul du devis a échoué',
+    submit_quote_retry:        'Votre mission est bien enregistrée. Seul le devis n’a pas abouti : réessayez, elle ne sera pas recréée.',
+    submit_quote_open_mission: 'Voir la mission',
   },
 };
 

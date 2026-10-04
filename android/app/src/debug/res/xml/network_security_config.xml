@@ -25,7 +25,7 @@
   </domain-config>
 
   <domain-config cleartextTrafficPermitted="true">
-    <domain includeSubdomains="false">192.168.45.94</domain>
+    <domain includeSubdomains="false">192.168.100.5</domain>
     <domain includeSubdomains="false">localhost</domain>
     <domain includeSubdomains="false">10.0.2.2</domain>
     <trust-anchors>

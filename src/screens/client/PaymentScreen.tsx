@@ -33,6 +33,8 @@ import { fontSize, fontFamily }    from '@theme/typography';
 import { formatCurrency }          from '@utils/formatters';
 import { useAuthStore }            from '@store/authStore';
 import { paymentsApi }              from '@api/endpoints/payments';
+import { StripeSetupBanner }        from '@components/dev/StripeSetupBanner';
+import { inspectStripeSetup, canCollectCardDetails } from '@utils/stripeDiagnostics';
 import type { PaymentMethod }        from '@models/index';
 import type { MissionStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
@@ -95,6 +97,8 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
   // -- Shared state ------------------------------------------------------------
   const [loading,  setLoading]  = useState(false);
   const [paid,     setPaid]     = useState(false);
+  // Card only held (mission starting within 6 days): charged once staffed.
+  const [held,     setHeld]     = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // -- Saved payment methods ------------------------------------------------
@@ -110,7 +114,39 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
     isSepa ? m.type === 'sepa_debit' : m.type === 'card',
   );
   const usingSaved = !isSepa && selectedMethodId !== null;
-  const canConfirm = isSepa ? ibanValid : (usingSaved || cardComplete);
+
+  // Stripe setup problems (placeholder key, CardField unusable on the New
+  // Architecture, …). Deterministic, so it is safe to compute every render.
+  // `stripeIssues` is what turns a silently dead CTA into an explained one.
+  const stripeIssues  = React.useMemo(() => inspectStripeSetup(), []);
+  const cardEntryOk   = canCollectCardDetails(stripeIssues);
+
+  // A saved method is confirmed server-side via its id and needs no CardField,
+  // so it still works when card ENTRY is broken.
+  const canConfirm = isSepa
+    ? ibanValid
+    : usingSaved || (cardEntryOk && cardComplete);
+
+  /**
+   * Why the CTA is disabled, in the user's words. Rendered under the button so
+   * a disabled control is never unexplained — the original bug was not that the
+   * button was disabled, it was that nothing said why.
+   *
+   * Keys are real entries in the payment namespace, NOT i18next `defaultValue`
+   * fallbacks: this project sets `parseMissingKeyHandler`, which returns the
+   * key itself and therefore takes precedence over any defaultValue. A missing
+   * key renders as literal 'pay.reason_card_unavailable' on screen.
+   */
+  const disabledReason = (): string | null => {
+    if (canConfirm || loading) return null;
+    if (isSepa) {
+      return iban.length === 0
+        ? t('pay.reason_enter_iban')
+        : t('pay.reason_iban_invalid');
+    }
+    if (!cardEntryOk) return t('pay.reason_card_unavailable');
+    return t('pay.reason_complete_card');
+  };
 
   useEffect(() => {
     paymentsApi.getMyMethods().then(({ data: res }) => {
@@ -203,8 +239,12 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
         if (
           paymentIntent?.status === 'Succeeded' ||
-          paymentIntent?.status === 'Processing'
+          paymentIntent?.status === 'Processing' ||
+          // Mission starting within 6 days: the card is only held, and charged
+          // once the mission is staffed (API audit 2026-10-02, M1).
+          paymentIntent?.status === 'RequiresCapture'
         ) {
+          setHeld(paymentIntent?.status === 'RequiresCapture');
           setPaid(true);
         } else {
           setErrorMsg(t('card_failed'));
@@ -225,12 +265,14 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           <CheckCircle2 size={54} color={colors.success} strokeWidth={1.5} />
         </View>
         <Text style={styles.successTitle}>
-          {isSepa ? t('sepa_success') : t('card_success')}
+          {isSepa ? t('sepa_success') : held ? t('card_held') : t('card_success')}
         </Text>
         <Text style={styles.successSubtitle}>
           {isSepa
             ? t('sepa_success_body')
-            : t('card_success_body')
+            : held
+              ? t('card_held_body')
+              : t('card_success_body')
           }
         </Text>
         <Button
@@ -274,6 +316,10 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
           <Text style={styles.amountSub}>{t('amount_sub')}</Text>
         </Card>
+
+        {/* Stripe setup problems — full detail in DEV, user-safe in release.
+            Renders nothing when the setup is healthy. */}
+        <StripeSetupBanner issues={stripeIssues} />
 
         {/* Method badge */}
         <View style={styles.methodBadge}>
@@ -458,6 +504,12 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
             : t('pay.footer_cgv')
           }
         </Text>
+        {/* A disabled CTA must always say why. */}
+        {disabledReason() && (
+          <Text style={styles.disabledReason} accessibilityRole="alert">
+            {disabledReason()}
+          </Text>
+        )}
       </View>
       </KeyboardAvoidingView>
     </View>
@@ -532,6 +584,7 @@ const styles = StyleSheet.create({
 
   footer:     { paddingHorizontal: layout.screenPaddingH, paddingVertical: spacing[4], backgroundColor: colors.background, borderTopWidth: 1, borderTopColor: colors.border, gap: spacing[2] },
   footerNote: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, textAlign: 'center', lineHeight: fontSize.xs * 1.6 },
+  disabledReason: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.warning, textAlign: 'center', lineHeight: fontSize.xs * 1.6 },
 
   successScreen:   { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: layout.screenPaddingH, gap: spacing[4] },
   successIcon:     { width: 110, height: 110, borderRadius: 55, backgroundColor: colors.successSurface, borderWidth: 2, borderColor: colors.success, alignItems: 'center', justifyContent: 'center', marginBottom: spacing[2] },

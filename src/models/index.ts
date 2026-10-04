@@ -63,11 +63,11 @@ export interface RegisterPayload {
   phone?:          string;
   role?:           UserRole;
   clientType?:     ClientType;
-  /** RGPD/CGU consent Ã¢â‚¬â€ must be true for the backend to accept the request. */
+  /** RGPD/CGU consent — must be true for the backend to accept the request. */
   acceptTerms:     boolean;
   /** Required when role === PARTNER (and no companyId) OR clientType === COMPANY. */
   companyName?:    string;
-  /** 14-digit SIRET Ã¢â‚¬â€ required for COMPANY clients and new partner companies. */
+  /** 14-digit SIRET — required for COMPANY clients and new partner companies. */
   siret?:          string;
   /** Optional billing fields for COMPANY clients. */
   billingAddress?: string;
@@ -103,6 +103,10 @@ export interface User {
   /** Company FK — non-null when role is PARTNER (resolves to the partner's
    *  société). Used by partner screens to gate company-owned resources. */
   companyId?:     string | null;
+  /** Client FK — non-null when role is CLIENT. Symétrique de `companyId` :
+   *  le serveur le renvoie déjà, il manquait simplement au modèle. Nécessaire
+   *  au référentiel de sites (lot 3, audit 2026-08), rattaché au client. */
+  clientId?:      string | null;
   twoFaEnabled?:  boolean;
   /** ISO timestamp of email verification; null/undefined = not yet verified. */
   emailVerifiedAt?: string | null;
@@ -162,7 +166,7 @@ export interface Quote {
   /** VAT rate applied to this quote (e.g. 20 for 20%). Defaults to 20 server-side. */
   vatRate?:         number;
   /**
-   * VAT amount in euros â€” derived backend field (totalWithVat - totalClientPrice).
+   * VAT amount in euros — derived backend field (totalWithVat - totalClientPrice).
    * Optional because legacy DB rows or older API versions may omit it; consumers
    * MUST fall back to `(totalWithVat - totalClientPrice)` when undefined.
    */
@@ -180,7 +184,7 @@ export interface Quote {
 }
 
 /**
- * One booking line â€” one service type, N agents, optional per-agent uniforms.
+ * One booking line — one service type, N agents, optional per-agent uniforms.
  * Used in both the quote payload and embedded in MissionSlot.
  */
 export interface BookingLine {
@@ -202,7 +206,7 @@ export interface CreateQuotePayload {
   /** For single-slot missions (legacy). */
   bookingLines?: BookingLine[];
   /**
-   * For multi-slot missions â€” per-slot staffing requirements.
+   * For multi-slot missions — per-slot staffing requirements.
    * Each entry references a slotId from the created MissionSlot records
    * (returned by POST /missions in the `slots` array).
    */
@@ -213,7 +217,7 @@ export interface CreateQuotePayload {
 }
 
 // -----------------------------------------------------------------------------
-// SLOT BOOKING LINE â€” local draft, carries display metadata not sent to API
+// SLOT BOOKING LINE — local draft, carries display metadata not sent to API
 // -----------------------------------------------------------------------------
 /**
  * Local representation of one service-type need within a slot draft.
@@ -228,14 +232,14 @@ export interface SlotBookingLine {
 }
 
 // -----------------------------------------------------------------------------
-// MISSION SLOT â€” mirrors backend MissionSlotDto (with per-slot bookingLines)
+// MISSION SLOT — mirrors backend MissionSlotDto (with per-slot bookingLines)
 // -----------------------------------------------------------------------------
 /**
  * One time window within a multi-day / variable-hours mission.
  *
  * `bookingLines` enables per-slot staffing:
- *   Day 08-18h   â†’ 3x SECURITE STANDARD
- *   Night 22-06h â†’ 1x SSIAP + 1x CYNOPHILE
+ *   Day 08-18h   → 3x SECURITE STANDARD
+ *   Night 22-06h → 1x SSIAP + 1x CYNOPHILE
  *
  * If `bookingLines` is omitted the backend uses the mission-level
  * `bookingLines` (if any) or leaves bookings for a later /quotes/calculate.
@@ -252,7 +256,7 @@ export interface MissionSlot {
   }>;
 }
 
-/** A created slot as returned by the API â€” has a server-assigned `id`. */
+/** A created slot as returned by the API — has a server-assigned `id`. */
 export interface MissionSlotRecord extends Omit<MissionSlot, 'bookingLines'> {
   id:        string;
   slotIndex: number;
@@ -287,7 +291,7 @@ export interface Mission {
 }
 
 /**
- * Payload for POST /missions â€” mirrors backend CreateMissionDto.
+ * Payload for POST /missions — mirrors backend CreateMissionDto.
  *
  * Single-slot (legacy):
  *   { startAt, endAt, durationHours, bookingLines?, ...location }
@@ -304,7 +308,7 @@ export interface CreateMissionPayload {
   latitude:  number;
   longitude: number;
 
-  /** Always required â€” a single-slot mission is slots with 1 entry. */
+  /** Always required — a single-slot mission is slots with 1 entry. */
   slots: MissionSlot[];
 
   title?:    string;
@@ -367,7 +371,7 @@ export interface Application {
 
 
 /**
- * Mirrors backend AgentAvailability â€” declared free windows.
+ * Mirrors backend AgentAvailability — declared free windows.
  */
 export interface AgentAvailability {
   id:        string;
@@ -383,15 +387,39 @@ export interface AgentAvailability {
 
 export interface IncidentReportPayload {
   description: string;
+  /**
+   * Qualification opérationnelle (miroir de l'enum Prisma `InterventionKind`).
+   *
+   * Côté client, un signalement n'est pas catégorisé par une liste de types :
+   * le client décrit ce qu'il constate. On laisse donc le champ optionnel —
+   * le serveur ne qualifie rien à sa place.
+   */
+  interventionKind?: InterventionKind;
   latitude?:   number;
   longitude?:  number;
 }
+
+/**
+ * Qualification opérationnelle d'un signalement terrain, telle que saisie par
+ * l'agent sur site. Sans impact paie ni disciplinaire — à distinguer de
+ * `IncidentType` côté serveur, qui relève du domaine RH et n'est jamais exposé.
+ */
+export type InterventionKind =
+  | 'INTRUSION'
+  | 'BLESSURE'
+  | 'AGRESSION'
+  | 'INCENDIE'
+  | 'EVACUATION'
+  | 'MATERIEL'
+  | 'AUTRE';
 
 export interface Incident {
   id:          string;
   bookingId:   string;
   reporterId:  string;
   description: string;
+  /** Null pour les signalements antérieurs à la migration du 10/08/2026. */
+  interventionKind?: InterventionKind | null;
   latitude?:   number;
   longitude?:  number;
   createdAt:   string;
@@ -594,7 +622,7 @@ export type AuthStackParamList = {
   TwoFa:    { tempToken: string };
   ForgotPassword: undefined;
   // `token` is populated when arriving via the email deep-link
-  // (securbook://auth/reset-password?token=â€¦). Undefined when the user
+  // (securbook://auth/reset-password?token=…). Undefined when the user
   // opens the screen manually and pastes the token by hand.
   ResetPassword:  { token?: string } | undefined;
 };
@@ -615,6 +643,13 @@ export type ProfileStackParamList = {
   DeleteAccount:      undefined;
   PaymentMethods:        undefined;
   AddPaymentMethod:      undefined;
+  /**
+   * Consignes de site (lot 3, audit 2026-08).
+   * Rattachées au profil plutôt qu'à une mission : un site est réutilisé
+   * d'une vacation à l'autre, ses consignes ne se ressaisissent pas.
+   */
+  SiteList:       undefined;
+  SiteDetail:     { siteId?: string };
 };
 
 export type MissionStackParamList = {
@@ -880,6 +915,16 @@ export interface Company {
   billingCity?:    string | null;
   billingZipCode?: string | null;
   vatNumber?:      string | null;
+  siren?:            string | null;
+  apeCode?:          string | null;
+  tradeName?:        string | null;
+  legalRepName?:     string | null;
+  legalRepRole?:     string | null;
+  iban?:             string | null;
+  bic?:              string | null;
+  rcProInsurer?:      string | null;
+  rcProPolicyNumber?: string | null;
+  rcProExpiresAt?:    string | null;
   createdAt:   string;
 }
 
@@ -988,6 +1033,7 @@ export type PartnerTeamStackParamList = {
 export type PartnerFinanceStackParamList = {
   PartnerFinancials: undefined;
   PartnerBilling:    undefined;
+  PartnerTimesheets: undefined;
 };
 
 // PartnerProfile tab — the route name "PartnerDashboard" is kept for back-compat

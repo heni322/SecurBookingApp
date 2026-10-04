@@ -6,6 +6,8 @@ const payment: PaymentNS = {
   sepa_failed: "The SEPA mandate could not be confirmed. Please try again.",
   card_failed: "Payment could not be confirmed. Please try again.",
   sepa_success: 'SEPA mandate registered!', card_success: 'Payment confirmed!',
+  card_held: 'Card authorized!',
+  card_held_body: "The amount is reserved on your card, not charged yet. It will be charged once every agent for your mission is assigned, and released if the mission is cancelled before then. You will receive your invoice by email.",
   sepa_success_body: "Your SEPA mandate is registered. The debit will be processed in 1-2 business days. Your mission will be activated upon payment confirmation.",
   card_success_body: "Your mission is confirmed. Qualified agents in your area will receive a notification. You will receive your invoice by email.",
   home: 'Back to home',
@@ -16,6 +18,8 @@ const payment: PaymentNS = {
   invoice_ref: 'Invoice #{{ref}}',
   invoice_count: '{{count}} invoice',
   invoice_open_error: 'Unable to open the invoice. Please try again.',
+  invoice_unavailable: 'The invoice is not available yet for this payment.',
+  invoice_download_a11y: 'Download the invoice',
   errors: {
     card_declined: 'Your card was declined. Please use another card.',
     expired_card: 'Your card is expired.',
@@ -63,6 +67,11 @@ const payment: PaymentNS = {
     cta_pay: 'Pay {{amount}}',
     footer_cgv: 'By confirming, you accept the Provalk terms and the refund policy.',
     err_generic: 'An error occurred during payment.',
+    reason_enter_iban: 'Enter your IBAN to continue.',
+    reason_iban_invalid: 'This IBAN is incomplete or invalid.',
+    reason_complete_card: 'Complete your card details to continue.',
+    reason_card_unavailable:
+      'Card payment is unavailable right now. This is not caused by what you entered — try SEPA transfer instead.',
   },
   add: {
     header_method: 'Payment method',
@@ -117,7 +126,7 @@ const payment: PaymentNS = {
     beneficiary_label: 'Beneficiary', payable_label: 'Payable to', address_label: 'Mailing address',
     amount_exact: 'Exact amount', amount_cheque: 'Cheque amount',
     bank_coords_title: 'BANK DETAILS', cheque_title: 'CHEQUE MAILING',
-    follow_mission: 'Follow my mission',
+    follow_mission: 'Follow my mission',
     result_title_virement: 'Bank details', result_title_cheque: 'Cheque mailing',
     result_subtitle: 'Your declaration has been registered',
     total_ttc: 'Total amount incl. VAT', vat_included: 'VAT 20% included',

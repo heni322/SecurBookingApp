@@ -17,6 +17,8 @@ import { palette } from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { paymentsApi } from '@api/endpoints/payments';
+import { StripeSetupBanner } from '@components/dev/StripeSetupBanner';
+import { inspectStripeSetup, canCollectCardDetails } from '@utils/stripeDiagnostics';
 import { useAuthStore } from '@store/authStore';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation } from '@i18n';
@@ -44,7 +46,13 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
   const [iban, setIban] = useState('');
   const [ibanFocused, setIbanFocused] = useState(false);
   const ibanValid = isValidIban(iban);
-  const canConfirm = methodType === 'card' ? cardComplete : ibanValid;
+
+  // Same Stripe setup gate as PaymentScreen — CardField is equally unusable
+  // here when the SDK cannot bind its events on the active renderer.
+  const stripeIssues = React.useMemo(() => inspectStripeSetup(), []);
+  const cardEntryOk  = canCollectCardDetails(stripeIssues);
+  const canConfirm =
+    methodType === 'card' ? cardEntryOk && cardComplete : ibanValid;
 
   const handlePickType = (type: MethodType) => {
     setMethodType(type); setErrorMsg(null); setCardComplete(false); setIban(''); setStep('form');
@@ -147,7 +155,11 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
       <ScreenHeader title={isSepa ? t('add.header_iban') : t('add.header_card')} onBack={() => setStep('pick')} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-        <View style={s.methodBadge}>
+      <StripeSetupBanner
+            issues={stripeIssues}
+            fallbackHint="L'ajout d'une carte est momentanément indisponible. Vous pouvez enregistrer un IBAN."
+          />
+          <View style={s.methodBadge}>
           {isSepa ? <Landmark size={14} color={colors.primary} strokeWidth={1.8} /> : <CreditCard size={14} color={colors.primary} strokeWidth={1.8} />}
           <Text style={s.methodBadgeText}>{isSepa ? t('add.method_badge_sepa') : t('add.method_badge_card')}</Text>
         </View>

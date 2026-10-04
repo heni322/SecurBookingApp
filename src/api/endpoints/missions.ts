@@ -19,11 +19,23 @@ import type {
  */
 export type MissionScope = 'ACTIVE' | 'ARCHIVED';
 
-/** PATCH /missions/update/:id/slots/:slotId payload. */
+/**
+ * PATCH /missions/update/:id/slots/:slotId payload.
+ *
+ * FIX (audit 2026-08, P1-5): this used to declare `bookingLines`, which the
+ * endpoint has never handled. The server's body was an inline TypeScript type,
+ * so ValidationPipe had no metadata to validate against and silently discarded
+ * the field — returning 200 while doing nothing. The backend now uses a real
+ * DTO and rejects unknown properties with 400, so this type must match it.
+ *
+ * Staffing (bookingLines) is fixed at mission creation. It is intentionally not
+ * editable per-slot: changing agentCount after publication would invalidate the
+ * quote, employment contracts and DPAE declarations derived from it.
+ */
 export interface UpdateSlotPayload {
-  startAt?:       string;
-  endAt?:         string;
-  bookingLines?:  { serviceTypeId: string; agentCount: number; agentUniforms?: string[] }[];
+  startAt?: string;
+  endAt?:   string;
+  notes?:   string;
 }
 
 export const missionsApi = {
@@ -85,9 +97,12 @@ export const missionsApi = {
   cancel: (id: string) =>
     apiClient.patch<ApiResponse<Mission>>(`/missions/cancel/${id}`),
 
-  /** PATCH /missions/publish/:id — publier une mission CREATED. */
-  publish: (id: string) =>
-    apiClient.patch<ApiResponse<Mission>>(`/missions/publish/${id}`),
+  // NOTE (audit 2026-08, P1-7): `publish` and `getEvents` were removed. Both
+  // map to routes the backend gates with @Roles(ADMIN), so from this client app
+  // they could only ever return 403, and neither was called anywhere in src/.
+  // Mission publication is payment-driven server-side (confirmOfflinePayment
+  // and the Stripe webhook transition CONFIRMED -> PUBLISHED), so there is no
+  // client-side publish step to wire up.
 
   // ── Slots & history ─────────────────────────────────────────────────────
 
@@ -102,8 +117,4 @@ export const missionsApi = {
   /** GET /missions/get/:id/history — historique des changements de statut. */
   getHistory: (id: string) =>
     apiClient.get<ApiResponse<any[]>>(`/missions/get/${id}/history`),
-
-  /** GET /missions/get/:id/events — événements du cycle de vie. */
-  getEvents: (id: string) =>
-    apiClient.get<ApiResponse<any[]>>(`/missions/get/${id}/events`),
 };

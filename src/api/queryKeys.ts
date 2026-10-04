@@ -40,6 +40,8 @@ export const qk = {
   bookings: {
     all:    ['bookings'] as const,
     mine:   (scope?: string) => ['bookings', 'mine', scope ?? 'all'] as const,
+    /** Bookings attached to one mission - the client-side mission detail view. */
+    byMission: (missionId: string) => ['bookings', 'mission', missionId] as const,
     detail: (id: string) => ['bookings', 'detail', id] as const,
   },
 
@@ -106,6 +108,15 @@ export const qk = {
     all:        ['dpae'] as const,
     byContract: (contractId: string) => ['dpae', 'by-contract', contractId] as const,
     pending:    () => ['dpae', 'pending'] as const,
+  },
+
+  sites: {
+    all:        ['sites'] as const,
+    byClient:   (clientId: string) => ['sites', 'client', clientId] as const,
+    detail:     (id: string) => ['sites', 'detail', id] as const,
+    /** Métadonnées des codes uniquement — les valeurs ne transitent jamais ici. */
+    secrets:    (siteId: string) => ['sites', 'secrets', siteId] as const,
+    accessLog:  (secretId: string) => ['sites', 'access-log', secretId] as const,
   },
 
 } as const;

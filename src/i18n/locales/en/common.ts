@@ -36,6 +36,16 @@ const common: CommonNS = {
   check_connection: 'Check your internet connection',
   mission_zone:     'Mission zone',
   mission_cancelled:'Mission cancelled',
+  // StarRating accessibility labels — read by screen readers, since the stars
+  // themselves are purely decorative (audit 2026-08, UX-1).
+  star_rating_value: 'Rating: {{value}} out of {{max}}',
+  star_rating_set:   'Give a rating of {{value}} out of {{max}}',
+  update_required_title:          'Update required',
+  update_required_body:           'This version of the app is no longer supported. Install the latest version to keep ordering and following your missions.',
+  update_required_version:        'Installed version: {{current}} · minimum required: {{min}}',
+  update_required_button_android: 'Update on Google Play',
+  update_required_button_ios:     'Update on the App Store',
+  update_required_no_store:       'Please update the app from your app store.',
 };
 
 export default common;

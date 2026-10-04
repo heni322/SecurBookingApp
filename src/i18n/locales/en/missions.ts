@@ -303,6 +303,9 @@ const missions: MissionsNS = {
     submit_error_title:    'Unable to create the mission',
     submit_error_jump_to:  'Edit',
     submit_error_network:  'Check your connection and try again.',
+    submit_error_title_quote:  'Mission created — quote calculation failed',
+    submit_quote_retry:        'Your mission is saved. Only the quote failed: retry, it will not be created again.',
+    submit_quote_open_mission: 'View mission',
   },
 };
 

@@ -10,7 +10,7 @@
  * lived inside ServicePickerScreen; it was extracted when the service/agent
  * selection was merged into the mission-creation "Quand & agents" step.
  */
-import React from 'react';
+import type React from 'react';
 import {
   Shield, Building2, Flame, Dog, Car, Star, UserCheck,
 } from 'lucide-react-native';

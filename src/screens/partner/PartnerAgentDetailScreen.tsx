@@ -15,6 +15,7 @@ import { ScreenHeader }  from '@components/ui/ScreenHeader';
 import { Card }          from '@components/ui/Card';
 import { Badge }         from '@components/ui/Badge';
 import { LoadingState }  from '@components/ui/LoadingState';
+import { EmptyState }    from '@components/ui/EmptyState';
 import { colors, palette } from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
@@ -29,19 +30,42 @@ export const PartnerAgentDetailScreen: React.FC<Props> = ({ route, navigation })
   const [data,       setData]       = useState<PartnerOnboarding | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error,      setError]      = useState<string | null>(null);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setRefreshing(true); else setLoading(true);
+    setError(null);
     try {
       const res = await partnerApi.getAgentOnboarding(agentId);
       setData((res.data as any)?.data ?? res.data);
-    } catch { /* silent */ }
+    } catch (err: any) {
+      // Was a silent catch -- a failed load fell through to rendering the
+      // full detail view with data=null, showing "0%, not validated, no
+      // documents" instead of an error.
+      setError(err?.response?.data?.message ?? t('agentDetail.errors.body'));
+    }
     finally { setLoading(false); setRefreshing(false); }
-  }, [agentId]);
+  }, [agentId, t]);
 
   useEffect(() => { load(); }, [load]);
 
   if (loading && !data) return <LoadingState message={t('agentDetail.loading')} />;
+
+  if (error && !data) {
+    return (
+      <View style={styles.screen}>
+        <ScreenHeader title={agentName} subtitle={t('agentDetail.title')} onBack={() => navigation.goBack()} />
+        <View style={styles.errorWrap}>
+          <EmptyState Icon={XCircle}
+            title={t('agentDetail.errors.title')}
+            subtitle={error}
+            actionLabel={t('agentDetail.errors.retry')}
+            onAction={() => load()}
+          />
+        </View>
+      </View>
+    );
+  }
 
   const pct       = data?.onboarding.progress ?? 0;
   const isValid   = data?.isValidated ?? false;
@@ -147,6 +171,7 @@ export const PartnerAgentDetailScreen: React.FC<Props> = ({ route, navigation })
 
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: colors.background },
+  errorWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: layout.screenPaddingH },
   content: { paddingHorizontal: layout.screenPaddingH, paddingTop: spacing[4], paddingBottom: spacing[8], gap: spacing[4] },
   statusBanner:    { flexDirection: 'row', alignItems: 'center', gap: spacing[4], borderRadius: radius.xl, borderWidth: 1, borderColor: colors.warning + '40', backgroundColor: colors.warningSurface, padding: spacing[4] },
   statusBannerOk:  { borderColor: colors.success + '40', backgroundColor: colors.successSurface },

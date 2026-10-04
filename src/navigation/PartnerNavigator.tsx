@@ -28,6 +28,7 @@ import { PartnerTeamScreen }          from '@screens/partner/PartnerTeamScreen';
 import { PartnerAgentDetailScreen }   from '@screens/partner/PartnerAgentDetailScreen';
 import { PartnerFinancialsScreen }    from '@screens/partner/PartnerFinancialsScreen';
 import { PartnerBillingScreen }       from '@screens/partner/PartnerBillingScreen';
+import { PartnerTimesheetsScreen }    from '@screens/partner/PartnerTimesheetsScreen';
 import { PartnerCompanyEditScreen }   from '@screens/partner/PartnerCompanyEditScreen';
 import { PartnerDocumentsScreen }     from '@screens/partner/PartnerDocumentsScreen';
 import { PartnerComplianceScreen }    from '@screens/partner/PartnerComplianceScreen';
@@ -96,6 +97,7 @@ function FinanceStackNavigator() {
     <FinanceStack.Navigator screenOptions={{ headerShown: false }}>
       <FinanceStack.Screen name="PartnerFinancials" component={PartnerFinancialsScreen} />
       <FinanceStack.Screen name="PartnerBilling"    component={PartnerBillingScreen} />
+      <FinanceStack.Screen name="PartnerTimesheets" component={PartnerTimesheetsScreen} />
     </FinanceStack.Navigator>
   );
 }

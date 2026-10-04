@@ -32,7 +32,13 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: true,
       /** Reconnect handled by connectivityService (active queries only). */
       refetchOnReconnect:   false,
-      /** Don't refetch when the component re-mounts (cache is enough). */
+      /**
+       * Refetch on re-mount - but ONLY when the entry is already stale.
+       * true is NOT 'always': inside staleTime a re-mount is a no-op.
+       * Anything that WRITES must therefore invalidate explicitly; relying
+       * on this flag to surface fresh data is how a just-created mission
+       * stays invisible in the list for five minutes.
+       */
       refetchOnMount:       true,
     },
     mutations: {
@@ -42,35 +48,13 @@ export const queryClient = new QueryClient({
   },
 });
 
-// ─── Query key factory ────────────────────────────────────────────────────────
-// Centralised key factory prevents typos and enables targeted invalidation.
-
-export const queryKeys = {
-  // Missions
-  missions:      ()          => ['missions']                        as const,
-  missionDetail: (id: string)=> ['missions', id]                   as const,
-
-  // Bookings
-  bookings:      (missionId: string) => ['bookings', missionId]    as const,
-  bookingDetail: (id: string)        => ['bookings', 'detail', id] as const,
-
-  // Notifications
-  notifications:   ()        => ['notifications']                  as const,
-  unreadCount:     ()        => ['notifications', 'unread']        as const,
-
-  // Service types (static, long cache)
-  serviceTypes:    ()        => ['serviceTypes']                   as const,
-
-  // User profile
-  profile:         ()        => ['profile']                        as const,
-
-  // Quotes
-  quotes:          (missionId: string) => ['quotes', missionId]    as const,
-
-  // Payments
-  paymentHistory:  ()        => ['payments', 'history']            as const,
-  paymentMethods:  ()        => ['payments', 'methods']            as const,
-
-  // Ratings
-  ratings:         (missionId: string) => ['ratings', missionId]   as const,
-} as const;
+// Query keys live in ONE place: @api/queryKeys (the qk factory).
+//
+// There used to be a second factory here. The two disagreed on the same
+// domain - missionDetail(id) was ['missions', id] while qk.missions.detail(id)
+// was ['missions','detail',id] - so invalidations written against one factory
+// silently matched nothing on the other. Prefix matching makes that failure
+// invisible: the call succeeds, it just invalidates no query. Three call
+// sites in api/queries were dead for exactly this reason.
+//
+// Do not add keys here. Add them to @api/queryKeys.

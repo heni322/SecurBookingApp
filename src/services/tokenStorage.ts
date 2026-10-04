@@ -53,6 +53,45 @@ let _refreshToken: string | null = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// ─── Storage backend reporting ───────────────────────────────────────────────
+// Which backend actually holds the tokens. Exposed so the app can report it to
+// crash/analytics tooling: a silent downgrade to plaintext is exactly the kind
+// of thing nobody discovers until an incident.
+export type StorageBackend =
+  | 'unknown'
+  | 'keychain-hardware'
+  | 'keychain-software'
+  | 'async-storage-plaintext';
+
+let _backend: StorageBackend = 'unknown';
+let _warnedAboutPlaintext = false;
+
+type DegradeListener = (backend: StorageBackend, reason: string) => void;
+let _onDegrade: DegradeListener | null = null;
+
+function setBackend(backend: StorageBackend, reason: string) {
+  const changed = _backend !== backend;
+  _backend = backend;
+
+  if (backend === 'async-storage-plaintext' && !_warnedAboutPlaintext) {
+    _warnedAboutPlaintext = true;
+    // console.warn, not __DEV__-gated: this must be visible in release builds
+    // too, because it is the case that actually matters.
+    console.warn(
+      `[tokenStorage] Secure storage unavailable (${reason}) — JWTs are being ` +
+        'stored in AsyncStorage in PLAINTEXT, readable by any process on a ' +
+        'rooted/jailbroken device.',
+    );
+  }
+  if (changed && _onDegrade) {
+    try {
+      _onDegrade(backend, reason);
+    } catch {
+      /* a telemetry hook must never break auth */
+    }
+  }
+}
+
 async function keychainGet(): Promise<{ accessToken: string; refreshToken: string } | null> {
   if (!Keychain) return null;
   try {
@@ -66,25 +105,69 @@ async function keychainGet(): Promise<{ accessToken: string; refreshToken: strin
   }
 }
 
+/**
+ * Persist both tokens in one Keychain entry.
+ *
+ * SECURITY FIX (audit 2026-08, P1-2). The previous implementation requested
+ * `SECURITY_LEVEL.SECURE_HARDWARE` on Android inside a `try { … } catch { return
+ * false; }`. On any device without a hardware-backed keystore — common on
+ * budget and older Android hardware — that request THROWS, the throw was
+ * swallowed, and the caller fell straight through to writing both JWTs into
+ * AsyncStorage in plaintext. Silently, with no signal, on an unknown share of
+ * the install base.
+ *
+ * The fix is a ladder rather than a single attempt: hardware-backed keystore
+ * first, then the software keystore (still OS-encrypted, still far better than
+ * plaintext), and only then the caller's plaintext fallback — which now
+ * announces itself.
+ */
 async function keychainSet(accessToken: string, refreshToken: string): Promise<boolean> {
-  if (!Keychain) return false;
-  try {
-    await Keychain.setGenericPassword(
-      KEYCHAIN_USERNAME,
-      JSON.stringify({ accessToken, refreshToken }),
-      {
-        service:    KEYCHAIN_SERVICE,
-        accessible: IOS_ACCESSIBILITY,
-        // Android Keystore: require device authentication (biometric / PIN)
-        ...(Platform.OS === 'android' && {
-          securityLevel: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
-        }),
-      },
-    );
-    return true;
-  } catch {
+  if (!Keychain) {
+    setBackend('async-storage-plaintext', 'react-native-keychain not installed');
     return false;
   }
+
+  const payload = JSON.stringify({ accessToken, refreshToken });
+
+  const attempts: Array<{
+    level?: KeychainModule.SECURITY_LEVEL;
+    backend: StorageBackend;
+    label: string;
+  }> =
+    Platform.OS === 'android'
+      ? [
+          {
+            level: Keychain.SECURITY_LEVEL.SECURE_HARDWARE,
+            backend: 'keychain-hardware',
+            label: 'hardware keystore',
+          },
+          {
+            level: Keychain.SECURITY_LEVEL.SECURE_SOFTWARE,
+            backend: 'keychain-software',
+            label: 'software keystore',
+          },
+        ]
+      : [{ backend: 'keychain-hardware', label: 'iOS keychain' }];
+
+  let lastError = 'unknown error';
+
+  for (const attempt of attempts) {
+    try {
+      await Keychain.setGenericPassword(KEYCHAIN_USERNAME, payload, {
+        service: KEYCHAIN_SERVICE,
+        accessible: IOS_ACCESSIBILITY,
+        ...(attempt.level ? { securityLevel: attempt.level } : {}),
+      });
+      setBackend(attempt.backend, attempt.label);
+      return true;
+    } catch (e: any) {
+      lastError = e?.message ?? String(e);
+      // Fall through to the next, weaker attempt.
+    }
+  }
+
+  setBackend('async-storage-plaintext', lastError);
+  return false;
 }
 
 async function keychainClear(): Promise<void> {
@@ -104,15 +187,19 @@ async function migrateFromAsyncStorage(): Promise<{ accessToken: string; refresh
     ]);
     if (!a || !r) return null;
 
-    // Write to Keychain
+    // NOTE: the legacy keys are wiped ONLY when the Keychain write succeeded.
+    // A previous comment here claimed they were wiped "regardless", which would
+    // have been wrong: on a device where Keychain is unavailable, deleting the
+    // AsyncStorage copy is the only copy, and the user is silently logged out.
+    // The plaintext-storage risk on those devices is reported via setBackend()
+    // instead of being papered over by data loss.
     const ok = await keychainSet(a, r);
     if (ok) {
-      // Wipe legacy keys regardless — even if Keychain failed, don't leak
       await Promise.allSettled([
         AsyncStorage.removeItem(LEGACY_KEYS.access),
         AsyncStorage.removeItem(LEGACY_KEYS.refresh),
       ]);
-      if (__DEV__) console.log('[tokenStorage] ✅ Migrated tokens AsyncStorage → Keychain');
+      if (__DEV__) console.log('[tokenStorage] Migrated tokens AsyncStorage -> Keychain');
     }
     return { accessToken: a, refreshToken: r };
   } catch {
@@ -166,27 +253,58 @@ export const tokenStorage = {
   /**
    * Persist new tokens.
    * - Updates in-memory cache immediately (synchronous getters stay valid).
-   * - Writes to Keychain; falls back to AsyncStorage if Keychain fails.
+   * - Writes to Keychain; falls back to AsyncStorage if every Keychain
+   *   attempt fails.
+   *
+   * FIX (audit 2026-08, P1-3): this used to be fire-and-forget. The backend
+   * rotates refresh tokens, so the old refresh token is already dead the moment
+   * a refresh succeeds. If the app was killed in the window between the
+   * in-memory update and the disk write, the persisted refresh token was the
+   * dead one — producing a forced logout on next cold start with no
+   * diagnosable cause. Callers must now await this.
    */
-  setTokens: ({ accessToken, refreshToken }: { accessToken: string; refreshToken: string }) => {
-    _accessToken  = accessToken;
+  setTokens: async ({
+    accessToken,
+    refreshToken,
+  }: {
+    accessToken: string;
+    refreshToken: string;
+  }): Promise<void> => {
+    _accessToken = accessToken;
     _refreshToken = refreshToken;
 
-    // Fire-and-forget async write
-    keychainSet(accessToken, refreshToken).then((ok) => {
-      if (!ok) asyncStorageSet(accessToken, refreshToken);
-    });
+    const ok = await keychainSet(accessToken, refreshToken);
+    if (!ok) await asyncStorageSet(accessToken, refreshToken);
   },
 
   /**
    * Wipe tokens from memory + secure storage.
+   *
+   * Also awaited (P1-3): a logout that returns before the wipe completes can
+   * leave credentials on disk if the process dies, which is the one moment the
+   * user explicitly asked for them to be gone.
    */
-  clearTokens: () => {
-    _accessToken  = null;
+  clearTokens: async (): Promise<void> => {
+    _accessToken = null;
     _refreshToken = null;
-    // Wipe both storages; one of them will be no-op
-    keychainClear();
-    asyncStorageClear();
+    // Wipe both storages; one of them will be a no-op.
+    await Promise.allSettled([keychainClear(), asyncStorageClear()]);
+  },
+
+  /**
+   * Which backend currently holds the tokens. Report this to crash/analytics
+   * tooling at startup: 'async-storage-plaintext' means this device is storing
+   * JWTs unencrypted, and without measurement you cannot know how large that
+   * slice of the install base is.
+   */
+  getStorageBackend: (): StorageBackend => _backend,
+
+  /**
+   * Register a one-off listener fired whenever the effective storage backend
+   * changes — intended for wiring into Sentry/analytics once a DSN exists.
+   */
+  onStorageDegraded: (listener: DegradeListener | null): void => {
+    _onDegrade = listener;
   },
 
   /**
@@ -200,7 +318,10 @@ export const tokenStorage = {
     if (kc) {
       _accessToken  = kc.accessToken;
       _refreshToken = kc.refreshToken;
-      if (__DEV__) console.log('[tokenStorage] ✅ Loaded tokens from Keychain');
+      // A successful Keychain read proves secure storage works on this device;
+      // the precise level is only known on write, so report the safe generic.
+      setBackend('keychain-software', 'tokens loaded from Keychain');
+      if (__DEV__) console.log('[tokenStorage] Loaded tokens from Keychain');
       return;
     }
 
@@ -217,7 +338,10 @@ export const tokenStorage = {
     if (as) {
       _accessToken  = as.accessToken;
       _refreshToken = as.refreshToken;
-      if (__DEV__) console.log('[tokenStorage] ⚠️  Keychain unavailable — using AsyncStorage');
+      // Record the reality: these tokens are sitting in plaintext. Doing this
+      // on read (not only on write) means the backend is reported correctly
+      // from app start, before any refresh happens.
+      setBackend('async-storage-plaintext', 'tokens loaded from AsyncStorage');
     }
     // else: no tokens at all → user must log in
   },

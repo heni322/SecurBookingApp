@@ -238,11 +238,6 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-          {/* FIX: proactive warning before the user reaches the pay button,
-              consistent with EmailVerificationBanner on HomeScreen. Renders
-              nothing once the email is verified. */}
-          <EmailVerificationBanner />
-
           {/* FIX: expired banner — button now calls handleRecalculate */}
           {isExpired && quote.status === 'PENDING' && (
             <View style={styles.expiredBanner}>
@@ -339,6 +334,11 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
           {quote.status === 'ACCEPTED' && (
             <View style={styles.paySection}>
+              {/* Just-in-time gate: the unverified-email notice lives next to the
+                  action it actually blocks, not at the top of the screen where
+                  it pushed the quote below the fold and competed with the gold
+                  total. handlePay still handles the server-side rejection. */}
+              <EmailVerificationBanner variant="inline" />
               <View style={styles.secureRow}>
                 <Lock size={13} color={colors.textMuted} strokeWidth={2} />
                 {/* FIX: 'secure_stripe' doesn't exist in QuoteNS — use 'secure_note' */}

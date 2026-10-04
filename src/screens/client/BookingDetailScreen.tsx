@@ -105,13 +105,22 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
 
 
   const handleIncident = async () => {
-    if (!incidentDesc.trim()) return;
+    const description = incidentDesc.trim();
+    // Le DTO serveur impose 10 caractères minimum (aligné sur l'app agent).
+    // Sans ce garde-fou côté client, une saisie type « RAS » partait en requête
+    // pour revenir en 400 avec un message de validation brut.
+    if (description.length < 10) {
+      toast.warning(t('incidents.too_short'), { title: t('incidents.report_title') });
+      return;
+    }
     setSubmitting(true);
     try {
-      await bookingsApi.reportIncident(bookingId, { description: incidentDesc.trim() });
+      await bookingsApi.reportIncident(bookingId, { description });
       setShowIncidentModal(false);
       setIncidentDesc('');
       toast.success(t('incidents.reported_body'), { title: t('incidents.reported_title') });
+      // Le signalement doit apparaître dans la liste sans quitter l'écran.
+      load();
     } catch { toast.error(t('incidents.report_error'), { title: t('errors.generic') }); }
     finally   { setSubmitting(false); }
   };
@@ -368,15 +377,27 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
               <AlertTriangle size={14} color={colors.warning} strokeWidth={2} />
               <Text style={styles.sectionLabel}>{t('incidents.section_title', { count: booking.incidents!.length })}</Text>
             </View>
-            {booking.incidents!.map(inc => (
-              <View key={inc.id} style={styles.incidentItem}>
-                <AlertTriangle size={16} color={colors.warning} strokeWidth={1.8} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.incidentDesc}>{inc.description}</Text>
-                  <Text style={styles.incidentDate}>{formatDate(inc.createdAt)}</Text>
+            {booking.incidents!.map(inc => {
+              // La qualification est absente sur les signalements antérieurs à la
+              // migration du 10/08/2026, et sur ceux saisis par le client
+              // lui-même depuis cet écran — le badge ne s'affiche donc que
+              // lorsqu'un agent a effectivement qualifié l'événement.
+              const kind = inc.interventionKind;
+              return (
+                <View key={inc.id} style={styles.incidentItem}>
+                  <AlertTriangle size={16} color={colors.warning} strokeWidth={1.8} />
+                  <View style={{ flex: 1 }}>
+                    {kind && kind !== 'AUTRE' && (
+                      <Text style={styles.incidentKind}>
+                        {t(`incidents.kinds.${kind}`, { defaultValue: kind })}
+                      </Text>
+                    )}
+                    <Text style={styles.incidentDesc}>{inc.description}</Text>
+                    <Text style={styles.incidentDate}>{formatDate(inc.createdAt)}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </Card>
         )}
 
@@ -602,6 +623,7 @@ const styles = StyleSheet.create({
   incidentsCard:  { gap:spacing[3] },
   incidentHeader: { flexDirection:'row', alignItems:'center', gap:spacing[2] },
   incidentItem:   { flexDirection:'row', gap:spacing[3], alignItems:'flex-start' },
+  incidentKind:   { fontFamily:fontFamily.bodyMedium, fontSize:fontSize.xs, color:colors.warning, textTransform:'uppercase', letterSpacing:0.6, marginBottom:2 },
   incidentDesc:   { fontFamily:fontFamily.body, fontSize:fontSize.sm, color:colors.textSecondary },
   incidentDate:   { fontFamily:fontFamily.body, fontSize:fontSize.xs, color:colors.textMuted, marginTop:2 },
 

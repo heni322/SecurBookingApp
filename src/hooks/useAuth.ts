@@ -17,7 +17,7 @@ export function useAuth() {
     try {
       const { data } = await authApi.login(payload);
       const { tokens } = data.data as { user: User; tokens: AuthTokens };
-      tokenStorage.setTokens(tokens);
+      await tokenStorage.setTokens(tokens);
       return data.data;
     } catch (err) {
       setError(handleError(err));
@@ -30,7 +30,7 @@ export function useAuth() {
     try {
       const { data } = await authApi.register(payload);
       const { tokens } = data.data as { user: User; tokens: AuthTokens };
-      tokenStorage.setTokens(tokens);
+      await tokenStorage.setTokens(tokens);
       return data.data;
     } catch (err) {
       setError(handleError(err));
@@ -38,10 +38,12 @@ export function useAuth() {
     } finally { setLoading(false); }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     const refreshToken = tokenStorage.getRefreshToken();
     if (refreshToken) authApi.logout(refreshToken).catch(() => {});
-    useAuthStore.getState().logout();
+    // Awaited so the on-disk wipe completes before the caller navigates away
+    // (P1-3).
+    await useAuthStore.getState().logout();
   }, []);
 
   return { login, register, logout, loading, error };

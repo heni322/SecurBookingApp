@@ -27,7 +27,10 @@ const profile: ProfileNS = {
     member_since:    'Member since',
     version:         'Version',
     privacy_policy:  'Privacy policy',
-    terms:           'Terms & Conditions',
+    terms:           'Terms of use',
+    sales_terms:     'Terms of sale',
+    legal_notice:    'Legal notice',
+    support:         'Contact support',
   },
   hero: {
     verified:      'VERIFIED CLIENT',

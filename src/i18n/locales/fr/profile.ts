@@ -27,7 +27,10 @@ const profile: ProfileNS = {
     member_since:    'Membre depuis',
     version:         'Version',
     privacy_policy:  'Politique de confidentialité',
-    terms:           'CGV',
+    terms:           "Conditions générales d'utilisation (CGU)",
+    sales_terms:     'Conditions générales de vente (CGV)',
+    legal_notice:    'Mentions légales',
+    support:         'Contacter le support',
   },
   hero: {
     verified:      'CLIENT VÉRIFIÉ',

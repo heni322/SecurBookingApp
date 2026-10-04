@@ -8,6 +8,14 @@ import type {
   Company,
 } from '@models/index';
 
+/** One entry in the partner activity timeline (GET /partner/activity). */
+export interface PartnerActivityEvent {
+  type: string;
+  at: string;
+  actorId: string | null;
+  meta: Record<string, unknown>;
+}
+
 /** Paginated payload shape returned by /partner/list/* endpoints. */
 export interface PaginatedResult<T> {
   data: T[];
@@ -78,4 +86,44 @@ export const partnerApi = {
   /** GET /partner/company - snapshot societe (prefill des formulaires). */
   getCompany: () =>
     apiClient.get<ApiResponse<Company>>('/partner/company'),
+
+  /** GET /partner/activity - journal d'activite de ma societe. */
+  getActivity: (limit = 50) =>
+    apiClient.get<ApiResponse<PartnerActivityEvent[]>>('/partner/activity', { params: { limit } }),
+};
+
+/** One row of GET /employment/timesheets/review (audit 2026-09, C3). */
+export interface ReviewTimesheet {
+  id: string;
+  status: 'OPEN' | 'AGENT_SUBMITTED' | 'PARTNER_APPROVED' | 'LOCKED';
+  checkinAt: string;
+  checkoutAt: string;
+  paidMinutes: number;
+  paidHours: number;
+  autoApproveAt: string | null;
+  /** Check-in or check-out captured without network and sent later (A14). */
+  offlineCapture?: boolean;
+  contract: {
+    id: string;
+    plannedHours: number | string;
+    agent: { id: string; firstName: string | null; lastName: string | null } | null;
+  };
+  booking: {
+    id: string;
+    mission: { id: string; title: string | null; city: string } | null;
+    incidentReports: Array<{ id: string; type: string; origin: string }>;
+  };
+}
+
+/** Timesheets of the partner's own company (scoped server-side). */
+export const timesheetsApi = {
+  review: (status: 'PENDING' | 'PARTNER_APPROVED' = 'PENDING') =>
+    apiClient.get<ApiResponse<{ data: ReviewTimesheet[]; meta: { total: number } }>>(
+      '/employment/timesheets/review',
+      { params: { status, limit: 200 } },
+    ),
+  approve: (id: string) =>
+    apiClient.patch<ApiResponse<unknown>>(`/employment/timesheets/${id}/status`, {
+      status: 'PARTNER_APPROVED',
+    }),
 };

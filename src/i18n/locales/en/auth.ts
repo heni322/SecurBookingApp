@@ -56,7 +56,7 @@ const auth: AuthNS = {
     email_label: 'Email address', email_placeholder: 'you@example.com',
     submit: 'Send reset link', submitting: 'Sending…', back_to_login: 'Back to sign in',
     sent_title: 'Check your inbox', sent_body: 'If an account exists for this address, a reset link valid for 1 hour has just been sent. Remember to check your spam folder.',
-    resend: 'Resend link', open_mail: 'Open mail app', enter_code: 'Enter the code',
+    resend: 'Resend link', open_mail: 'Open mail app', enter_code: 'Enter the code', have_code: 'I already have a code',
     errors: { email_required: 'Email is required', email_invalid: 'Invalid email address', generic: 'Could not send. Please try again shortly.' },
   },
   reset_password: {
@@ -75,8 +75,13 @@ const auth: AuthNS = {
   },
   emailVerification: {
     bannerTitle: "Verify your email address",
+    bannerTitleShort: "Verify your email address",
     bannerBody: "Confirm your email to secure your account and unlock all features.",
+    inlineBody: "Confirm your email address to pay for this quote.",
     resendButton: "Resend confirmation email",
+    resendShort: "Resend",
+    cooldown: "Resend in {{seconds}}s",
+    dismiss: "Hide this reminder",
     sentTitle: "Email sent",
     sentBody: "A new confirmation link has just been sent to you. Remember to check your spam folder.",
     errorTitle: "Could not send",

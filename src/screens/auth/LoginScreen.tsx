@@ -11,7 +11,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Mail, Lock, Eye, EyeOff, ShieldCheck, ArrowRight, Fingerprint } from 'lucide-react-native';
 import Svg, { Circle, Defs, RadialGradient as SvgRadialGradient, Stop } from 'react-native-svg';
 import { authApi }           from '@api/endpoints/auth';
-import { tokenStorage }      from '@services/tokenStorage';
 import { fcmService }        from '@services/fcmService';
 import { useAuthStore }      from '@store/authStore';
 import { biometricService }  from '@services/biometricService';
@@ -28,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation('auth');
   const toast = useToast();
   const { top } = useSafeAreaInsets();
 
@@ -92,8 +91,9 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       }
       const { user, tokens } = payload as { user: User; tokens: AuthTokens };
       if (!tokens?.accessToken) throw new Error('Invalid response');
-      tokenStorage.setTokens(tokens);
-      hydrate(user, tokens);
+      // hydrate() persists the tokens itself; the previous explicit
+      // setTokens() here was a redundant second write of the same values.
+      await hydrate(user, tokens);
     } catch (err: unknown) {
       const status  = (err as any)?.response?.status;
       const message = (err as any)?.response?.data?.message ?? t('login.errors.generic');

@@ -37,9 +37,20 @@ describe('@config', () => {
 
   it('is deeply frozen (immutable at the top level)', () => {
     expect(Object.isFrozen(config)).toBe(true);
-    expect(() => {
+
+    // AUDIT 2026-08 : ce test attendait une exception. Object.freeze ne garantit
+    // pas cela — une écriture sur un objet gelé ne lève QU'EN mode strict, et
+    // échoue silencieusement sinon. Le transpileur Jest émet du CommonJS non
+    // strict, donc l'assertion ne pouvait pas passer dans cet environnement.
+    //
+    // La garantie réelle du gel, c'est l'absence d'effet : on teste ça.
+    const before = config.env;
+    try {
       // @ts-expect-error — intentional mutation attempt
       config.env = 'production';
-    }).toThrow();
+    } catch {
+      // Mode strict : l'exception est acceptable, l'invariant reste le même.
+    }
+    expect(config.env).toBe(before);
   });
 });

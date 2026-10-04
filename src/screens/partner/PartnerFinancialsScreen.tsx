@@ -104,7 +104,8 @@ export const PartnerFinancialsScreen: React.FC = () => {
     setGenerating(true);
     try {
       const res = await partnerApi.generateInvoice(from, to);
-      const url = (res.data as any)?.data?.pdfUrl ?? (res.data as any)?.pdfUrl;
+      // Backend returns { url }; keep pdfUrl as a legacy fallback.
+      const url = (res.data as any)?.data?.url ?? (res.data as any)?.url ?? (res.data as any)?.data?.pdfUrl ?? (res.data as any)?.pdfUrl;
       if (url) {
         await Linking.openURL(url).catch(() => showAlert(t('financials.pdf.generated'), t('financials.pdf.cannotOpen')));
       } else {

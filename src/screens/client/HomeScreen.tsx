@@ -42,7 +42,7 @@ type Nav = CompositeNavigationProp<
 
 
 export const HomeScreen: React.FC = () => {
-  const { t }          = useTranslation('home');
+  const { t }          = useTranslation('home');
   const toast = useToast();
   const { top }        = useSafeAreaInsets(); // Fix #3: real safe area top
   const navigation     = useNavigation<Nav>();
@@ -147,8 +147,11 @@ export const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Email verification reminder (renders only when unverified) */}
-        <EmailVerificationBanner />
+        {/* Account-level reminder: single-line strip directly under the header.
+            Ambient and dismissible (24h snooze) - the blocking case is handled
+            just-in-time on QuoteDetailScreen, not here. Renders nothing once
+            the email is verified. */}
+        <EmailVerificationBanner variant="strip" />
 
         {/* ── Stats row ── */}
         {loading && !missions ? (

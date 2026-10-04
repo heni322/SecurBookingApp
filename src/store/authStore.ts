@@ -57,11 +57,11 @@ interface AuthState {
   setUser:    (user: User)                 => void;
   setLoading: (v: boolean)                 => void;
   /** Called after successful login — hydrates session and connects services. */
-  hydrate:    (user: User, tokens: AuthTokens) => void;
+  hydrate:    (user: User, tokens: AuthTokens) => Promise<void>;
   /** Called at app startup — validates stored tokens and restores session. */
   rehydrate:  ()                           => Promise<void>;
   /** Clears session and disconnects all services. */
-  logout:     ()                           => void;
+  logout:     ()                           => Promise<void>;
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -80,8 +80,11 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (v)       => set({ isLoading: v }),
 
       // ── Post-login hydration ───────────────────────────────────────────
-      hydrate: (user, tokens) => {
-        tokenStorage.setTokens(tokens);
+      hydrate: async (user, tokens) => {
+        // Awaited (audit 2026-08, P1-3): the session must be on disk before the
+        // UI treats the user as logged in, or an app kill straight after login
+        // loses it entirely.
+        await tokenStorage.setTokens(tokens);
         set({
           user,
           accessToken: tokens.accessToken,
@@ -142,7 +145,10 @@ export const useAuthStore = create<AuthState>()(
                 );
                 const { accessToken: newAt, refreshToken: newRt } = rData.data ?? rData;
 
-                tokenStorage.setTokens({ accessToken: newAt, refreshToken: newRt });
+                // Awaited: the backend rotates refresh tokens, so the previous
+                // one is already dead. Losing this write means a forced logout
+                // on next cold start with no diagnosable cause (P1-3).
+                await tokenStorage.setTokens({ accessToken: newAt, refreshToken: newRt });
                 accessToken = newAt;
 
                 const { data: uData } = await rawHttp.get('/users/me', {
@@ -155,7 +161,7 @@ export const useAuthStore = create<AuthState>()(
                 return; // ✅ Session refreshed
               } catch {
                 // Both tokens invalid → force logout
-                tokenStorage.clearTokens();
+                await tokenStorage.clearTokens();
                 set({ user: null, accessToken: null, isLoggedIn: false, isLoading: false });
                 return;
               }
@@ -172,7 +178,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       // ── Logout ────────────────────────────────────────────────────────
-      logout: () => {
+      logout: async () => {
         // Best-effort: clear any in-flight mission draft for this user.
         try {
           const uid = get().user?.id;
@@ -188,7 +194,10 @@ export const useAuthStore = create<AuthState>()(
 
         socketService.disconnect();
         fcmService.unregisterToken().catch(() => {});
-        tokenStorage.clearTokens();
+        // Awaited: logout is the one moment the user explicitly asked for the
+        // credentials to be gone, so the wipe must complete before the session
+        // is reported as ended (P1-3).
+        await tokenStorage.clearTokens();
         set({ user: null, accessToken: null, isLoggedIn: false, isLoading: false });
       },
     }),

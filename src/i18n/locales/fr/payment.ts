@@ -11,6 +11,9 @@ const payment: PaymentNS = {
 
   sepa_success: 'Mandat SEPA enregistré !',
   card_success: 'Paiement confirmé !',
+  card_held: 'Carte autorisée !',
+  card_held_body:
+    "Le montant est réservé sur votre carte, pas encore débité. Il sera débité dès que tous les agents de votre mission seront affectés, et libéré si la mission est annulée avant. Vous recevrez votre facture par e-mail.",
 
   sepa_success_body:
     "Votre mandat SEPA est enregistré. Le débit sera effectué sous 1 à 2 jours ouvrés. Votre mission sera activée dès confirmation du paiement.",
@@ -33,6 +36,8 @@ const payment: PaymentNS = {
   invoice_ref:        'Paiement #{{ref}}',
   invoice_count:      '{{count}} facture',
   invoice_open_error: "Impossible d'ouvrir la facture.",
+  invoice_unavailable: "La facture n'est pas encore disponible pour ce paiement.",
+  invoice_download_a11y: 'Télécharger la facture',
 
   errors: {
     card_declined:
@@ -98,6 +103,11 @@ const payment: PaymentNS = {
     cta_pay: 'Payer {{amount}}',
     footer_cgv: 'En confirmant, vous acceptez les CGV Provalk et la politique de remboursement.',
     err_generic: 'Une erreur est survenue lors du paiement.',
+    reason_enter_iban: 'Saisissez votre IBAN pour continuer.',
+    reason_iban_invalid: 'Cet IBAN est incomplet ou invalide.',
+    reason_complete_card: 'Complétez les informations de votre carte pour continuer.',
+    reason_card_unavailable:
+      "Le paiement par carte est indisponible pour le moment. Ce n'est pas lié à votre saisie — essayez le virement SEPA.",
   },
   add: {
     header_method: 'Moyen de paiement',
@@ -182,7 +192,7 @@ const payment: PaymentNS = {
     bank_coords_title: 'COORDONNÉES BANCAIRES',
     cheque_title: 'ENVOI DU CHÈQUE',
 
-    follow_mission: 'Suivre ma mission',
+    follow_mission: 'Suivre ma mission',
     result_title_virement: 'Coordonnées bancaires', result_title_cheque: 'Envoi du chèque',
     result_subtitle: 'Votre déclaration a été enregistrée',
     total_ttc: 'Montant total TTC', vat_included: 'TVA 20% incluse',

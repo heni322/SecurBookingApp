@@ -56,7 +56,7 @@ const auth: AuthNS = {
     email_label: 'Adresse email', email_placeholder: 'vous@exemple.com',
     submit: 'Envoyer le lien', submitting: 'Envoi…', back_to_login: 'Retour à la connexion',
     sent_title: 'Vérifiez votre boîte mail', sent_body: 'Si un compte existe pour cette adresse, un lien de réinitialisation valable 1 heure vient d\'être envoyé. Pensez à vérifier vos spams.',
-    resend: 'Renvoyer le lien', open_mail: 'Ouvrir ma messagerie', enter_code: 'Saisir le code reçu',
+    resend: 'Renvoyer le lien', open_mail: 'Ouvrir ma messagerie', enter_code: 'Saisir le code reçu', have_code: 'J\'ai déjà un code',
     errors: { email_required: 'Email requis', email_invalid: 'Email invalide', generic: 'Envoi impossible. Réessayez dans un instant.' },
   },
   reset_password: {
@@ -75,8 +75,13 @@ const auth: AuthNS = {
   },
   emailVerification: {
     bannerTitle: "Vérifiez votre adresse email",
+    bannerTitleShort: "Vérifiez votre adresse email",
     bannerBody: "Confirmez votre email pour sécuriser votre compte et débloquer toutes les fonctionnalités.",
+    inlineBody: "Confirmez votre adresse email pour pouvoir régler ce devis.",
     resendButton: "Renvoyer l'email de confirmation",
+    resendShort: "Renvoyer",
+    cooldown: "Renvoyer dans {{seconds}} s",
+    dismiss: "Masquer ce rappel",
     sentTitle: "Email envoyé",
     sentBody: "Un nouveau lien de confirmation vient de vous être envoyé. Pensez à vérifier vos spams.",
     errorTitle: "Envoi impossible",

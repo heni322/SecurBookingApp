@@ -50,6 +50,18 @@ const booking: BookingNS = {
     reported_title:  'Incident reported',
     reported_body:   'Your report has been sent to the Provalk team.',
     report_error:    'Unable to report the incident.',
+    too_short:       'Please describe the incident in at least 10 characters.',
+    // Operational qualification reported by the agent from the field.
+    // Keys mirror the Prisma `InterventionKind` enum — do not rename.
+    kinds: {
+      INTRUSION:  'Intrusion',
+      BLESSURE:   'Injury',
+      AGRESSION:  'Assault',
+      INCENDIE:   'Fire',
+      EVACUATION: 'Evacuation',
+      MATERIEL:   'Technical incident',
+      AUTRE:      'Other',
+    },
   },
 
   actions: {

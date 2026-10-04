@@ -18,12 +18,13 @@ import map_picker    from './map_picker';
 import analytics     from './analytics';
 import offline_banner from './offline_banner';
 import partner       from './partner';
+import sites         from './sites';
 
 const fr = {
   common, auth, home, missions, profile, navigation, notifications,
   quote, payment, account,
   booking, rating, dispute, tracking, conversation, services,
   map_picker, analytics, offline_banner,
-  partner,
+  partner, sites,
 } as const;
 export default fr;

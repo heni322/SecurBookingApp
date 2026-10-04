@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Switch, RefreshControl, Modal, Pressable,
+  StyleSheet, Switch, RefreshControl, Modal, Pressable, Linking,
 } from 'react-native';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -12,6 +12,7 @@ import {
   Mail, Phone, CalendarDays, ShieldCheck,
   FileText, Info, LogOut, ChevronRight, CreditCard,
   Bell, Lock, Wallet, Fingerprint, Trash2, Edit3, BarChart2, Globe,
+  Scale, LifeBuoy, Receipt,
 } from 'lucide-react-native';
 import { Avatar }           from '@components/ui/Avatar';
 import { Card }             from '@components/ui/Card';
@@ -28,7 +29,13 @@ import { formatDate }       from '@utils/formatters';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation }   from '@i18n';
 import { useConfirmDialogStore } from '@store/confirmDialogStore';
+import { config }           from '@config';
 import i18n, { SUPPORTED_LANGUAGES, type SupportedLanguage } from '@i18n';
+
+/** Opens a legal / support page; a missing browser or mail app is not fatal. */
+const openExternal = (url: string) => {
+  Linking.openURL(url).catch(() => { /* no handler for this URL on the device */ });
+};
 
 type Nav = NativeStackNavigationProp<ProfileStackParamList>;
 type LucideIconComp = React.FC<{ size: number; color: string; strokeWidth: number }>;
@@ -81,7 +88,7 @@ export const ProfileScreen: React.FC = () => {
       cancelLabel:  t('logout.cancel'),
       confirmStyle: 'destructive',
     });
-    if (ok) logout();
+    if (ok) await logout();
   };
 
   const handleSelectLanguage = useCallback((lang: SupportedLanguage) => {
@@ -223,15 +230,21 @@ export const ProfileScreen: React.FC = () => {
           </Card>
         </View>
 
-        {/* ── Legal ── */}
+        {/* ── Legal ── (audit 2026-09-30, P0-9: these rows had no onPress) */}
         <View style={styles.sectionGroup}>
           <Text style={styles.sectionTitle}>{t('sections.legal')}</Text>
           <Card elevated style={styles.menuCard}>
-            <MenuRow Icon={Info}        iconColor={colors.textMuted} label={t('menu.version')}        value="1.0.0" />
+            <MenuRow Icon={Info}        iconColor={colors.textMuted} label={t('menu.version')}        value={config.appVersion} />
             <Divider />
-            <MenuRow Icon={ShieldCheck} iconColor={colors.success}   label={t('menu.privacy_policy')} tappable />
+            <MenuRow Icon={ShieldCheck} iconColor={colors.success}   label={t('menu.privacy_policy')} tappable onPress={() => openExternal(config.legal.privacyUrl)} />
             <Divider />
-            <MenuRow Icon={FileText}    iconColor={colors.textMuted} label={t('menu.terms')}           tappable />
+            <MenuRow Icon={FileText}    iconColor={colors.textMuted} label={t('menu.terms')}           tappable onPress={() => openExternal(config.legal.termsUrl)} />
+            <Divider />
+            <MenuRow Icon={Receipt}     iconColor={colors.textMuted} label={t('menu.sales_terms')}     tappable onPress={() => openExternal(config.legal.salesTermsUrl)} />
+            <Divider />
+            <MenuRow Icon={Scale}       iconColor={colors.textMuted} label={t('menu.legal_notice')}    tappable onPress={() => openExternal(config.legal.legalNoticeUrl)} />
+            <Divider />
+            <MenuRow Icon={LifeBuoy}    iconColor={colors.info}      label={t('menu.support')}         tappable onPress={() => openExternal(config.legal.supportUrl)} />
           </Card>
         </View>
 

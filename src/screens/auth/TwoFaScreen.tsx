@@ -18,7 +18,7 @@ import { useToast } from '@hooks/useToast';
 type Props = NativeStackScreenProps<AuthStackParamList, 'TwoFa'>;
 
 export default function TwoFaScreen({ route }: Props) {
-  const { t }  = useTranslation('auth');
+  const { t }  = useTranslation('auth');
   const toast = useToast();
   const { t: tc } = useTranslation('common'); // cross-namespace alias
 
@@ -58,7 +58,7 @@ export default function TwoFaScreen({ route }: Props) {
         refreshToken: payload.refreshToken ?? payload.tokens?.refreshToken,
         expiresIn:    payload.expiresIn    ?? payload.tokens?.expiresIn ?? 0,
       };
-      hydrate(user, tokens);
+      await hydrate(user, tokens);
     } catch {
       toast.error(t('two_fa_screen.invalid_body'), { title: t('two_fa_screen.invalid_title') });
       setCode(['', '', '', '', '', '']);

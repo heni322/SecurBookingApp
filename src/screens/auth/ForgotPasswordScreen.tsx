@@ -5,9 +5,9 @@
  * ───────────────────
  *  • The backend always returns 200 (anti-enumeration): we therefore show the
  *    same "check your inbox" confirmation whether or not the email exists.
- *  • In-app flow only — no deep-link yet. After sending, the user comes back and
- *    taps "Enter the code" to reach the ResetPassword screen and paste the
- *    link/token from their email.
+ *  • The email links to an HTTPS page that shows a one-time code (audit
+ *    2026-09-30). The user taps "Enter the code" (after sending) or "I already
+ *    have a code" (first screen) to reach ResetPassword and paste it.
  */
 import React, { useState } from 'react';
 import {
@@ -108,6 +108,17 @@ export const ForgotPasswordScreen: React.FC<Props> = ({ navigation }) => {
               style={styles.cta}
               rightIcon={!loading ? <ArrowRight size={18} color={colors.textInverse} strokeWidth={2} /> : undefined}
             />
+
+            {/* The reset email shows a code (audit 2026-09-30): a user who
+                closed the app after requesting it must still reach the entry
+                screen without having to request a new code. */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ResetPassword')}
+              style={styles.resend}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.resendTxt}>{t('forgot_password.have_code')}</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>

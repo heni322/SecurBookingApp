@@ -28,3 +28,19 @@ export type { UploadDocumentResponse } from './endpoints/upload';
 
 // SOS
 export { sosApi }            from './endpoints/sos';
+
+// Consignes de site — accès, postes, contacts, codes (lot 3, audit 2026-08).
+// ⚠️  Les valeurs des codes d'accès n'apparaissent dans aucune réponse de
+// lecture : elles sont chiffrées côté serveur et ne ressortent que par une
+// révélation journalisée, depuis l'application agent.
+export { sitesApi }          from './endpoints/sites';
+export type {
+  Site,
+  SitePost,
+  SiteContact,
+  SiteContactRole,
+  SiteSecretKind,
+  SiteSecretMeta,
+  SecretAccessEntry,
+  CreateSitePayload,
+} from './endpoints/sites';
