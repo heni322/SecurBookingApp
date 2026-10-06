@@ -286,8 +286,24 @@ export interface Mission {
   quote?:        Quote;
   payment?:      Payment;
   bookings?:     Booking[];
+  /** Refunds / commercial gestures on this mission (GET /missions/get/:id). */
+  creditNotes?:  CreditNoteSummary[];
   createdAt:     string;
   updatedAt:     string;
+}
+
+/**
+ * A credit note as the client sees it (audit 2026-10-06).
+ *  REFUNDED — money returned (Stripe refund, or bank transfer confirmed)
+ *  PENDING  — owed to the client, to be repaid by bank transfer
+ *  APPLIED  — deducted from another invoice
+ * `amount` is a Prisma Decimal, serialised as a string.
+ */
+export interface CreditNoteSummary {
+  id:      string;
+  amount:  number | string;
+  status:  'PENDING' | 'APPLIED' | 'REFUNDED';
+  reason?: string | null;
 }
 
 /**

@@ -63,7 +63,8 @@ const missions: MissionsNS = {
     error_load:       'Impossible de charger la mission.',
     retry:            'Réessayer',
     cancel_title:     'Annuler la mission',
-    cancel_body:      'Cette action est irréversible. Continuer ?',
+    // Cancellation policy (CEO decision 2026-10-06), applied automatically.
+    cancel_body:      'Action irréversible. Si la mission est déjà payée : remboursée à 100 % si elle commence dans plus de 48 h, à 50 % entre 24 h et 48 h, sans remboursement à moins de 24 h (agents déjà mobilisés). Continuer ?',
     cancel_back:      'Retour',
     cancel_confirm:   'Annuler',
     cancel_error:     "Impossible d'annuler la mission",
@@ -86,6 +87,10 @@ const missions: MissionsNS = {
     section_location: 'Localisation de la mission',
     section_notes:    'Notes & instructions',
     section_bookings: 'Postes',
+    section_refunds: 'Remboursements',
+    refund_done: 'Remboursé',
+    refund_pending: 'À rembourser par virement',
+    refund_applied: 'Déduit d’une facture',
     total_ttc:        'Total TTC',
   },
 

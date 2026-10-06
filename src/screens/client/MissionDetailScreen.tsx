@@ -14,7 +14,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Calendar, Clock, MapPin, Radio, Banknote,
   CalendarDays, MessageSquare, FileText, Zap, 
-  Check, Hourglass, Users, PlayCircle, CheckCheck, XCircle, Pencil,
+  Check, Hourglass, Users, PlayCircle, CheckCheck, XCircle, Pencil, Receipt,
 } from 'lucide-react-native';
 
 import { quotesApi }            from '@api/endpoints/quotes';
@@ -258,6 +258,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
   const canEdit        = useMemo(() => mission?.status === MissionStatus.CREATED, [mission]);
   const hasQuote       = useMemo(() => Boolean(mission?.quote), [mission]);
   const bookings       = useMemo(() => mission?.bookings ?? [], [mission]);
+  const creditNotes    = useMemo(() => mission?.creditNotes ?? [], [mission]);
   const displayTitle   = useMemo(() => mission?.title?.trim() || t('card_fallback_title', { city: mission?.city }), [mission, t]);
   // SEPA debit is still settling: mission is published but funds are not yet
   // captured, so an assigned agent cannot check in until the debit clears.
@@ -473,6 +474,30 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         )}
 
+        {/* Refunds / credit notes (audit 2026-10-06): the API returned them
+            on the mission but the app never showed them, so a client had no
+            trace of a refund or a commercial gesture. */}
+        {creditNotes.length > 0 && (
+          <Card elevated style={styles.notesCard}>
+            <SectionLabel Icon={Receipt} text={t('detail.section_refunds')} count={creditNotes.length} />
+            {creditNotes.map(cn => (
+              <View key={cn.id} style={styles.refundRow}>
+                <View style={styles.refundMain}>
+                  <Text style={styles.refundAmount}>{formatCurrency(Number(cn.amount))}</Text>
+                  {cn.reason ? <Text style={styles.notesText} numberOfLines={2}>{cn.reason}</Text> : null}
+                </View>
+                <Text style={cn.status === 'PENDING' ? styles.refundPending : styles.refundDone}>
+                  {cn.status === 'PENDING'
+                    ? t('detail.refund_pending')
+                    : cn.status === 'APPLIED'
+                      ? t('detail.refund_applied')
+                      : t('detail.refund_done')}
+                </Text>
+              </View>
+            ))}
+          </Card>
+        )}
+
         <View style={{ height: spacing[4] }} />
       </ScrollView>
 
@@ -560,6 +585,11 @@ const styles = StyleSheet.create({
   mapWrap:           { borderRadius: radius.lg, overflow: 'hidden', height: 160 },
   notesCard:         { gap: spacing[3] },
   notesText:         { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 22 },
+  refundRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
+  refundMain:        { flex: 1, gap: 2 },
+  refundAmount:      { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.base, color: colors.textPrimary },
+  refundDone:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
+  refundPending:     { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.warning },
   bookingsSection:   { gap: spacing[3] },
   footer:            { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[8], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background, gap: spacing[3] },
   editLink:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] + 2, paddingVertical: spacing[2] },

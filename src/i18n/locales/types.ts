@@ -144,6 +144,7 @@ export interface MissionsNS {
     cta_select: string; cta_waiting: string; cta_assigning: string; cta_messaging: string;
     badge_live: string; badge_approach: string; badge_urgent: string;
     section_approach: string; section_location: string; section_notes: string; section_bookings: string;
+    section_refunds: string; refund_done: string; refund_pending: string; refund_applied: string;
     total_ttc: string;
     sepa_settling_title: string; sepa_settling_body: string;
   };
