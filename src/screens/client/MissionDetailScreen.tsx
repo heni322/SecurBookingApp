@@ -4,6 +4,15 @@
  * FIX: "Obtenir un devis" CTA now calls POST /quotes/calculate inline before
  * navigating so QuoteDetailScreen always opens with a fresh quote rather than
  * hitting a dead-end 404 EmptyState.
+ *
+ * v2 (2026-10-07, device QA):
+ *  - "Suivi en direct" used the red `danger` variant — the colour of cancel /
+ *    delete — for the screen's most positive action. It is now the gold
+ *    primary with a pulsing live dot, so it reads as "live", not "danger".
+ *  - Footer used a fixed 32dp bottom padding on top of the tab bar, leaving a
+ *    dead band between the CTA and the tabs.
+ *  - Tracking nav fell back to the literal 'Agent' (English) when the name
+ *    was missing; uses the localised "assigned agent" label instead.
  */
 import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -29,7 +38,7 @@ import { ScreenHeader }         from '@components/ui/ScreenHeader';
 import { colors, palette }      from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import { formatMissionRange, formatCurrency, formatDate } from '@utils/formatters';
+import { formatMissionRange, formatDate, formatEuros } from '@utils/formatters';
 import { MISSION_STATUS_COLOR }  from '@utils/statusHelpers';
 import { isCancellableMission }  from '@utils/typeGuards';
 import { MissionStatus }         from '@constants/enums';
@@ -39,10 +48,32 @@ import { useTranslation }        from '@i18n';
 import i18n from '@i18n';
 import { useConfirmDialogStore } from '@store/confirmDialogStore';
 import { useToast } from '@hooks/useToast';
+import { MissionTasksList } from '@components/domain/MissionTasksList';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'MissionDetail'>;
 // Button.variant is 'filled'|'outline'|'ghost'|'danger' — no 'primary'
 type Cta = { label: string; isLive?: boolean; disabled?: boolean; loading?: boolean; onPress: () => void };
+
+/** Small pulsing dot used inside the live-tracking CTA. */
+const LiveDot: React.FC = () => {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0, duration: 800, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <Animated.View
+      style={[styles.liveDot, { opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.35] }) }]}
+    />
+  );
+};
+
+const agentDisplayName = (agent: unknown): string =>
+  ((agent as any)?.fullName as string | undefined)?.trim() || i18n.t('booking:agent.assigned_label');
 
 const STATUS_I18N_KEY: Record<MissionStatus, keyof MissionsNS['statuses']> = {
   [MissionStatus.CREATED]:     'created',
@@ -305,7 +336,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         label: t('detail.track'), isLive: true,
         onPress: () => navigation.navigate('LiveTracking', {
           missionId, bookingId: liveBooking.id,
-          agentName: (liveBooking?.agent as any)?.fullName ?? 'Agent',
+          agentName: agentDisplayName(liveBooking?.agent),
           missionAddress: mission?.address ?? mission?.city ?? '',
           siteLat: mission?.latitude as number, siteLng: mission?.longitude as number,
         }),
@@ -320,7 +351,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     if (!b?.agent || !mission) return;
     navigation.navigate('LiveTracking', {
       missionId, bookingId: b.id,
-      agentName: (b.agent as any).fullName ?? 'Agent',
+      agentName: agentDisplayName(b.agent),
       missionAddress: mission?.address ?? mission?.city ?? '',
       siteLat: mission?.latitude as number, siteLng: mission?.longitude as number,
     });
@@ -413,7 +444,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             {mission.quote && (
               <View style={styles.quoteSummaryRow}>
                 <Banknote size={13} color={palette.gold} strokeWidth={1.8} />
-                <Text style={styles.quoteSummaryText}>{formatCurrency(mission.quote.totalWithVat)} TTC</Text>
+                <Text style={styles.quoteSummaryText}>{formatEuros(Number(mission.quote.totalWithVat))} TTC</Text>
               </View>
             )}
           </View>
@@ -458,10 +489,29 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
           )}
         </Card>
 
+        <Card elevated style={styles.notesCard}>
+          <SectionLabel Icon={FileText} text={i18n.t('mission_tasks:detail_title')} tone="primary" />
+          <MissionTasksList
+            tasks={mission.serviceTasks}
+            serviceNames={Object.fromEntries(
+              bookings
+                .filter(b => (b as any).serviceTypeId)
+                .map(b => [(b as any).serviceTypeId as string, (b as any).serviceType?.name ?? '']),
+            )}
+          />
+        </Card>
+
         {mission.notes?.trim() ? (
           <Card elevated style={styles.notesCard}>
             <SectionLabel Icon={FileText} text={t('detail.section_notes')} />
             <Text style={styles.notesText}>{mission.notes}</Text>
+            {mission.textReview?.some(r => r.field === 'mission.notes') ? (
+              <Text style={styles.reviewNote}>
+                {mission.textReview.find(r => r.field === 'mission.notes')?.status === 'REJECTED'
+                  ? i18n.t('mission_tasks:review_rejected')
+                  : i18n.t('mission_tasks:review_pending')}
+              </Text>
+            ) : null}
           </Card>
         ) : null}
 
@@ -483,7 +533,7 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             {creditNotes.map(cn => (
               <View key={cn.id} style={styles.refundRow}>
                 <View style={styles.refundMain}>
-                  <Text style={styles.refundAmount}>{formatCurrency(Number(cn.amount))}</Text>
+                  <Text style={styles.refundAmount}>{formatEuros(Number(cn.amount))}</Text>
                   {cn.reason ? <Text style={styles.notesText} numberOfLines={2}>{cn.reason}</Text> : null}
                 </View>
                 <Text style={cn.status === 'PENDING' ? styles.refundPending : styles.refundDone}>
@@ -514,7 +564,8 @@ export const MissionDetailScreen: React.FC<Props> = ({ route, navigation }) => {
             loading={cta.loading}
             fullWidth
             size="lg"
-            variant={cta.isLive ? 'danger' : 'filled'}
+            variant="filled"
+            leftIcon={cta.isLive ? <LiveDot /> : undefined}
           />
           {canEdit && (
             <TouchableOpacity
@@ -584,6 +635,7 @@ const styles = StyleSheet.create({
   locationAddress:   { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 21 },
   mapWrap:           { borderRadius: radius.lg, overflow: 'hidden', height: 160 },
   notesCard:         { gap: spacing[3] },
+  reviewNote:        { color: colors.warning, fontSize: fontSize.xs },
   notesText:         { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary, lineHeight: 22 },
   refundRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
   refundMain:        { flex: 1, gap: 2 },
@@ -591,7 +643,8 @@ const styles = StyleSheet.create({
   refundDone:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
   refundPending:     { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.warning },
   bookingsSection:   { gap: spacing[3] },
-  footer:            { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[8], paddingTop: spacing[4], borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background, gap: spacing[3] },
+  liveDot:           { width: 8, height: 8, borderRadius: 4, backgroundColor: palette.navy },
+  footer:            { paddingHorizontal: layout.screenPaddingH, paddingBottom: spacing[4], paddingTop: spacing[3], borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.background, gap: spacing[3] },
   editLink:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[1] + 2, paddingVertical: spacing[2] },
   editLinkText:      { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
   cancelLink:        { alignItems: 'center', paddingVertical: spacing[1] },

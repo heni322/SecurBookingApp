@@ -21,6 +21,14 @@
  *
  * FIX (mai 2026): vatRate = 0.2 (décimal, 0–1) côté DB mais affiché en %
  *   — multiplié par 100 pour l'affichage ("TVA 20%" au lieu de "TVA 0.2%").
+ *
+ * FIX (2026-10-07, seen on device): lines used the CATALOGUE rate (19 €/h,
+ *   22 €/h) and did not add up to "Base HT" (228 + 264 = 492 € vs 908,23 €).
+ *   That confused the client and hinted at the cost base. The base HT is now
+ *   shared across lines by weight (hours × catalogue rate) — the API's rule
+ *   for invoice lines — so lines sum to the base, and each shows its real
+ *   price per hour. Hours come from each post's own slot (the mission's total
+ *   duration was applied to every post, wrong for multi-slot missions).
  */
 import React, { useMemo } from 'react';
 import { useTranslation } from '@i18n';
@@ -31,7 +39,7 @@ import { Button }    from '@components/ui/Button';
 import { colors }    from '@theme/colors';
 import { spacing }   from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-import { formatCurrency, formatDate } from '@utils/formatters';
+import { formatCurrency, formatDate, formatTime } from '@utils/formatters';
 import type { Quote, Mission, Booking } from '@models/index';
 
 interface Props {
@@ -68,34 +76,49 @@ interface PrestationRow {
  * Note : c'est un affichage indicatif — le vrai total reste
  * `quote.totalClientPrice`.
  */
-function buildPrestationRows(
+export function buildPrestationRows(
   bookings: Booking[],
   durationHours: number,
+  baseHt: number,
+  slots: Array<{ id: string; startAt: string; endAt: string }> = [],
 ): PrestationRow[] {
-  const map = new Map<string, PrestationRow>();
+  const slotHours = new Map(slots.map(sl => [sl.id, Math.max(0, (new Date(sl.endAt).getTime() - new Date(sl.startAt).getTime()) / 3_600_000)]));
+  const map = new Map<string, PrestationRow & { weight: number }>();
   for (const b of bookings) {
     if (!b.serviceTypeId || !b.serviceType) continue;
     if (['CANCELLED', 'ABANDONED'].includes(b.status)) continue;
 
     // Coerce Prisma Decimal / string → number. Fallback to 0 on parse failure.
-    const rate = Number(b.serviceType.baseRatePerHour ?? 0) || 0;
+    const rate  = Number(b.serviceType.baseRatePerHour ?? 0) || 0;
+    const hours = (b as any).slotId && slotHours.has((b as any).slotId) ? slotHours.get((b as any).slotId)! : durationHours;
 
-    const existing = map.get(b.serviceTypeId);
-    if (existing) {
-      existing.agentCount += 1;
-      existing.subtotal = existing.agentCount * existing.hours * existing.ratePerHour;
-    } else {
-      map.set(b.serviceTypeId, {
-        serviceTypeId: b.serviceTypeId,
-        serviceName:   b.serviceType.name,
-        agentCount:    1,
-        hours:         durationHours,
-        ratePerHour:   rate,
-        subtotal:      durationHours * rate,
-      });
-    }
+    const row = map.get(b.serviceTypeId) ?? {
+      serviceTypeId: b.serviceTypeId, serviceName: b.serviceType.name,
+      agentCount: 0, hours: 0, ratePerHour: 0, subtotal: 0, weight: 0,
+    };
+    row.agentCount += 1;
+    row.hours      += hours;                       // agent-hours
+    row.weight     += hours * (rate || 1);
+    map.set(b.serviceTypeId, row);
   }
-  return Array.from(map.values());
+  const rows = Array.from(map.values());
+  const totalWeight = rows.reduce((a, r) => a + r.weight, 0) || 1;
+  // Share the base HT by weight; the last line takes the rounding remainder
+  // so the lines add up to the base exactly.
+  let allocated = 0;
+  return rows.map((r, i) => {
+    const subtotal = i === rows.length - 1
+      ? Math.round((baseHt - allocated) * 100) / 100
+      : Math.round((baseHt * r.weight / totalWeight) * 100) / 100;
+    allocated += subtotal;
+    const perAgentHours = r.agentCount > 0 ? r.hours / r.agentCount : 0;
+    return {
+      serviceTypeId: r.serviceTypeId, serviceName: r.serviceName, agentCount: r.agentCount,
+      hours: perAgentHours,
+      ratePerHour: r.hours > 0 ? subtotal / r.hours : 0,  // real price per agent-hour
+      subtotal,
+    };
+  });
 }
 
 export const QuoteBreakdownCard: React.FC<Props> = ({
@@ -142,9 +165,9 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
   const prestations = useMemo<PrestationRow[]>(() => {
     if (!mission?.bookings || mission.bookings.length === 0) return [];
     const dh = num(mission.durationHours);
-    if (dh === 0) return [];
-    return buildPrestationRows(mission.bookings, dh);
-  }, [mission]);
+    if (dh === 0 && !(mission as any).slots?.length) return [];
+    return buildPrestationRows(mission.bookings, dh, baseHt, (mission as any).slots ?? []);
+  }, [mission, baseHt]);
 
   // ── Lignes de la ventilation (majorations + sous-total + TVA) ────────────────
   const breakdownRows: Array<{ label: string; value: number; muted?: boolean }> = [
@@ -228,7 +251,7 @@ export const QuoteBreakdownCard: React.FC<Props> = ({
             variant="filled"
           />
           <Text style={styles.expiryNote}>
-            {t('valid_until', { date: formatDate(quote.expiresAt) })}
+            {t('valid_until', { date: `${formatDate(quote.expiresAt)} · ${formatTime(quote.expiresAt)}` })}
           </Text>
         </>
       )}

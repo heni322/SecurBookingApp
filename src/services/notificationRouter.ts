@@ -15,6 +15,21 @@
  */
 import { CommonActions } from '@react-navigation/native';
 import { navigationRef } from '@services/navigationRef';
+import i18n from '@i18n';
+import type { useAuthStore as AuthStoreHook } from '@store/authStore';
+
+/**
+ * Current user's role, read lazily: authStore imports fcmService, which
+ * imports this module — a top-level import of the store would close that
+ * cycle and break on load-order changes.
+ */
+function authState(): { role?: string; isLoggedIn: boolean } {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { useAuthStore } = require('@store/authStore') as { useAuthStore: typeof AuthStoreHook };
+  const s = useAuthStore.getState();
+  return { role: s.user?.role, isLoggedIn: !!s.isLoggedIn };
+}
+const currentRole = () => authState().role;
 
 /** Flat string map exactly as delivered in an FCM `data` payload. */
 export type NotificationData = Record<string, string | undefined> & {
@@ -23,16 +38,19 @@ export type NotificationData = Record<string, string | undefined> & {
 
 type NavAction = ReturnType<typeof CommonActions.navigate>;
 
+// `initial: false`: a deep link must open the target ON TOP of the tab's
+// root list, not replace it — otherwise the tab's stack holds only the deep
+// linked screen and the tab keeps re-opening it (seen with MissionCreate).
 const toMissions = (screen: string, params?: Record<string, unknown>): NavAction =>
   CommonActions.navigate('Main', {
     screen: 'Missions',
-    params: { screen, params },
+    params: { screen, params, initial: false },
   });
 
 const toProfile = (screen: string, params?: Record<string, unknown>): NavAction =>
   CommonActions.navigate('Main', {
     screen: 'Profile',
-    params: { screen, params },
+    params: { screen, params, initial: false },
   });
 
 const toTab = (tab: string): NavAction =>
@@ -61,6 +79,54 @@ function parseCoords(
   return { lat, lng };
 }
 
+// ── Partner destinations ─────────────────────────────────────────────────────────
+// [FIX 2026-10-07] For a PARTNER, 'Main' is PartnerNavigator, which has no
+// Missions / Profile / Notifications tabs: every client-shaped action above
+// was unhandled, so tapping ANY push notification did nothing for partners.
+const toPartner = (tab: string, screen?: string, params?: Record<string, unknown>): NavAction =>
+  CommonActions.navigate('Main', screen
+    ? { screen: tab, params: { screen, initial: false, ...(params ? { params } : {}) } }
+    : { screen: tab });
+
+function resolvePartnerAction(type: string, missionId?: string): NavAction {
+  switch (type) {
+    case 'PAYMENT_CONFIRMED':
+    case 'PAYMENT_FAILED':
+    case 'PAYMENT_PENDING':
+    case 'PAYMENT_PROCESSING':
+      return toPartner('PartnerFinance', 'PartnerBilling');
+    case 'DOCUMENT_APPROVED':
+    case 'DOCUMENT_REJECTED':
+    case 'ACCOUNT_SUSPENDED':
+    case 'ACCOUNT_ACTIVATED':
+      return toPartner('PartnerProfile', 'PartnerCompliance');
+    case 'CONTRACT_CREATED':
+    case 'CONTRACT_AWAITING_SIGNATURE':
+    case 'CONTRACT_SIGNED':
+    case 'CONTRACT_FULLY_SIGNED':
+    case 'CONTRACT_CANCELLED':
+    case 'CONTRACT_NEEDED':
+      return toPartner('PartnerHome', 'PartnerContracts');
+    case 'BOOKING_ASSIGNED':
+    case 'BOOKING_CHECKIN':
+    case 'BOOKING_CHECKOUT':
+    case 'AGENT_CHECKED_IN':
+    case 'AGENT_CHECKED_OUT':
+    case 'BOOKING_CANCELLED':
+    case 'BOOKING_FORCE_CHECKOUT':
+    case 'MISSION_PUBLISHED':
+    case 'MISSION_AVAILABLE':
+    case 'MISSION_REPORT_READY':
+    case 'INCIDENT_REPORTED':
+      // The mission itself when the notification names one (2026-10-07).
+      return missionId
+        ? toPartner('PartnerHome', 'PartnerMissionDetail', { missionId })
+        : toPartner('PartnerHome', 'PartnerMissions');
+    default:
+      return toPartner('PartnerHome');
+  }
+}
+
 /**
  * Pure mapping: notification type + flat data → navigation action (or null).
  *
@@ -73,6 +139,10 @@ export function resolveNotificationAction(data: NotificationData): NavAction | n
   const type = data.type ?? '';
   const missionId = data.missionId;
   const bookingId = data.bookingId;
+
+  if (currentRole() === 'PARTNER') {
+    return resolvePartnerAction(type, missionId);
+  }
 
   switch (type) {
     case 'MISSION_AVAILABLE':
@@ -101,7 +171,7 @@ export function resolveNotificationAction(data: NotificationData): NavAction | n
         return toMissions('LiveTracking', {
           missionId,
           bookingId,
-          agentName: data.agentName ?? 'Agent',
+          agentName: data.agentName ?? i18n.t('booking:agent.assigned_label'),
           missionAddress: data.missionAddress ?? '',
           siteLat: coords.lat,
           siteLng: coords.lng,
@@ -164,7 +234,9 @@ let pendingData: NotificationData | null = null;
  */
 export function navigateFromNotification(data: NotificationData | null | undefined): void {
   if (!data) return;
-  if (!navigationRef.isReady()) {
+  // Also hold it while signed out: 'Main' does not exist yet, so the action
+  // was dropped and the tap was lost after sign-in (2026-10-07).
+  if (!navigationRef.isReady() || !authState().isLoggedIn) {
     pendingData = data;
     return;
   }
@@ -172,9 +244,13 @@ export function navigateFromNotification(data: NotificationData | null | undefin
   if (action) navigationRef.dispatch(action);
 }
 
-/** Called once from NavigationContainer onReady to replay a buffered deep-link. */
+/**
+ * Replays a buffered deep-link. Called from NavigationContainer onReady and
+ * again by RootNavigator once the user is signed in.
+ */
 export function flushPendingNotification(): void {
   if (!pendingData) return;
+  if (!navigationRef.isReady() || !authState().isLoggedIn) return; // keep it for after sign-in
   const data = pendingData;
   pendingData = null;
   const action = resolveNotificationAction(data);

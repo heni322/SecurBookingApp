@@ -9,6 +9,12 @@ const booking: BookingNS = {
     missions_count:  '{{count}} missions',
     follow_live:     "Suivre l'agent en direct",
     rating_empty:    '—',
+    missions_count_one: '{{count}} mission',
+    new_agent:       'Nouvel agent',
+    checkin_at:      'Arrivée {{time}}',
+    checkout_at:     'Départ {{time}}',
+    awaiting_agent:  'En attente d\'un agent',
+    auto_assign:     'Attribution automatique',
   },
 
   applications: {

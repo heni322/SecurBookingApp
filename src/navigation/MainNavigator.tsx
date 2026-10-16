@@ -21,6 +21,7 @@ import {
   AccessibilityInfo,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { getFocusedRouteNameFromRoute, CommonActions } from '@react-navigation/native';
 import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Shield, Bell, User } from 'lucide-react-native';
@@ -57,6 +58,19 @@ const TABS: TabDef[] = [
 /** Core content height of the bar, before the device safe-area inset. */
 const BAR_CONTENT_HEIGHT = 58;
 
+/**
+ * Immersive, task-focused screens nested inside a tab stack. The tab bar is
+ * hidden while one of these is focused: a live map needs every vertical pixel,
+ * and switching tabs mid-tracking is not a meaningful action (back exits).
+ */
+const IMMERSIVE_ROUTES = new Set<string>([
+  'LiveTracking',
+  // Multi-step order form: a stray tab tap mid-order left the flow (the
+  // draft survives, but the user loses their place), and the bar took ~80dp
+  // from the map and the sticky Continue button.
+  'MissionCreate',
+]);
+
 export const MainNavigator: React.FC = () => {
   const { t }       = useTranslation('navigation');
   const insets      = useSafeAreaInsets();
@@ -86,15 +100,18 @@ export const MainNavigator: React.FC = () => {
         const label   = t(`tabs.${tab.labelKey}`);
         const isNotif = route.name === 'Notifications';
         const badge   = isNotif ? unreadCount : 0;
+        const hideBar = IMMERSIVE_ROUTES.has(getFocusedRouteNameFromRoute(route) ?? '');
 
         return {
           headerShown:          false,
           tabBarShowLabel:      false,
           tabBarHideOnKeyboard: true,
-          tabBarStyle: [
-            styles.tabBar,
-            { height: BAR_CONTENT_HEIGHT + bottomPad, paddingBottom: bottomPad },
-          ],
+          tabBarStyle: hideBar
+            ? { display: 'none' }
+            : [
+                styles.tabBar,
+                { height: BAR_CONTENT_HEIGHT + bottomPad, paddingBottom: bottomPad },
+              ],
           tabBarButton: (props) => (
             <TabBarButton {...props} label={label} badge={badge} />
           ),
@@ -111,7 +128,29 @@ export const MainNavigator: React.FC = () => {
       }}
     >
       <Tab.Screen name="Home"          component={HomeScreen}            />
-      <Tab.Screen name="Missions"      component={MissionStackNavigator} />
+      <Tab.Screen
+        name="Missions"
+        component={MissionStackNavigator}
+        listeners={({ navigation, route }) => ({
+          // The Missions tab must always land on a meaningful screen. If its
+          // stack was left on a one-off flow (create form, live map), reset
+          // it to the list: the create draft is autosaved, the map has
+          // nothing to resume. Normal screens (a mission's detail) are kept,
+          // and re-tapping the focused tab still pops to the list as usual.
+          tabPress: (e) => {
+            const focused = getFocusedRouteNameFromRoute(route);
+            const stackKey = (route as { state?: { key?: string } }).state?.key;
+            if (focused && IMMERSIVE_ROUTES.has(focused) && stackKey) {
+              e.preventDefault();
+              navigation.dispatch({
+                ...CommonActions.reset({ index: 0, routes: [{ name: 'MissionList' }] }),
+                target: stackKey,
+              });
+              navigation.navigate('Missions');
+            }
+          },
+        })}
+      />
       <Tab.Screen name="Notifications" component={NotificationsScreen}   />
       <Tab.Screen name="Profile"       component={ProfileStackNavigator} />
     </Tab.Navigator>

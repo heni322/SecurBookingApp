@@ -4,9 +4,33 @@
  * Design:
  *  - Month/Year navigator header
  *  - Calendar grid (7 columns Mon→Sun)
- *  - Hour : Minute scroll wheels (infinite-feel with clamped range)
+ *  - Hour : Minute wheels
  *  - Compact summary pill when value is set
  *  - Gold brand colors, navy surfaces
+ *
+ * [FIX 2026-10-07 · Create Mission step 2 audit]
+ *  - WRONG TIME DISPLAYED: the trigger printed `iso.split('T')[1]`, i.e. the
+ *    raw string. Presets and copies store full UTC ISO strings, so "Ce soir
+ *    20:00" was shown as "18:00:00.000Z". The display is now formatted from
+ *    the Date in the device's local time, whatever the input format.
+ *  - STALE PICKER: day/hour/minute were seeded from `value` on mount only.
+ *    After a preset, a copy or an automatic end shift, opening the picker
+ *    showed the OLD time and "Confirmer" wrote it back. The wheel state is now
+ *    re-synced from `value` every time the sheet opens.
+ *  - LIMITS AT THE MINUTE: minDate only greyed out whole days, so "today
+ *    08:00" was accepted when the earliest valid time was 15:30 (rejected
+ *    later at Continue). minDate / new maxDate are now enforced on the exact
+ *    date-time: confirm is disabled with an explicit "too early / too late".
+ *  - Emits a full ISO string (same format as presets) instead of a
+ *    timezone-less "YYYY-MM-DDTHH:MM", so all slot dates share one format.
+ *  - Hour/minute wheels wrap (23 → 00), natural for night shifts.
+ *  - Hardcoded "HEURE", missing accessibility labels, white-on-gold confirm
+ *    text (contrast) fixed.
+ *
+ * [2026-10-07 · Paris time] Days, hours and minutes are PARIS wall-clock
+ * values, whatever the phone's time zone (utils/parisTime.ts). On a phone left
+ * on UTC, "08:00" used to mean 08:00 UTC = 10:00 in Paris, and the quote
+ * added surcharges for hours nobody picked.
  */
 import React, { useState, useCallback, useMemo } from 'react';
 import {
@@ -19,12 +43,25 @@ import { spacing, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { useTranslation } from '@i18n';
 import i18n from '@i18n';
+import {
+  parisParts, fromParis, daysInMonth as monthDays, weekdayOf, inParis,
+} from '@utils/parisTime';
+
+/** A calendar day in Paris (month 0-based). */
+interface Day { y: number; m: number; d: number }
+const dayKey = (x: Day) => x.y * 10_000 + x.m * 100 + x.d;
+const parisDay = (date: Date): Day => { const p = parisParts(date); return { y: p.year, m: p.month, d: p.day }; };
 
 interface Props {
   label:     string;
-  value:     string;   // ISO datetime string "YYYY-MM-DDTHH:MM"
+  /** Any string `new Date()` can parse (full ISO recommended). '' = unset. */
+  value:     string;
+  /** Receives a full ISO 8601 string (UTC, `toISOString()`). */
   onChange:  (iso: string) => void;
+  /** Earliest selectable instant (enforced at the minute). */
   minDate?:  Date;
+  /** Latest selectable instant (enforced at the minute). */
+  maxDate?:  Date;
   error?:    string;
   hint?:     string;
 }
@@ -48,44 +85,67 @@ function parseISO(iso: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function toISO(d: Date, h: number, m: number): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(h)}:${pad(m)}`;
+/** Paris day + Paris time → the instant. */
+function compose(day: Day, h: number, m: number): Date {
+  return fromParis(day.y, day.m, day.d, h, m);
+}
+
+function formatTime(d: Date): string {
+  const p = parisParts(d);
+  return `${pad(p.hour)}:${pad(p.minute)}`;
 }
 
 function formatDisplay(iso: string): string {
   const d = parseISO(iso);
   if (!d) return '';
-  return d.toLocaleDateString(i18n.language, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
-    + i18n.t('common:datetime_at_sep') + iso.split('T')[1];
+  return d.toLocaleDateString(i18n.language, inParis({ weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }))
+    + i18n.t('common:datetime_at_sep') + formatTime(d);
 }
 
-function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month + 1, 0).getDate();
+function formatShort(d: Date): string {
+  return d.toLocaleDateString(i18n.language, inParis({ weekday: 'short', day: 'numeric', month: 'short' }))
+    + i18n.t('common:datetime_at_sep') + formatTime(d);
 }
 
 /** Returns 0=Monday offset of the first day of the month */
 function firstDayOffset(year: number, month: number): number {
-  const d = new Date(year, month, 1).getDay(); // 0=Sun
+  const d = weekdayOf(year, month, 1); // 0=Sun
   return d === 0 ? 6 : d - 1;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const DateTimePicker: React.FC<Props> = ({
-  label, value, onChange, minDate, error, hint,
+  label, value, onChange, minDate, maxDate, error, hint,
 }) => {
   const { t } = useTranslation('common');
-  const now       = useMemo(() => new Date(), []);
-  const parsed    = parseISO(value);
-  const initDate  = parsed ?? new Date(now.getTime() + 24 * 3_600_000);
+  const now = useMemo(() => new Date(), []);
+  const today = useMemo(() => parisDay(now), [now]);
 
   const [open,        setOpen]        = useState(false);
-  const [viewYear,    setViewYear]    = useState(initDate.getFullYear());
-  const [viewMonth,   setViewMonth]   = useState(initDate.getMonth());
-  const [selectedDay, setSelectedDay] = useState<Date | null>(parsed);
-  const [hour,        setHour]        = useState(parsed?.getHours()   ?? 9);
-  const [minute,      setMinute]      = useState(parsed?.getMinutes() ?? 0);
+  const [viewYear,    setViewYear]    = useState(today.y);
+  const [viewMonth,   setViewMonth]   = useState(today.m);
+  const [selectedDay, setSelectedDay] = useState<Day | null>(null);
+  const [hour,        setHour]        = useState(9);
+  const [minute,      setMinute]      = useState(0);
 
-  const daysInMonth  = getDaysInMonth(viewYear, viewMonth);
+  /** Seed the wheels from the CURRENT value (or a sensible default) on open. */
+  const openSheet = useCallback(() => {
+    const parsed = parseISO(value);
+    // No value yet: start from the earliest allowed time, rounded up to 5 min.
+    const fallback = minDate
+      ? new Date(Math.ceil(minDate.getTime() / 300_000) * 300_000)
+      : new Date(now.getTime() + 24 * 3_600_000);
+    const seed = parsed ?? fallback;
+    const p = parisParts(seed);
+    setViewYear(p.year);
+    setViewMonth(p.month);
+    setSelectedDay(parsed || minDate ? { y: p.year, m: p.month, d: p.day } : null);
+    setHour(parsed || minDate ? p.hour : 9);
+    setMinute(parsed ? p.minute - (p.minute % 5) : (minDate ? p.minute : 0));
+    setOpen(true);
+  }, [value, minDate, now]);
+
+  const daysInMonth  = monthDays(viewYear, viewMonth);
   const firstOffset  = firstDayOffset(viewYear, viewMonth);
   const cells        = useMemo(() => {
     const arr: (number | null)[] = Array(firstOffset).fill(null);
@@ -94,27 +154,21 @@ export const DateTimePicker: React.FC<Props> = ({
     return arr;
   }, [firstOffset, daysInMonth]);
 
+  // Whole-day limits compared on the Paris calendar.
   const isDisabled = useCallback((day: number) => {
-    if (!minDate) return false;
-    const d = new Date(viewYear, viewMonth, day);
-    d.setHours(0, 0, 0, 0);
-    const m = new Date(minDate);
-    m.setHours(0, 0, 0, 0);
-    return d < m;
-  }, [viewYear, viewMonth, minDate]);
+    const k = dayKey({ y: viewYear, m: viewMonth, d: day });
+    if (minDate && k < dayKey(parisDay(minDate))) return true;
+    if (maxDate && k > dayKey(parisDay(maxDate))) return true;
+    return false;
+  }, [viewYear, viewMonth, minDate, maxDate]);
 
-  const isSelected = useCallback((day: number) => {
-    if (!selectedDay) return false;
-    return selectedDay.getFullYear() === viewYear
-      && selectedDay.getMonth()     === viewMonth
-      && selectedDay.getDate()      === day;
-  }, [selectedDay, viewYear, viewMonth]);
+  const isSelected = useCallback((day: number) =>
+    !!selectedDay && dayKey(selectedDay) === dayKey({ y: viewYear, m: viewMonth, d: day }),
+  [selectedDay, viewYear, viewMonth]);
 
-  const isToday = useCallback((day: number) => {
-    return now.getFullYear() === viewYear
-      && now.getMonth()     === viewMonth
-      && now.getDate()      === day;
-  }, [viewYear, viewMonth, now]);
+  const isToday = useCallback((day: number) =>
+    dayKey(today) === dayKey({ y: viewYear, m: viewMonth, d: day }),
+  [viewYear, viewMonth, today]);
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
@@ -127,18 +181,25 @@ export const DateTimePicker: React.FC<Props> = ({
 
   const handleDayPress = (day: number) => {
     if (isDisabled(day)) return;
-    setSelectedDay(new Date(viewYear, viewMonth, day));
+    setSelectedDay({ y: viewYear, m: viewMonth, d: day });
   };
 
+  // Exact candidate + its validity against the limits (to the minute).
+  const candidate = selectedDay ? compose(selectedDay, hour, minute) : null;
+  const tooEarly  = !!(candidate && minDate && candidate.getTime() < minDate.getTime());
+  const tooLate   = !!(candidate && maxDate && candidate.getTime() > maxDate.getTime());
+  const canConfirm = !!candidate && !tooEarly && !tooLate;
+
   const handleConfirm = () => {
-    if (!selectedDay) return;
-    onChange(toISO(selectedDay, hour, minute));
+    if (!candidate || !canConfirm) return;
+    onChange(candidate.toISOString());
     setOpen(false);
   };
 
-  const handleHour = (delta: number) => {
-    setHour(h => Math.min(23, Math.max(0, h + delta)));
-  };
+  // Wheels wrap around: 23 → 00 is the natural move for night shifts.
+  const handleHour   = (delta: number) => setHour(h => (h + delta + 24) % 24);
+  const handleMinute = (delta: number) => setMinute(m => (m + delta + 60) % 60);
+
   return (
     <>
       {/* ── Trigger ───────────────────────────────────────────────────────── */}
@@ -147,14 +208,17 @@ export const DateTimePicker: React.FC<Props> = ({
 
         <TouchableOpacity
           style={[styles.trigger, error && styles.triggerError, value && styles.triggerFilled]}
-          onPress={() => setOpen(true)}
+          onPress={openSheet}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={value ? `${label} : ${formatDisplay(value)}` : `${label} : ${t('datetime_select_label')}`}
+          accessibilityHint={error}
         >
           <Calendar size={16} color={value ? colors.primary : colors.textMuted} strokeWidth={1.8} />
           <Text style={[styles.triggerText, !value && styles.triggerPlaceholder]}>
             {value ? formatDisplay(value) : t('datetime_select_label')}
           </Text>
-          {value && <Clock size={14} color={colors.primary} strokeWidth={1.8} />}
+          {value ? <Clock size={14} color={colors.primary} strokeWidth={1.8} /> : null}
         </TouchableOpacity>
 
         {error && <Text style={styles.error}>{error}</Text>}
@@ -173,21 +237,26 @@ export const DateTimePicker: React.FC<Props> = ({
 
             {/* Header */}
             <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>{label}</Text>
-              <TouchableOpacity onPress={() => setOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.sheetTitle} accessibilityRole="header">{label}</Text>
+              <TouchableOpacity
+                onPress={() => setOpen(false)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel={t('close')}
+              >
                 <X size={20} color={colors.textMuted} strokeWidth={2} />
               </TouchableOpacity>
             </View>
 
             {/* ── Calendar ────────────────────────────────────────────────── */}
             <View style={styles.calNav}>
-              <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
+              <TouchableOpacity onPress={prevMonth} style={styles.navBtn} accessibilityRole="button" accessibilityLabel={t('datetime_prev_month')}>
                 <ChevronLeft size={18} color={colors.textPrimary} strokeWidth={2} />
               </TouchableOpacity>
               <Text style={styles.calTitle}>
                 {new Date(viewYear, viewMonth, 1).toLocaleDateString(i18n.language, { month: 'long' })} {viewYear}
               </Text>
-              <TouchableOpacity onPress={nextMonth} style={styles.navBtn}>
+              <TouchableOpacity onPress={nextMonth} style={styles.navBtn} accessibilityRole="button" accessibilityLabel={t('datetime_next_month')}>
                 <ChevronRight size={18} color={colors.textPrimary} strokeWidth={2} />
               </TouchableOpacity>
             </View>
@@ -218,6 +287,9 @@ export const DateTimePicker: React.FC<Props> = ({
                     onPress={() => handleDayPress(day)}
                     disabled={disabled}
                     activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected, disabled }}
+                    accessibilityLabel={new Date(viewYear, viewMonth, day).toLocaleDateString(i18n.language, { weekday: 'long', day: 'numeric', month: 'long' })}
                   >
                     <Text style={[
                       styles.cellText,
@@ -235,21 +307,21 @@ export const DateTimePicker: React.FC<Props> = ({
             {/* ── Time picker ─────────────────────────────────────────────── */}
             <View style={styles.timeSep}>
               <View style={styles.timeSepLine} />
-              <Text style={styles.timeSepLabel}>HEURE</Text>
+              <Text style={styles.timeSepLabel}>{t('datetime_time_label')}</Text>
               <View style={styles.timeSepLine} />
             </View>
 
             <View style={styles.timePicker}>
               {/* Hour */}
               <View style={styles.timeWheel}>
-                <TouchableOpacity onPress={() => handleHour(1)} style={styles.wheelBtn}>
+                <TouchableOpacity onPress={() => handleHour(1)} style={styles.wheelBtn} accessibilityRole="button" accessibilityLabel="+1 h">
                   <ChevronUp size={18} color={colors.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
                 <View style={styles.wheelValue}>
                   <Text style={styles.wheelNumber}>{pad(hour)}</Text>
                   <Text style={styles.wheelUnit}>h</Text>
                 </View>
-                <TouchableOpacity onPress={() => handleHour(-1)} style={styles.wheelBtn}>
+                <TouchableOpacity onPress={() => handleHour(-1)} style={styles.wheelBtn} accessibilityRole="button" accessibilityLabel="-1 h">
                   <ChevronDown size={18} color={colors.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
@@ -258,14 +330,14 @@ export const DateTimePicker: React.FC<Props> = ({
 
               {/* Minute — steps of 5 */}
               <View style={styles.timeWheel}>
-                <TouchableOpacity onPress={() => setMinute(m => Math.min(55, m + 5))} style={styles.wheelBtn}>
+                <TouchableOpacity onPress={() => handleMinute(5)} style={styles.wheelBtn} accessibilityRole="button" accessibilityLabel="+5 min">
                   <ChevronUp size={18} color={colors.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
                 <View style={styles.wheelValue}>
                   <Text style={styles.wheelNumber}>{pad(minute)}</Text>
                   <Text style={styles.wheelUnit}>min</Text>
                 </View>
-                <TouchableOpacity onPress={() => setMinute(m => Math.max(0, m - 5))} style={styles.wheelBtn}>
+                <TouchableOpacity onPress={() => handleMinute(-5)} style={styles.wheelBtn} accessibilityRole="button" accessibilityLabel="-5 min">
                   <ChevronDown size={18} color={colors.primary} strokeWidth={2.5} />
                 </TouchableOpacity>
               </View>
@@ -273,30 +345,43 @@ export const DateTimePicker: React.FC<Props> = ({
 
             {/* Quick shortcuts */}
             <View style={styles.shortcuts}>
-              {[8, 9, 10, 12, 14, 18, 20, 22].map(h => (
+              {[6, 7, 8, 9, 14, 18, 20, 22].map(h => (
                 <TouchableOpacity
                   key={h}
-                  style={[styles.shortcut, hour === h && styles.shortcutActive]}
+                  style={[styles.shortcut, hour === h && minute === 0 && styles.shortcutActive]}
                   onPress={() => { setHour(h); setMinute(0); }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${pad(h)}:00`}
                 >
-                  <Text style={[styles.shortcutText, hour === h && styles.shortcutTextActive]}>
+                  <Text style={[styles.shortcutText, hour === h && minute === 0 && styles.shortcutTextActive]}>
                     {pad(h)}h
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
+            {/* Out-of-range explanation (instead of a silently refused confirm) */}
+            {(tooEarly || tooLate) && (
+              <Text style={styles.rangeError} accessibilityLiveRegion="polite">
+                {tooEarly
+                  ? t('datetime_too_early', { min: formatShort(minDate!) })
+                  : t('datetime_too_late',  { max: formatShort(maxDate!) })}
+              </Text>
+            )}
+
             {/* Confirm button */}
             <TouchableOpacity
-              style={[styles.confirmBtn, !selectedDay && styles.confirmBtnDisabled]}
+              style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
               onPress={handleConfirm}
-              disabled={!selectedDay}
+              disabled={!canConfirm}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canConfirm }}
             >
-              <Check size={18} color="#fff" strokeWidth={2.5} />
-              <Text style={styles.confirmText}>
-                {selectedDay
-                  ? `${t('datetime_confirm_prefix')} — ${selectedDay.toLocaleDateString(i18n.language, { day: 'numeric', month: 'short' })}${t('datetime_at_sep')}${pad(hour)}:${pad(minute)}`
+              <Check size={18} color={canConfirm ? colors.textInverse : colors.textMuted} strokeWidth={2.5} />
+              <Text style={[styles.confirmText, !canConfirm && styles.confirmTextDisabled]}>
+                {candidate
+                  ? `${t('datetime_confirm_prefix')} — ${formatShort(candidate)}`
                   : t('datetime_select_date_first')
                 }
               </Text>
@@ -354,7 +439,7 @@ const styles = StyleSheet.create({
     justifyContent:  'flex-end',
   },
   sheet: {
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.backgroundElevatedSolid,
     borderTopLeftRadius:  radius['2xl'],
     borderTopRightRadius: radius['2xl'],
     paddingHorizontal:    spacing[5],
@@ -381,9 +466,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   navBtn: {
-    width:           36,
-    height:          36,
-    borderRadius:    18,
+    width:           40,
+    height:          40,
+    borderRadius:    20,
     backgroundColor: colors.surface,
     borderWidth:     1,
     borderColor:     colors.border,
@@ -395,6 +480,7 @@ const styles = StyleSheet.create({
     fontSize:      fontSize.base,
     color:         colors.textPrimary,
     letterSpacing: -0.2,
+    textTransform: 'capitalize',
   },
 
   // Day names
@@ -457,9 +543,9 @@ const styles = StyleSheet.create({
     gap:            spacing[2],
   },
   wheelBtn: {
-    width:           40,
-    height:          40,
-    borderRadius:    20,
+    width:           44,
+    height:          44,
+    borderRadius:    22,
     backgroundColor: colors.surface,
     borderWidth:     1,
     borderColor:     colors.borderPrimary,
@@ -506,7 +592,8 @@ const styles = StyleSheet.create({
   },
   shortcut: {
     paddingHorizontal: spacing[3],
-    paddingVertical:   spacing[1] + 2,
+    minHeight:         36,
+    justifyContent:    'center',
     borderRadius:      radius.full,
     backgroundColor:   colors.surface,
     borderWidth:       1,
@@ -523,6 +610,13 @@ const styles = StyleSheet.create({
   },
   shortcutTextActive: { color: colors.primary },
 
+  rangeError: {
+    fontFamily: fontFamily.bodyMedium,
+    fontSize:   fontSize.sm,
+    color:      colors.warning,
+    textAlign:  'center',
+  },
+
   // Confirm
   confirmBtn: {
     flexDirection:   'row',
@@ -538,12 +632,13 @@ const styles = StyleSheet.create({
     shadowRadius:    12,
     elevation:       6,
   },
-  confirmBtnDisabled: { backgroundColor: colors.surfaceBorder, shadowOpacity: 0 },
+  confirmBtnDisabled: { backgroundColor: colors.surfaceBorder, shadowOpacity: 0, elevation: 0 },
+  // Navy on gold (white on #bc933b failed WCAG contrast).
   confirmText: {
     fontFamily:    fontFamily.bodySemiBold,
     fontSize:      fontSize.base,
-    color:         colors.white,
+    color:         colors.textInverse,
     letterSpacing: 0.1,
   },
+  confirmTextDisabled: { color: colors.textMuted },
 });
-

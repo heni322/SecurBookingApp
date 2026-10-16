@@ -123,8 +123,14 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
     return () => { if (countdownRef.current) clearInterval(countdownRef.current); };
   }, [quote]);
 
-  // isExpired must be a strict boolean — avoid "" (empty string) which is not boolean
-  const isExpired   = secondsLeft === 0 || Boolean(quote?.status === 'PENDING' && quote?.expiresAt && new Date(quote.expiresAt) <= new Date());
+  // isExpired must be a strict boolean — avoid "" (empty string) which is not boolean.
+  // [2026-10-07] The API's expiry job sets status EXPIRED; only a PENDING quote
+  // past its date was treated as expired, so an EXPIRED quote showed no banner
+  // and no button at all — the client could neither recalculate nor pay (seen
+  // on device; 5 such quotes in the demo data). Both shapes count now.
+  const isExpired   = secondsLeft === 0
+    || quote?.status === 'EXPIRED'
+    || Boolean(quote?.status === 'PENDING' && quote?.expiresAt && new Date(quote.expiresAt) <= new Date());
   const showWarning = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 300;
   const showUrgent  = secondsLeft !== null && secondsLeft > 0 && secondsLeft <= 120;
 
@@ -239,7 +245,7 @@ export const QuoteDetailScreen: React.FC<Props> = ({ route, navigation }) => {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
           {/* FIX: expired banner — button now calls handleRecalculate */}
-          {isExpired && quote.status === 'PENDING' && (
+          {isExpired && (quote.status === 'PENDING' || quote.status === 'EXPIRED') && (
             <View style={styles.expiredBanner}>
               <AlertTriangle size={18} color={colors.danger} strokeWidth={2} />
               <View style={{ flex: 1 }}>

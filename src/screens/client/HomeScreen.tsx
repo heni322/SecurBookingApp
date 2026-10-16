@@ -33,6 +33,8 @@ import type { Mission, MainTabParamList, MissionStackParamList } from '@models/i
 import { useTranslation }        from '@i18n';
 import { useToast } from '@hooks/useToast';
 import { useSafeAreaInsets }    from 'react-native-safe-area-context';
+import { inParis } from '@utils/parisTime';
+import i18n from '@i18n';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<MainTabParamList, 'Home'>,
@@ -91,9 +93,10 @@ export const HomeScreen: React.FC = () => {
   const formatStartShort = (m: typeof allMissions[number]): string => {
     const { start } = missionWindow(m);
     if (!start) return '';
-    return new Date(start).toLocaleString(undefined, {
+    // Mission start in Paris time (decision 2026-10-07).
+    return new Date(start).toLocaleString(i18n.language, inParis({
       weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    }));
   };
 
   const totalMissions   = nonCancelledMissions.length;
@@ -105,12 +108,17 @@ export const HomeScreen: React.FC = () => {
     m.status === MissionStatus.IN_PROGRESS,
   ).length;
 
-  const firstName = user?.fullName?.split(' ')[0] ?? 'Client';
+  // An empty name used to print "Bonsoir," with a dangling comma (seen on device).
+  const firstName = user?.fullName?.trim().split(/\s+/)[0] ?? '';
   const hour      = new Date().getHours();
   const greeting  = hour < 18 ? t('greeting.morning') : t('greeting.evening');
 
-  const goToServicePicker = () => navigation.navigate('Missions', { screen: 'MissionCreate' } as any);
-  const goToMissionDetail = (id: string) => navigation.navigate('Missions', { screen: 'MissionDetail', params: { missionId: id } } as any);
+  // `initial: false` keeps MissionList as the root of the Missions stack.
+  // Without it, opening MissionCreate / MissionDetail from Home made that
+  // screen the stack's ONLY route: back returned to Home, and tapping the
+  // Missions tab afterwards re-opened the create form instead of the list.
+  const goToServicePicker = () => navigation.navigate('Missions', { screen: 'MissionCreate', initial: false } as any);
+  const goToMissionDetail = (id: string) => navigation.navigate('Missions', { screen: 'MissionDetail', params: { missionId: id }, initial: false } as any);
   const goToMissionList   = () => navigation.navigate('Missions', { screen: 'MissionList' } as any);
 
   const handleSos = useCallback(async () => {
@@ -137,9 +145,9 @@ export const HomeScreen: React.FC = () => {
         {/* ── Header ── */}
         <View style={[styles.header, { paddingTop: top + spacing[4] }]}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>{greeting}, {firstName}</Text>
+            <Text style={styles.greeting}>{firstName ? `${greeting}, ${firstName}` : greeting}</Text>
             <Text style={styles.date}>
-              {new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
+              {new Date().toLocaleDateString(i18n.language, { weekday: 'long', day: 'numeric', month: 'long' })}
             </Text>
           </View>
           <TouchableOpacity style={styles.newMissionBtn} onPress={goToServicePicker} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('cta.title')}>

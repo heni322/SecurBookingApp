@@ -23,6 +23,7 @@ import { colors }                  from '@theme/colors';
 import { spacing, radius }         from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import { useToastStore, type ToastItem, type ToastVariant } from '@store/toastStore';
+import i18n from '@i18n';
 
 interface VariantStyle {
   bg:     string;
@@ -207,7 +208,7 @@ export const Toast: React.FC<Props> = ({ item }) => {
             onPress={handleDismiss}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="Dismiss"
+            accessibilityLabel={i18n.t('common:close')}
             style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
           >
             <X size={16} color={colors.textMuted} strokeWidth={2.2} />

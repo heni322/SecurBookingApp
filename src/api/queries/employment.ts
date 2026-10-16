@@ -62,8 +62,16 @@ function unwrap<T>(res: AxiosResponse<ApiResponse<T>>): T {
 // ─── Contracts ──────────────────────────────────────────────────────────────
 
 /** Paginated contracts list — partner dashboard. */
+/**
+ * Paginated contract list. The API returns `{ data, meta }` (paginate util);
+ * this hook was typed `{ items, total, ... }`, which never matched — it had no
+ * caller until the partner contracts list (2026-10-07).
+ */
 export function useContracts(filter?: ContractFilter) {
-  return useQuery<{ items: EmploymentContract[]; total: number; page: number; limit: number }>({
+  return useQuery<{
+    data: EmploymentContract[];
+    meta: { total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrev: boolean };
+  }>({
     queryKey: qk.contracts.list(filter as Record<string, unknown> | undefined),
     queryFn:  async () => unwrap(await contractsApi.list(filter)),
   });
@@ -282,20 +290,6 @@ export function useGeneratePayslip() {
   });
 }
 
-/** Admin payslip status transitions (DRAFT → VALIDATED → PAID). */
-export function useUpdatePayslipStatus() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationKey: ['payslips', 'update-status'],
-    mutationFn: (vars: { id: string; status: PayslipStatus }) =>
-      payslipsApi.updateStatus(vars.id, vars.status),
-    onSuccess: (_res, vars) => {
-      qc.invalidateQueries({ queryKey: qk.payslips.detail(vars.id) });
-      qc.invalidateQueries({ queryKey: qk.payslips.all });
-    },
-  });
-}
-
 // ─── DPAE ───────────────────────────────────────────────────────────────────
 
 /** DPAE attached to a contract (partner read view). 404 if not generated yet. */
@@ -308,34 +302,3 @@ export function useDpaeByContract(contractId: string | undefined) {
   });
 }
 
-/** Admin: pending DPAE list. */
-export function usePendingDpae() {
-  return useQuery<Dpae[]>({
-    queryKey: qk.dpae.pending(),
-    queryFn:  async () => unwrap(await dpaeApi.findPending()),
-  });
-}
-
-/** Admin manual DPAE submission. */
-export function useSubmitDpae() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationKey: ['dpae', 'submit'],
-    mutationFn: (id: string) => dpaeApi.submit(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.dpae.all });
-    },
-  });
-}
-
-/** Admin bulk retry of FAILED DPAEs. */
-export function useRetryFailedDpae() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationKey: ['dpae', 'retry-failed'],
-    mutationFn: () => dpaeApi.retryFailed(),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.dpae.all });
-    },
-  });
-}

@@ -25,7 +25,26 @@ export interface GeocodingResult {
   placeId: string;
 }
 
+/** Verdict of POST /geocoding/validate-coherence (declared city vs GPS point). */
+export interface CoherenceResult {
+  verdict:  'coherent' | 'incoherent' | 'unverifiable';
+  distanceKm: number | null;
+  declared: { inseeCode: string; name: string; latitude: number; longitude: number } | null;
+  /** Commune actually found at the point (BAN reverse geocode), when known. */
+  resolved: { inseeCode: string | null; city: string; zipCode: string } | null;
+}
+
 export const geocodingApi = {
+  /**
+   * Is this GPS point in (or next to) the declared commune? Same official
+   * check the API applies when the mission is created, run early so the user
+   * can fix it on the location step instead of at the very end.
+   */
+  validateCoherence: (body: { city: string; latitude: number; longitude: number }) =>
+    apiClient.post<ApiResponse<CoherenceResult>>('/geocoding/validate-coherence', body, {
+      timeout: 6000,
+    }),
+
   /**
    * Forward address search (BAN, France). Min 3 chars enforced server-side.
    * @param q     free-text query

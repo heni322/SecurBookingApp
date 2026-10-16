@@ -31,9 +31,45 @@
  * longer happen now that Leaflet ships inline in the HTML string itself —
  * the IIFE that calls signalReady() runs synchronously once the WebView
  * parses the document, with no separate network round-trip in between.
+ *
+ * [FIX 2026-10-07] "Localisation impossible — Délai dépassé" on device:
+ *  ROOT CAUSE: a single getCurrentPosition({ enableHighAccuracy: true,
+ *  timeout: 10000, maximumAge: 0 }) with no provider configured. On Android
+ *  the community module then uses the raw LocationManager GPS provider only;
+ *  indoors / with a cold GPS a fix routinely takes 15-60 s, and maximumAge:0
+ *  refused the perfectly good cached network fix the phone already had.
+ *  FIX: fused provider (Play Services when present) + two-stage locate:
+ *   1. fast coarse fix (network/Wi-Fi, cache ≤ 2 min accepted, 8 s);
+ *   2. only if that fails, a high-accuracy GPS attempt with 20 s;
+ *   3. a coarse fix (> 100 m) is silently refined in the background unless
+ *      the user has already moved the pin themselves.
+ *  Failure copy now tells the user what to do (tap the map) instead of
+ *  "try again", which would fail the same way.
+ *
+ * [FIX 2026-10-07] Other issues on the "Lieu" step:
+ *  - The map ignored the city / postcode typed above it (Paris, 75001 while the
+ *    map sat on North Africa). New `focusQuery` prop re-centres the map on the
+ *    typed place (debounced, via our BAN geocoder) until a pin exists.
+ *  - Every coordinate change from the address search rebuilt the HTML and
+ *    remounted the whole WebView (flash + reload). The page is now built once
+ *    from the initial coords; later changes are injected (showPin).
+ *  - Leaflet +/- control collided with the "tap the map" hint pill. Removed;
+ *    pinch-to-zoom is the native gesture.
+ *
+ * [FIX 2026-10-07 · Create Mission audit]
+ *  - A pin placed or dragged on the map was only reported to the form when the
+ *    user ALSO tapped "Valider". Without it the form kept the previous GPS
+ *    point while the map showed the new one, and that stale point was
+ *    submitted. Every placement is now committed immediately; the extra
+ *    confirm tap is gone (one less step, no silent divergence).
+ *  - The reverse-geocoded place (street, city, postcode) is passed up with the
+ *    coordinates, so the parent can keep address / city / postcode coherent
+ *    with the pin instead of only overwriting the street line.
+ *  - Out-of-order reverse-geocode responses (fast successive taps) are
+ *    dropped, so an older lookup can never label a newer pin.
  */
 
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { useTranslation } from '@i18n';
 import {
   View, Text, TouchableOpacity, ActivityIndicator,
@@ -46,6 +82,7 @@ import {
   type Permission, type PermissionStatus,
 } from 'react-native-permissions';
 import { MapPin, Navigation, Check, Unlock, X } from 'lucide-react-native';
+import type { GeocodingResult } from '@api/endpoints/geocoding';
 import { useToast } from '@hooks/useToast';
 import { useConfirmDialog } from '@hooks/useConfirmDialog';
 import { geocodingApi } from '@api/endpoints/geocoding';
@@ -57,13 +94,52 @@ import { LeafletMapView, type LeafletMapViewHandle } from './LeafletMapView';
 
 interface Coords { latitude: number; longitude: number }
 
+/** Place resolved at the pin (BAN reverse geocode). Absent when lookup fails. */
+export type PickedPlace = Pick<GeocodingResult, 'shortName' | 'city' | 'zipCode'>;
+
 interface Props {
   latitude?:            number;
   longitude?:           number;
-  onSelect:             (coords: Coords, address?: string) => void;
+  /**
+   * Called as soon as the pin is placed / moved (place undefined), then again
+   * with the resolved place once the reverse geocode answers.
+   */
+  onSelect:             (coords: Coords, place?: PickedPlace) => void;
   onInteractionChange?: (active: boolean) => void;
+  /**
+   * Free-text place (e.g. "75001 Paris") the map should centre on while no
+   * pin has been placed yet. Geocoded with a debounce; never places a pin.
+   */
+  focusQuery?:          string;
 }
 
+
+// Prefer the fused provider (Play Services) on Android: it returns a network /
+// Wi-Fi fix in ~1 s where the raw GPS provider can take a minute indoors.
+// Permissions are handled explicitly below via react-native-permissions.
+Geolocation.setRNConfiguration({
+  skipPermissionRequests: true,
+  authorizationLevel: 'whenInUse',
+  locationProvider: 'auto',
+});
+
+type Fix = { latitude: number; longitude: number; accuracy: number };
+
+const getFix = (opts: { enableHighAccuracy: boolean; timeout: number; maximumAge: number }) =>
+  new Promise<Fix>((resolve, reject) => {
+    Geolocation.getCurrentPosition(
+      (pos) => resolve({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy ?? 9999,
+      }),
+      reject,
+      opts,
+    );
+  });
+
+/** Coarse accuracy above which we try to refine in the background (metres). */
+const REFINE_ABOVE_M = 100;
 
 /** Foreground location permission for the active platform. */
 const LOCATION_PERMISSION: Permission = Platform.select({
@@ -93,7 +169,6 @@ function buildPickerBodyScript(
   const hasPin = lat != null && lng != null;
 
   return `
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('${tileUrl}',{maxZoom:19,attribution:'',keepBuffer:4}).addTo(map);
 
   function makeIcon(r){
@@ -123,6 +198,14 @@ function buildPickerBodyScript(
     if(marker){ setTimeout(place,350); } else { setTimeout(function(){ marker=L.marker([lt,ln],{icon:makeIcon(true),draggable:true}).addTo(map); attachDrag(marker); setTimeout(function(){marker.setIcon(makeIcon(false));},600); },350); }
     send('coords',{lat:lt,lng:ln});
   };
+  // Prop-driven pin (address picked in the search field): no echo back.
+  window.showPin=function(lt,ln){
+    map.setView([lt,ln],16,{animate:true});
+    if(marker){ marker.setLatLng([lt,ln]); }
+    else { marker=L.marker([lt,ln],{icon:makeIcon(false),draggable:true}).addTo(map); attachDrag(marker); }
+  };
+  // Centre on a place without placing a pin (typed city / postcode).
+  window.focusArea=function(lt,ln,z){ if(!marker){ map.flyTo([lt,ln],z||13,{animate:true,duration:.6}); } };
   signalReady();
   `;
 }
@@ -131,7 +214,7 @@ function buildPickerBodyScript(
 //  Component
 // ---------------------------------------------------------------------------
 export const MapLocationPicker: React.FC<Props> = ({
-  latitude, longitude, onSelect, onInteractionChange,
+  latitude, longitude, onSelect, onInteractionChange, focusQuery,
 }) => {
   const { t } = useTranslation('map_picker');
   const toast    = useToast();
@@ -144,21 +227,42 @@ export const MapLocationPicker: React.FC<Props> = ({
   );
   const [address,    setAddress]    = useState<string | null>(null);
   const [loadingGeo, setLoadingGeo] = useState(false);
-  const [confirmed,  setConfirmed]  = useState(!!latitude && !!longitude);
   const [mapReady,   setMapReady]   = useState(false);
   const [locked,     setLocked]     = useState(true);
   const [locating,   setLocating]   = useState(false);
 
+  const mountedRef      = useRef(true);
+  // True once the user moves the pin by hand — a background GPS refinement
+  // must never overwrite a deliberate placement.
+  const userPlacedRef   = useRef(false);
+  // Coords we last pushed into the map ourselves, to tell our own echoes apart.
+  const lastLocatedRef  = useRef<Coords | null>(null);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+  // Latest reverse-geocode request; older answers are discarded.
+  const geoReqRef = useRef(0);
+
   const reverseGeocode = useCallback(async (lat: number, lon: number) => {
+    const reqId = ++geoReqRef.current;
     setLoadingGeo(true); setAddress(null);
     try {
       // Backend proxies the official IGN Géoplateforme / BAN reverse endpoint.
       const res = await geocodingApi.reverseGeocode(lat, lon);
+      if (!mountedRef.current || reqId !== geoReqRef.current) return;
       const r = res.data.data;
       // Prefer the BAN short street-level name, fall back to the full label.
       setAddress(r?.shortName || r?.displayName || null);
-    } catch { setAddress(null); } finally { setLoadingGeo(false); }
-  }, []);
+      if (r) {
+        onSelect(
+          { latitude: lat, longitude: lon },
+          { shortName: r.shortName || r.displayName, city: r.city, zipCode: r.zipCode },
+        );
+      }
+    } catch {
+      if (reqId === geoReqRef.current && mountedRef.current) setAddress(null);
+    } finally {
+      if (reqId === geoReqRef.current && mountedRef.current) setLoadingGeo(false);
+    }
+  }, [onSelect]);
 
   // The shell already intercepts 'ready' for its own loading/error chrome;
   // this onMessage only needs to handle this screen's own message type.
@@ -167,11 +271,18 @@ export const MapLocationPicker: React.FC<Props> = ({
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'coords') {
         const coords = { latitude: msg.lat, longitude: msg.lng };
-        setMarker(coords); setConfirmed(false);
+        const own = lastLocatedRef.current;
+        if (!own || Math.abs(own.latitude - msg.lat) > 1e-6 || Math.abs(own.longitude - msg.lng) > 1e-6) {
+          userPlacedRef.current = true;
+        }
+        setMarker(coords);
+        // Commit immediately — the form must never hold a different point
+        // than the one the user sees on the map.
+        onSelect(coords);
         reverseGeocode(msg.lat, msg.lng);
       }
     } catch { /* ignore */ }
-  }, [reverseGeocode]);
+  }, [reverseGeocode, onSelect]);
 
   const unlock = useCallback(() => {
     setLocked(false);
@@ -185,31 +296,49 @@ export const MapLocationPicker: React.FC<Props> = ({
     Animated.timing(lockAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
   }, [lockAnim, onInteractionChange]);
 
-  const handleConfirm = useCallback(() => {
-    if (!marker) return;
-    setConfirmed(true); onSelect(marker, address ?? undefined); lock();
-  }, [marker, address, onSelect, lock]);
-
   // ── [FIX H2] Read the current GPS fix once permission is confirmed granted ──
-  const runGeolocation = useCallback(() => {
+  const placeLocated = useCallback((fix: Fix) => {
+    lastLocatedRef.current = { latitude: fix.latitude, longitude: fix.longitude };
+    mapRef.current?.inject(`window.setMarker(${fix.latitude},${fix.longitude});`);
+  }, []);
+
+  const runGeolocation = useCallback(async () => {
     setLocating(true);
-    Geolocation.getCurrentPosition(
-      (pos) => {
-        const { latitude: lt, longitude: ln } = pos.coords;
-        setLocating(false);
-        mapRef.current?.inject(`window.setMarker(${lt},${ln});`);
-      },
-      (err) => {
-        const msg =
-          err.code === 1 ? t('perm_denied') :
-          err.code === 2 ? t('position_unavailable') :
-                           t('timeout_retry');
-        setLocating(false);
-        toast.error(msg, { title: t('locate_failed_title') });
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-    );
-  }, [t, toast]);
+    userPlacedRef.current = false;
+    let fix: Fix;
+    try {
+      try {
+        // 1. Fast, coarse fix: network/Wi-Fi, recent cache accepted.
+        fix = await getFix({ enableHighAccuracy: false, timeout: 8000, maximumAge: 120_000 });
+      } catch (e: any) {
+        if (e?.code === 1) throw e;               // permission: don't retry
+        // 2. No coarse fix available → give real GPS a fair chance.
+        fix = await getFix({ enableHighAccuracy: true, timeout: 20_000, maximumAge: 300_000 });
+      }
+    } catch (err: any) {
+      if (!mountedRef.current) return;
+      setLocating(false);
+      const msg =
+        err?.code === 1 ? t('perm_denied') :
+        err?.code === 2 ? t('position_unavailable') :
+                          t('timeout_retry');
+      toast.error(msg, { title: t('locate_failed_title') });
+      return;
+    }
+    if (!mountedRef.current) return;
+    setLocating(false);
+    placeLocated(fix);
+
+    // 3. Coarse fix → quietly refine with GPS unless the user moves the pin.
+    if (fix.accuracy > REFINE_ABOVE_M) {
+      getFix({ enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 })
+        .then((better) => {
+          if (!mountedRef.current || userPlacedRef.current) return;
+          if (better.accuracy < fix.accuracy) placeLocated(better);
+        })
+        .catch(() => { /* coarse fix stays — nothing to tell the user */ });
+    }
+  }, [t, toast, placeLocated]);
 
   // ── [FIX H2] Offer to deep-link into system Settings when blocked ──────────
   const promptOpenSettings = useCallback(async () => {
@@ -286,15 +415,49 @@ export const MapLocationPicker: React.FC<Props> = ({
     }
   }, [mapReady, runGeolocation, promptOpenSettings, promptRationale, toast, t]);
 
+  // Built ONCE from the initial coordinates. Later prop changes are injected
+  // (see effects below) — rebuilding the HTML remounted the whole WebView.
+  const initialRef = useRef({ latitude, longitude });
   const tileUrl = config.maps.tileUrlTemplate;
   const bodyScript = useMemo(
-    () => buildPickerBodyScript(latitude, longitude, tileUrl),
-    [latitude, longitude, tileUrl],
+    () => buildPickerBodyScript(initialRef.current.latitude, initialRef.current.longitude, tileUrl),
+    [tileUrl],
   );
 
-  const initialZoom = latitude != null && longitude != null ? 14 : 6;
-  const centerLat = latitude ?? 46.6034; // France centroid fallback
-  const centerLng = longitude ?? 1.8883;
+  // Coordinates set from outside (address search) → move the pin in place.
+  useEffect(() => {
+    if (!mapReady || latitude == null || longitude == null) return;
+    if (marker && Math.abs(marker.latitude - latitude) < 1e-6 && Math.abs(marker.longitude - longitude) < 1e-6) return;
+    mapRef.current?.inject(`window.showPin(${latitude},${longitude});`);
+    setMarker({ latitude, longitude });
+    // A pin set from outside (address search) carries its own label.
+    geoReqRef.current++;
+    setLoadingGeo(false);
+    setAddress(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [latitude, longitude, mapReady]);
+
+  // Typed city / postcode → centre the map there while no pin exists.
+  useEffect(() => {
+    const q = focusQuery?.trim() ?? '';
+    if (!mapReady || marker || q.length < 3) return;
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      try {
+        const res = await geocodingApi.searchAddress(q, 1);
+        const hit = res.data.data?.[0];
+        if (!cancelled && hit) {
+          mapRef.current?.inject(`window.focusArea(${hit.latitude},${hit.longitude},13);`);
+        }
+      } catch { /* best effort — the user can still pan */ }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(id); };
+  }, [focusQuery, mapReady, marker]);
+
+  const hasInitial  = initialRef.current.latitude != null && initialRef.current.longitude != null;
+  const initialZoom = hasInitial ? 15 : 6;
+  const centerLat = initialRef.current.latitude ?? 46.6034; // France centroid fallback
+  const centerLng = initialRef.current.longitude ?? 1.8883;
 
   return (
     <View style={styles.wrapper}>
@@ -354,27 +517,25 @@ export const MapLocationPicker: React.FC<Props> = ({
       </View>
 
       {marker && (
-        <View style={[styles.preview, confirmed && styles.previewConfirmed]}>
-          <MapPin size={16} color={confirmed ? colors.success : colors.primary} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+        <View style={[styles.preview, styles.previewConfirmed]} accessibilityLiveRegion="polite">
+          <MapPin size={16} color={colors.success} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
           <View style={styles.previewLeft}>
-            {loadingGeo
-              ? <ActivityIndicator size="small" color={colors.primary} />
-              : <>
-                  <Text style={styles.coords}>{marker.latitude.toFixed(5)}, {marker.longitude.toFixed(5)}</Text>
-                  {address && <Text style={styles.addrText} numberOfLines={2}>{address}</Text>}
-                </>
-            }
-          </View>
-          {!confirmed
-            ? <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm} activeOpacity={0.85}>
-                <Check size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={styles.confirmText}>{t('validate_btn')}</Text>
-              </TouchableOpacity>
-            : <View style={styles.confirmedBadge}>
-                <Check size={12} color={colors.success} strokeWidth={2.5} />
-                <Text style={styles.confirmedText}>{t('validated')}</Text>
+            {loadingGeo ? (
+              <View style={styles.resolvingRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.addrText}>{t('address_resolving')}</Text>
               </View>
-          }
+            ) : (
+              <>
+                {address && <Text style={styles.addrMain} numberOfLines={2}>{address}</Text>}
+                <Text style={styles.coords}>{marker.latitude.toFixed(5)}, {marker.longitude.toFixed(5)}</Text>
+              </>
+            )}
+          </View>
+          <View style={styles.confirmedBadge}>
+            <Check size={12} color={colors.success} strokeWidth={2.5} />
+            <Text style={styles.confirmedText}>{t('position_saved')}</Text>
+          </View>
         </View>
       )}
     </View>
@@ -428,20 +589,12 @@ const styles = StyleSheet.create({
   },
   tapHintText:      { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.primary },
   preview:          { flexDirection: 'row', alignItems: 'center', marginTop: spacing[3], backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.borderPrimary, padding: spacing[3], gap: spacing[2] },
-  previewConfirmed: { borderColor: colors.success, backgroundColor: 'rgba(74,222,128,0.10)' },
+  previewConfirmed: { borderColor: colors.successBorder, backgroundColor: colors.successSurface },
+  resolvingRow:     { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
+  addrMain:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textPrimary },
   previewLeft:      { flex: 1, gap: 3 },
   coords:           { fontFamily: fontFamily.mono, fontSize: fontSize.xs, color: colors.textPrimary },
   addrText:         { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.5 },
-  confirmBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
-    backgroundColor: colors.primary, borderRadius: radius.full,
-    paddingHorizontal: spacing[3], paddingVertical: spacing[2], flexShrink: 0,
-    ...Platform.select({
-      ios:     { shadowColor: colors.primary, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6 },
-      android: { elevation: 3 },
-    }),
-  },
-  confirmText:    { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: palette.white },
   confirmedBadge: { flexDirection: 'row', alignItems: 'center', gap: spacing[1], backgroundColor: 'rgba(74,222,128,0.15)', borderWidth: 1, borderColor: colors.success, borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[2], flexShrink: 0 },
   confirmedText:  { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
 });

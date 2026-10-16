@@ -17,7 +17,9 @@ export interface CommonNS {
   success:       string;
   unknown_error: string;
   tls_badge: string; map_loading: string; total_spent: string;
-  search_address: string; phone_too_short: string; phone_invalid: string;
+  search_address: string; address_label: string; clear: string; address_no_result: string; address_search_error: string;
+  datetime_time_label: string; datetime_too_early: string; datetime_too_late: string;
+  datetime_prev_month: string; datetime_next_month: string; phone_too_short: string; phone_invalid: string;
   biometric_confirm: string; biometric_fingerprint: string; biometric_default: string;
   generic_error: string;
   datetime_select_label: string; datetime_confirm_prefix: string; datetime_select_date_first: string; datetime_at_sep: string; back: string; send: string; search: string; back_home: string; add_agent: string; map_unavailable: string; check_connection: string; mission_zone: string; mission_cancelled: string;
@@ -258,6 +260,7 @@ export interface MissionsNS {
     footer_step_progress: string;
     footer_ready:         string;
     slots_total_short:    string;
+    slots_total_short_one: string;
 
     // ── Review step enrichments ────────────────────────────────────────
     review_agent_hours:     string;
@@ -305,6 +308,10 @@ export interface MissionsNS {
     step_staff_2:        string;
     progress_staff:      string;
     next_to_staff:       string;
+    screen_title_new: string; address_label: string; zip_invalid: string;
+    location_checking: string; location_incoherent: string; location_use_resolved: string;
+    location_keep: string; remove_agent_a11y: string; remove_service_a11y: string;
+    slot_duration_max: string; slot_duration_hint: string; staff_load_error: string; partner_created_toast: string; beyond_horizon: string;
     when_staff_title:    string;
     when_staff_subtitle: string;
     creneau_label:       string;
@@ -338,14 +345,14 @@ export interface ProfileNS {
   sections: { account: string; security: string; preferences: string; info: string; legal: string; };
   menu: {
     edit_profile: string; analytics: string; payment_history: string; payment_methods: string;
-    two_fa: string; two_fa_enabled: string; two_fa_disabled: string;
+    two_fa: string; two_fa_enabled: string; two_fa_disabled: string; two_fa_recommended: string;
     quick_login: string; notifications: string; language: string;
     language_fr: string; language_en: string;
     email: string; phone: string;
     member_since: string; version: string; privacy_policy: string; terms: string;
     sales_terms: string; legal_notice: string; support: string;
   };
-  hero: { verified: string; since: string; phone_not_set: string; };
+  hero: { verified: string; since: string; phone_not_set: string; add_name: string; account_id: string; email_unverified: string; email_verified: string; };
   language_picker: { title: string; subtitle: string; };
   logout: { button: string; title: string; message: string; confirm: string; cancel: string; };
   delete_account: string;
@@ -353,6 +360,7 @@ export interface ProfileNS {
 
 export interface NavigationNS {
   tabs: { home: string; missions: string; notifications: string; profile: string; };
+  partner_tabs: { dashboard: string; team: string; finance: string; profile: string; };
 }
 
 export interface NotificationsNS {
@@ -406,6 +414,7 @@ export interface PaymentNS {
   title_card: string; title_sepa: string; secured_by: string;
   incomplete_card: string; sepa_failed: string; card_failed: string;
   sepa_success: string; card_success: string;
+  total_ttc_label: string; use_new_card: string;
   card_held: string; card_held_body: string;
   sepa_success_body: string; card_success_body: string;
   home: string;
@@ -449,7 +458,7 @@ export interface PaymentNS {
     header_add: string;
     header_iban: string;
     header_card: string;
-    pick_sub: string;
+    pick_sub: string; pick_title: string; iban_invalid: string; iban_valid: string;
     card_label: string; card_desc: string;
     sepa_label: string; sepa_desc: string;
     method_badge_card: string; method_badge_sepa: string;
@@ -526,7 +535,7 @@ export interface AccountNS {
 
 export interface BookingNS {
   screen_title: string;
-  agent: { assigned_label: string; cnaps_badge: string; missions_count: string; follow_live: string; rating_empty: string; };
+  agent: { assigned_label: string; cnaps_badge: string; missions_count: string; missions_count_one: string; follow_live: string; rating_empty: string; new_agent: string; checkin_at: string; checkout_at: string; awaiting_agent: string; auto_assign: string; };
   applications: {
     section_title: string; more: string; more_plural: string; waiting: string;
     select_title: string; select_subtitle: string; select_subtitle_plural: string;
@@ -605,7 +614,7 @@ export interface ServicesNS {
 }
 export interface MapPickerNS {
   label: string; hint: string; loading: string;
-  validate_btn: string; validated: string; unlock_hint: string;
+  validate_btn: string; validated: string; unlock_hint: string; position_saved: string; address_resolving: string;
   perm_title: string; perm_message: string; perm_allow: string; perm_cancel: string;
   perm_settings_hint: string; perm_denied_title: string; perm_denied: string;
   position_unavailable: string; timeout_retry: string; locate_failed_title: string;
@@ -653,6 +662,10 @@ export interface PartnerNS {
       financesSub: string;
       billing: string;
       billingSub: string;
+      staffing?: string;
+      staffingSub?: string;
+      contracts?: string;
+      contractsSub?: string;
       compliance: string;
       complianceSub: string;
       documents: string;
@@ -1175,6 +1188,10 @@ export interface PartnerNS {
     newMission: string;
     urgent: string;
     cancelAction: string;
+    fundAction: string;
+    filled: string;
+    moreAgents: string;
+    transferPending: string;
     agents_one: string;
     agents_other: string;
     tabs: {
@@ -1419,10 +1436,32 @@ export interface PartnerNS {
       };
     };
   };
+  staffing: {
+    title: string; subtitle: string; cityPlaceholder: string; retry: string;
+    empty: { title: string; body: string };
+    error: { title: string; body: string };
+    urgent: string; filled: string; noSlot: string;
+    assign: {
+      title: string; intro: string; empty: string; cta: string;
+      confirmTitle: string; confirmBody: string; confirm: string; cancel: string;
+      success: string; favorite: string; available: string; distance: string;
+      notAssignable: string; rating: string;
+      errors: { generic: string; network: string; taken: string; notFound: string; forbidden: string };
+    };
+  };
+  missionDetail: { [key: string]: string | { [key: string]: string } };
+  contractsList: {
+    title: string; subtitle: string; retry: string;
+    empty: { title: string; body: string };
+    error: { title: string; body: string };
+    agentSigned: string; awaitingAgent: string; dpae: string; unknownAgent: string;
+  };
   funding: {
     title: string;
     calculating: string;
     funded: string;
+    pending: { title: string; body: string; invoice: string };
+    expired: { title: string; body: string; action: string };
     actions: {
       accept: string;
       declare: string;
@@ -1446,6 +1485,7 @@ export interface PartnerNS {
       vat: string;
       agentSalary: string;
       platformMargin: string;
+      base: string;
       fixedCharges: string;
       surcharges: {
         night: string;
@@ -1547,4 +1587,15 @@ export interface LocaleResources {
   conversation: ConversationNS; services: ServicesNS; map_picker: MapPickerNS; analytics: AnalyticsNS; offline_banner: OfflineBannerNS;
   partner: PartnerNS;
   sites: SitesNS;
+  mission_tasks: MissionTasksNS;
+}
+
+/** Tâches de mission et modération des observations. */
+export interface MissionTasksNS {
+  section_title: string; section_hint: string; loading: string; no_service: string; no_task: string;
+  exclusions_title: string; contract_notice: string; on_validation: string; prefectoral: string;
+  validation_notice: string; notes_hint: string; detail_title: string; detail_empty: string;
+  status_pending: string; status_rejected: string; review_pending: string; review_rejected: string;
+  moderation_confirm_title: string; moderation_blocked_title: string; moderation_fix: string;
+  moderation_maintain: string; moderation_maintain_hint: string;
 }

@@ -19,12 +19,13 @@ import analytics     from './analytics';
 import offline_banner from './offline_banner';
 import partner       from './partner';
 import sites         from './sites';
+import mission_tasks from './mission_tasks';
 
 const fr = {
   common, auth, home, missions, profile, navigation, notifications,
   quote, payment, account,
   booking, rating, dispute, tracking, conversation, services,
   map_picker, analytics, offline_banner,
-  partner, sites,
+  partner, sites, mission_tasks,
 } as const;
 export default fr;

@@ -29,11 +29,59 @@
  * Backend payload (unified slots[]):
  *   ─ ALL missions     -> { ...base, slots: [{ startAt, endAt, durationHours, bookingLines }] }
  *   ─ Single-slot      -> same shape, 1 entry in slots array
+ *
+ * Audit 2026-10-07 (Create Mission investigation) — location integrity:
+ *   ─ Address, city, postcode and GPS are now updated TOGETHER from one source
+ *     (a search result or the pin's reverse geocode). Picking an address used
+ *     to keep the previous city when the result had none ("Paris" + 97615 +
+ *     a Mayotte street), and moving the pin never touched city/postcode.
+ *   ─ The location step checks city <-> GPS coherence (same official check the
+ *     API now enforces) and offers a one-tap fix instead of failing at submit.
+ *   ─ Postcode format validated; the address field mirrors the form state.
+ *   ─ Edit mode hydrates ONCE: the effect depended on a fresh [] every render
+ *     until the catalog loaded — re-fetching the mission on every render,
+ *     looping forever if the catalog failed, and overwriting the user's edits
+ *     if it arrived late. Catalog data is now merged into lines separately.
+ *   ─ Single step indicator (stepper), no "Précédent" that silently exits on
+ *     step 1, tab bar hidden for the flow (see MainNavigator).
+ *   ─ Changing a slot's start keeps its duration instead of wiping the end.
+ *
+ * Audit 2026-10-07 — step 2 "Quand & agents":
+ *   ─ PARTNERS could never finish: /quotes/calculate is CLIENT-only, so every
+ *     partner order ended on "quote calculation failed" although the mission
+ *     was saved. Partners no longer call it (who prices partner orders is an
+ *     open business question — see the audit report).
+ *   ─ Slot > 12 h showed "Durée maximum : 10 jours"; now the real rule.
+ *   ─ Service catalog failure had no retry (order blocked) — retry added.
+ *   ─ Validation scrolls to the first faulty slot; conflict chips jump to it.
+ *   ─ Server errors are routed to the right step by their stable `key`, not
+ *     by regex on translated text.
+ *   ─ Presets show the actual day and hours they set ("Ce soir" after 19:00
+ *     silently meant TOMORROW night).
+ *   ─ New slots are pre-filled 24 h after the previous one (multi-night
+ *     missions no longer need every date re-entered); end picker capped at
+ *     start + 12 h with the 6–12 h rule shown up front.
+ *   ─ Title / notes limits aligned with the API (120 / 1000).
+ *   ─ "Urgent" computed on the Paris calendar, like the API and the web app.
+ *
+ * CEO decisions 2026-10-07:
+ *   ─ Partner orders are B2B, priced by Provalk (ops alerted on creation);
+ *     the partner is told the quote arrives within 1 business day.
+ *   ─ Booking horizon: 12 months (picker + validation; API enforces too).
+ *   ─ No price figure before the quote: the €/h is no longer shown in the
+ *     service picker (same rationale as SHOW_INDICATIVE_ESTIMATE=false).
+ *
+ * Navigation audit 2026-10-07:
+ *   ─ Success paths REPLACE the form (partner → missions list, edit → quote).
+ *     They used navigate(), which stacked the destination on top: back then
+ *     returned to the already-submitted form.
+ *   ─ Android hardware back on step 2 returns to step 1 (it used to drop the
+ *     whole flow, while the header/footer back went one step).
  */
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, KeyboardAvoidingView, Keyboard,
-  Platform, StyleSheet, TouchableOpacity, ActivityIndicator,
+  Platform, StyleSheet, TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import type { TFunction } from 'i18next';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -53,6 +101,8 @@ import { queryClient }       from '@lib/queryClient';
 import { qk }                from '@api/queryKeys';
 import { quotesApi }         from '@api/endpoints/quotes';
 import { serviceTypesApi }   from '@api/endpoints/serviceTypes';
+import { geocodingApi }      from '@api/endpoints/geocoding';
+import type { PickedPlace }  from '@components/ui/MapLocationPicker';
 import { missionDraftStorage, isDraftMeaningful } from '@services/missionDraftStorage';
 import type { MissionDraftPayload } from '@services/missionDraftStorage';
 import { Button }            from '@components/ui/Button';
@@ -68,6 +118,11 @@ import {
 } from '@constants/serviceCatalog';
 import type { UniformValue } from '@constants/serviceCatalog';
 import { formatEuros }       from '@utils/formatters';
+import { isTodayInParis, stepForApiKey } from '@utils/missionCreate';
+import { moderationMessages, moderationOutcome } from '@utils/moderation';
+import { ServiceTasksPicker, toServiceTasksPayload } from '@components/domain/ServiceTasksPicker';
+// Mission times are entered and shown in Paris time (decision 2026-10-07).
+import { parisParts, fromParis, inParis } from '@utils/parisTime';
 import { colors }            from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
@@ -150,6 +205,8 @@ const MIN_DURATION_H   = 6;
 const MAX_DURATION_H   = 12;   // Must match backend SLOT_MAX_HOURS (legal R2: max 12h/slot)
 const MAX_SLOTS        = 30;
 const MAX_AGENTS       = 20;
+/** Booking horizon — mirrors the API's BOOKING_HORIZON_DAYS (CEO decision). */
+const MAX_HORIZON_MS   = 365 * 24 * 3_600_000;
 
 /** Autosave debounce — we don't need keystroke-level persistence. */
 const AUTOSAVE_DEBOUNCE_MS = 700;
@@ -167,11 +224,16 @@ function durationHours(start: string, end: string): number {
   return (e - s) / 3_600_000;
 }
 
-function isToday(iso: string): boolean {
-  if (!iso) return false;
-  const d = new Date(iso), t = new Date();
-  return d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear();
+/** Same calendar day in Paris — the API's (priced) notion of an urgent mission. */
+const isToday = (iso: string) => isTodayInParis(iso);
+
+/** "ven. 20:00 → 02:00" — what a preset will actually set. */
+function presetSummary(startIso: string, endIso: string): string {
+  const s = new Date(startIso), e = new Date(endIso);
+  const hm = (d: Date) => d.toLocaleTimeString(i18n.language, inParis({ hour: '2-digit', minute: '2-digit' }));
+  return `${s.toLocaleDateString(i18n.language, inParis({ weekday: 'short', day: 'numeric' }))} · ${hm(s)}–${hm(e)}`;
 }
+
 
 function clampDuration(h: number): number {
   return Math.max(MIN_DURATION_H, Math.round(h * 10) / 10);
@@ -192,16 +254,12 @@ function allAgents(slots: SlotDraft[]): number {
 function formatSlotDateShort(startIso: string, endIso: string): string {
   if (!startIso || !endIso) return '';
   const s = new Date(startIso), e = new Date(endIso);
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' };
-  return `${s.toLocaleString('fr-FR', opts)} → ${e.toLocaleString('fr-FR', opts)}`;
+  const opts: Intl.DateTimeFormatOptions = inParis({ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return `${s.toLocaleString(i18n.language, opts)} → ${e.toLocaleString(i18n.language, opts)}`;
 }
 
-function formatDateShort(iso: string): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-  });
-}
+/** French postcode, DOM included (5 digits). Mirrors the API DTO. */
+const ZIP_RE = /^\d{5}$/;
 
 /** Human-readable relative time for the draft restore banner. */
 function formatRelativeFromNow(savedAt: number): string {
@@ -238,36 +296,35 @@ interface SchedulePreset {
   build: () => { startAt: string; endAt: string };
 }
 
+// Presets are Paris wall-clock times: "Ce soir 20:00" is 20:00 in Paris on any
+// phone (it was 20:00 in the phone's zone — 22:00 in Paris on a UTC phone).
+const iso = (d: Date) => d.toISOString();
+
 function makeTonight() {
-  const start = new Date();
-  start.setMinutes(0, 0, 0);
-  start.setHours(20);
-  if (start.getTime() < Date.now() + MIN_FUTURE_HOURS * 3_600_000) {
-    start.setDate(start.getDate() + 1);
-  }
-  const end = new Date(start);
-  end.setHours(start.getHours() + 6);
-  return { startAt: start.toISOString(), endAt: end.toISOString() };
+  const p = parisParts(new Date());
+  let day = p.day;
+  if (fromParis(p.year, p.month, day, 20, 0).getTime() < Date.now() + MIN_FUTURE_HOURS * 3_600_000) day += 1;
+  return { startAt: iso(fromParis(p.year, p.month, day, 20, 0)), endAt: iso(fromParis(p.year, p.month, day + 1, 2, 0)) };
 }
 
 function makeTomorrow() {
-  const start = new Date();
-  start.setDate(start.getDate() + 1);
-  start.setHours(8, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(20, 0, 0, 0);
-  return { startAt: start.toISOString(), endAt: end.toISOString() };
+  const p = parisParts(new Date());
+  return { startAt: iso(fromParis(p.year, p.month, p.day + 1, 8, 0)), endAt: iso(fromParis(p.year, p.month, p.day + 1, 20, 0)) };
 }
 
 function makeWeekend() {
-  const start = new Date();
-  const offset = (6 - start.getDay() + 7) % 7 || 7;
-  start.setDate(start.getDate() + offset);
-  start.setHours(20, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  end.setHours(2, 0, 0, 0);
-  return { startAt: start.toISOString(), endAt: end.toISOString() };
+  const p = parisParts(new Date());
+  const offset = (6 - p.weekday + 7) % 7 || 7; // next Saturday (Paris calendar)
+  return {
+    startAt: iso(fromParis(p.year, p.month, p.day + offset, 20, 0)),
+    endAt:   iso(fromParis(p.year, p.month, p.day + offset + 1, 2, 0)),
+  };
+}
+
+/** Same Paris wall-clock time on the next calendar day (DST-safe, unlike +24 h). */
+function nextParisDay(isoStr: string): string {
+  const p = parisParts(new Date(isoStr));
+  return fromParis(p.year, p.month, p.day + 1, p.hour, p.minute).toISOString();
 }
 
 const SCHEDULE_PRESETS: SchedulePreset[] = [
@@ -312,7 +369,7 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   const [hydrating, setHydrating] = useState<boolean>(isEditMode);
 
   // Service catalog — fetched here now that ServicePicker is gone.
-  const { data: services, loading: servicesLoading, execute: loadServices } =
+  const { data: services, loading: servicesLoading, error: servicesError, execute: loadServices } =
     useApi(serviceTypesApi.findAll);
   const serviceTypes = (services as ServiceType[] | null) ?? [];
 
@@ -338,8 +395,13 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   // bookings back into the screen's form/slots state. Bookings are grouped by
   // (slotId, serviceTypeId) -> agentCount, with the first booking's uniform used
   // for the line (the UI applies one uniform per line, fanned out per agent).
+  // Hydrate ONCE per mission id (see header note: the old dependency on a
+  // render-fresh serviceTypes array re-ran this on every render).
+  const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isEditMode || !editMissionId) return;
+    if (hydratedForRef.current === editMissionId) return;
+    hydratedForRef.current = editMissionId;
     let cancelled = false;
     (async () => {
       try {
@@ -405,6 +467,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         if (!cancelled && hydratedSlots.length > 0) {
           setSlots(hydratedSlots);
         }
+        // Tasks already ordered, regrouped by service so they show ticked.
+        if (!cancelled) {
+          const grouped: Record<string, string[]> = {};
+          for (const task of (mission.serviceTasks ?? []) as Array<{ serviceTypeId: string; code: string }>) {
+            (grouped[task.serviceTypeId] ??= []).push(task.code);
+          }
+          setServiceTasks(grouped);
+        }
       } catch {
         if (!cancelled) {
           toast.error(t('detail.error_load'));
@@ -415,11 +485,13 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       }
     })();
     return () => { cancelled = true; };
-  // serviceTypes intentionally included so names/rates resolve once the catalog loads.
-  }, [isEditMode, editMissionId, serviceTypes]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode, editMissionId]);
 
   const [step,    setStep]    = useState<Step>(1);
   const [form,    setForm]    = useState<FormData>(INITIAL_FORM);
+  /** Tasks ticked per service (GET /service-tasks); the mission = service + these. */
+  const [serviceTasks, setServiceTasks] = useState<Record<string, string[]>>({});
   const [slots,   setSlots]   = useState<SlotDraft[]>(() => ([{
     key: nextKey(), startAt: '', endAt: '', lines: seedLines, pickerOpen: seedLines.length === 0,
   }]));
@@ -430,6 +502,36 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const isMultiSlot = slots.length > 1;
   const agentsTotal = useMemo(() => allAgents(slots), [slots]);
+
+  // Fill catalog-derived fields (name, rate, allowed uniforms) on lines that
+  // were hydrated / restored before the catalog arrived. Only patches empty
+  // fields — never touches counts, uniforms or anything the user edited.
+  useEffect(() => {
+    if (serviceTypes.length === 0) return;
+    setSlots(prev => {
+      let changed = false;
+      const next = prev.map(s => ({
+        ...s,
+        lines: s.lines.map(l => {
+          if (l.name && l.allowedUniforms.length > 0) return l;
+          const svc = serviceTypes.find(x => x.id === l.serviceTypeId);
+          if (!svc) return l;
+          changed = true;
+          return {
+            ...l,
+            name:            l.name || svc.name,
+            accent:          l.name ? l.accent : getServiceMeta(svc.name).accent,
+            ratePerHour:     l.ratePerHour || svc.baseRatePerHour,
+            allowedUniforms: l.allowedUniforms.length ? l.allowedUniforms : allowedUniformsForService(svc),
+          };
+        }),
+      }));
+      return changed ? next : prev;
+    });
+  // Re-runs after hydration / draft restore too; returns the same state when
+  // nothing is missing, so it cannot loop.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services, slots]);
 
   const setField = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) =>
     setForm(p => ({ ...p, [k]: v })), []);
@@ -538,23 +640,72 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   // ──────────────────────────────────────────────────────────────────────────
   // Address auto-fill
   // ──────────────────────────────────────────────────────────────────────────
+  // A location issue found on step 1 (GPS point not in the declared city).
+  const [locationIssue, setLocationIssue] = useState<{
+    declared: string; resolvedCity: string; resolvedZip: string;
+  } | null>(null);
+  const [checkingLocation, setCheckingLocation] = useState(false);
+
+  /**
+   * Search result → address, city, postcode and GPS replaced TOGETHER.
+   * Never fall back to the previous city/postcode: a value from another
+   * address is worse than an empty field the user is asked to fill.
+   */
   const handleAddressSelect = useCallback((r: NominatimResult) => {
+    // The keyboard stayed open over the map after a pick (seen on device).
+    Keyboard.dismiss();
     const a = r.address;
     const road = a.road ?? '', num = a.house_number ?? '';
     setForm(p => ({
       ...p,
-      address:   num ? `${num} ${road}` : road,
-      city:      a.city ?? a.town ?? a.village ?? p.city,
-      zipCode:   a.postcode ?? p.zipCode,
+      address:   (num ? `${num} ${road}` : road) || r.display_name.split(',')[0],
+      city:      a.city ?? a.town ?? a.village ?? '',
+      zipCode:   a.postcode ?? '',
       latitude:  parseFloat(r.lat),
       longitude: parseFloat(r.lon),
     }));
-    setErrors(e => ({ ...e, address: undefined, latitude: undefined }));
+    setLocationIssue(null);
+    setErrors(e => ({ ...e, address: undefined, city: undefined, zipCode: undefined, latitude: undefined }));
   }, []);
 
-  const handleMapSelect = useCallback((coords: { latitude: number; longitude: number }, addr?: string) => {
-    setForm(p => ({ ...p, latitude: coords.latitude, longitude: coords.longitude, address: addr ?? p.address }));
-    setErrors(e => ({ ...e, latitude: undefined }));
+  /** Free typing in the address field keeps the form in sync with the screen. */
+  const handleAddressChange = useCallback((text: string) => {
+    setForm(p => ({ ...p, address: text }));
+    setErrors(e => (e.address ? { ...e, address: undefined } : e));
+  }, []);
+
+  /**
+   * Pin placed / moved. Coordinates are committed at once; when the reverse
+   * geocode answers, street, city and postcode follow the pin so the four
+   * fields always describe the same place.
+   */
+  const handleMapSelect = useCallback((coords: { latitude: number; longitude: number }, place?: PickedPlace) => {
+    setForm(p => ({
+      ...p,
+      latitude:  coords.latitude,
+      longitude: coords.longitude,
+      ...(place ? {
+        address: place.shortName || p.address,
+        city:    place.city || p.city,
+        zipCode: place.zipCode || p.zipCode,
+      } : {}),
+    }));
+    setLocationIssue(null);
+    setErrors(e => ({ ...e, latitude: undefined, ...(place ? { address: undefined, city: undefined, zipCode: undefined } : {}) }));
+  }, []);
+
+  const applyResolvedLocation = useCallback(() => {
+    if (!locationIssue) return;
+    setForm(p => ({ ...p, city: locationIssue.resolvedCity, zipCode: locationIssue.resolvedZip || p.zipCode }));
+    setLocationIssue(null);
+  }, [locationIssue]);
+
+  const setFieldTracked = useCallback(<K extends keyof FormData>(k: K, v: FormData[K]) => {
+    setForm(p => ({ ...p, [k]: v }));
+    if (k === 'city' || k === 'zipCode') {
+      setLocationIssue(null);
+      setErrors(e => (e[k] ? { ...e, [k]: undefined } : e));
+    }
   }, []);
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -601,8 +752,31 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       // staying fully editable (the core "flexible" win).
       const last = prev[prev.length - 1];
       const seeded = last.lines.map(l => ({ ...l }));
-      return [...prev, { key: nextKey(), startAt: '', endAt: '', lines: seeded, pickerOpen: seeded.length === 0 }];
+      // ...and its schedule as "same hours, next day": the common case for
+      // multi-day guarding (5 nights = 4 taps instead of 8 date pickers).
+      // Still fully editable; overlap rules are re-checked at validation.
+      const ls = last.startAt ? new Date(last.startAt).getTime() : NaN;
+      const le = last.endAt ? new Date(last.endAt).getTime() : NaN;
+      const hasDates = !isNaN(ls) && !isNaN(le) && le > ls;
+      return [...prev, {
+        key:       nextKey(),
+        startAt:   hasDates ? nextParisDay(last.startAt) : '',
+        endAt:     hasDates ? nextParisDay(last.endAt) : '',
+        lines:     seeded,
+        pickerOpen: seeded.length === 0,
+      }];
     });
+  }, []);
+
+  // ── Scroll-to-slot (validation errors, conflict chips) ───────────────────
+  // Slot cards report their y inside the step container, which reports its
+  // own y inside the scroll content; the sum is the scroll offset.
+  const stepRootYRef = useRef(0);
+  const slotYRef     = useRef<Record<string, number>>({});
+  const scrollToSlot = useCallback((key: string) => {
+    const y = stepRootYRef.current + (slotYRef.current[key] ?? 0);
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing[3]), animated: true });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const removeSlot = useCallback((key: string) => {
@@ -697,7 +871,9 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     if (target >= 1) {
       if (!form.address.trim()) e.address  = t('create.address_required');
       if (!form.city.trim())    e.city     = t('create.city_required');
-      if (form.latitude == null) e.latitude = t('create.map_position_required');
+      if (form.zipCode.trim() && !ZIP_RE.test(form.zipCode.trim())) e.zipCode = t('create.zip_invalid');
+      if (form.latitude == null || form.longitude == null ||
+          (form.latitude === 0 && form.longitude === 0)) e.latitude = t('create.map_position_required');
     }
 
     if (target >= 2) {
@@ -706,11 +882,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       slots.forEach(s => {
         if (!s.startAt) { e[`slot_${s.key}_startAt`] = t('create.slot_start_required'); return; }
         if (!s.endAt)   { e[`slot_${s.key}_endAt`]   = t('create.slot_end_required');   return; }
+        if (new Date(s.startAt).getTime() > Date.now() + MAX_HORIZON_MS) {
+          e[`slot_${s.key}_startAt`] = t('create.beyond_horizon'); return;
+        }
         const start = new Date(s.startAt), end = new Date(s.endAt);
         if (end <= start) { e[`slot_${s.key}_endAt`] = t('create.slot_end_before_start'); return; }
         const d = durationHours(s.startAt, s.endAt);
         if (d < MIN_DURATION_H) { e[`slot_${s.key}_endAt`] = t('create.slot_duration_min'); return; }
-        if (d > MAX_DURATION_H) { e[`slot_${s.key}_endAt`] = t('create.duration_max');      return; }
+        if (d > MAX_DURATION_H) { e[`slot_${s.key}_endAt`] = t('create.slot_duration_max'); return; }
         if (slotAgents(s) === 0) { e[`slot_${s.key}_lines`] = t('create.slot_lines_required'); return; }
         valid.push({ start, end, key: s.key });
       });
@@ -725,12 +904,55 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     setErrors(e);
-    return Object.keys(e).filter(k => e[k]).length === 0;
+    const ok = Object.keys(e).filter(k => e[k]).length === 0;
+    // Step 2 errors can be several screens down: bring the first one into view.
+    if (!ok && target >= 2) {
+      const first = slots.find(s => Object.keys(e).some(k => k.startsWith(`slot_${s.key}_`)));
+      if (first) setTimeout(() => scrollToSlot(first.key), 50);
+    }
+    return ok;
   };
 
-  const handleNext = () => {
+  /**
+   * Step 1 → 2: check that the GPS point really is in the declared city,
+   * using the same official check the API enforces at creation. Only a
+   * positive mismatch (point reverse-geocoded to another commune) stops the
+   * user; timeouts, outages and "unverifiable" let them through — the server
+   * re-checks anyway.
+   */
+  const checkLocationCoherence = async (): Promise<boolean> => {
+    if (form.latitude == null || form.longitude == null) return true;
+    setCheckingLocation(true);
+    try {
+      const { data: res } = await geocodingApi.validateCoherence({
+        city: form.city.trim(), latitude: form.latitude, longitude: form.longitude,
+      });
+      const v = (res as any)?.data ?? res;
+      if (v?.verdict === 'incoherent' && v.resolved?.city) {
+        setLocationIssue({
+          declared:     v.declared?.name ?? form.city.trim(),
+          resolvedCity: v.resolved.city,
+          resolvedZip:  v.resolved.zipCode ?? '',
+        });
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    } finally {
+      setCheckingLocation(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (checkingLocation) return;
     if (!validate(step)) return;
-    if (step < TOTAL_STEPS) { setStep(s => (s + 1) as Step); return; }
+    if (step === 1 && !(await checkLocationCoherence())) return;
+    if (step < TOTAL_STEPS) {
+      setStep(s => (s + 1) as Step);
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+      return;
+    }
     handleSubmit();
   };
 
@@ -743,6 +965,21 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
   // Submit
   // ──────────────────────────────────────────────────────────────────────────
   const submittingRef = useRef(false);
+
+  // ── Android hardware back / swipe-back: step 2 → step 1 ───────────────────────
+  // The header/footer back went one step, but the system back left the whole
+  // flow. Intercept a BACK-type removal while on step 2; success navigations
+  // set leavingRef so they are never blocked.
+  const leavingRef = useRef(false);
+  const stepRef    = useRef<Step>(1);
+  useEffect(() => { stepRef.current = step; }, [step]);
+  useEffect(() => navigation.addListener('beforeRemove', (e) => {
+    if (leavingRef.current || stepRef.current === 1) return;
+    const type = e.data.action.type;
+    if (type !== 'GO_BACK' && type !== 'POP') return;
+    e.preventDefault();
+    setStep(1);
+  }), [navigation]);
   /**
    * Id of the mission this screen has ALREADY created, if any.
    *
@@ -758,7 +995,11 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
    * defeat the whole point.
    */
   const createdMissionIdRef = useRef<string | null>(null);
-  const handleSubmit = async () => {
+  /**
+   * `maintain`: the client saw a moderation warning on its notes and keeps
+   * them. They are then reviewed by Provalk before any officer sees them.
+   */
+  const handleSubmit = async (maintain = false) => {
     if (submittingRef.current) return; // guard double-tap
     submittingRef.current = true;
     setLoading(true);
@@ -781,8 +1022,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // ALWAYS send the slots[] format - the backend DTO only accepts slots[],
       // not flat startAt/endAt/bookingLines. Single-slot = slots with 1 entry.
+      const orderedServiceIds = [
+        ...new Set(sortedSlots.flatMap(s => slotApiLines(s).map(l => l.serviceTypeId))),
+      ];
       const missionPayload: Parameters<typeof missionsApi.create>[0] = {
         ...base,
+        serviceTasks: toServiceTasksPayload(serviceTasks, orderedServiceIds),
+        moderationInteractive: true,
+        ...(maintain ? { moderationMaintain: true } : {}),
         isUrgent: isToday(sortedSlots[0]?.startAt ?? ''),
         slots: sortedSlots.map(s => ({
           startAt:       new Date(s.startAt).toISOString(),
@@ -826,23 +1073,50 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
 
       // Backend derives quote lines from existing Booking rows (created in the
       // mission transaction above). Only missionId is needed.
-      await quotesApi.calculate({ missionId: mission.id });
+      // Partners get their quote on the funding screen they land on next
+      // (it calculates on open), so it is not computed twice here.
+      if (!isPartner) {
+        await quotesApi.calculate({ missionId: mission.id });
+      }
 
       if (!isEditMode && userId) missionDraftStorage.clear(userId);
+      leavingRef.current = true; // let the success navigation through
       if (isEditMode) {
         toast.success(t('edit.saved_toast'));
-        navigation.navigate('QuoteDetail', { missionId: mission.id });
+        navigation.replace('QuoteDetail', { missionId: mission.id });
       } else if (isPartner) {
-        // Partner success path: hop back to the partner missions list.
-        // The screen is typed against MissionStackParamList but at runtime
-        // is hosted under PartnerHomeStack; cast through unknown to bridge.
+        toast.success(t('create.partner_created_toast'));
+        // Partner success path: REPLACE the form with the funding screen
+        // (quote -> accept -> bank transfer), which publishes the mission once
+        // paid. Same stack (PartnerHomeStack); typed for MissionStackParamList,
+        // hosted there at runtime — cast to bridge.
         (navigation as unknown as {
-          navigate: (parent: string, target: { screen: string }) => void;
-        }).navigate('PartnerHome', { screen: 'PartnerMissions' });
+          replace: (name: string, params: { missionId: string; bookingLines: [] }) => void;
+        }).replace('PartnerMissionFunding', { missionId: mission.id, bookingLines: [] });
       } else {
         navigation.replace('QuoteDetail', { missionId: mission.id });
       }
     } catch (err: unknown) {
+      // Moderation of the notes (docs/mission-tasks in the API). A refusal
+      // must be edited; an out-of-scope note can be edited or kept.
+      const moderation = moderationOutcome(err);
+      if (moderation) {
+        const lines = moderationMessages(moderation, i18n.language ?? 'fr');
+        const tt = i18n.getFixedT(null, 'mission_tasks');
+        if (moderation.kind === 'confirm') {
+          Alert.alert(
+            tt('moderation_confirm_title'),
+            [...lines, tt('moderation_maintain_hint')].join('\n\n'),
+            [
+              { text: tt('moderation_fix'), style: 'cancel' },
+              { text: tt('moderation_maintain'), onPress: () => { void handleSubmit(true); } },
+            ],
+          );
+        } else {
+          setSubmitError({ title: tt('moderation_blocked_title'), details: lines, jumpTo: 2 });
+        }
+        return;
+      }
       const status       = (err as any)?.response?.status;
       const apiMsg       = (err as any)?.response?.data?.message;
       const localMsg     = (err as any)?.message;
@@ -858,11 +1132,14 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         : isNetworkErr ? [t('create.submit_error_network')]
         : [localMsg ?? t('create.error_create')];
 
+      // Prefer the API's stable error key (I18nExceptionFilter returns it);
+      // fall back to the text for class-validator messages, which have none.
+      const apiKey: string = (err as any)?.response?.data?.key ?? '';
       const joined = details.join(' ').toLowerCase();
-      const jumpTo: Step | null =
-        /(address|city|zipcode|latitude|longitude|adresse|ville)/.test(joined) ? 1
-        : /(start|end|duration|slot|durée|creneau|créneau|heure|agent|service|tenue)/.test(joined) ? 2
-        : null;
+      const jumpTo: Step | null = stepForApiKey(apiKey)
+        ?? (/(address|city|zipcode|latitude|longitude|adresse|ville|postal|gps)/.test(joined) ? 1
+        : /(start|end|duration|slot|durée|creneau|créneau|heure|agent|service|prestation|tenue)/.test(joined) ? 2
+        : null);
 
       // When createdMissionId is set, the mission DID commit and only the
       // downstream quote calculation failed. Telling the user 'Unable to
@@ -912,8 +1189,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         2: t('partner:createMission.title' as never),
       }
     : {
-        1: t('create.step_where_2'),
-        2: t('create.step_staff_2'),
+        // The stepper below already says "1 Lieu — 2 Quand & agents"; the
+        // header names the task instead of repeating the step a third time.
+        1: t('create.screen_title_new'),
+        2: t('create.screen_title_new'),
       };
 
   const nextLabel = step === 1
@@ -998,17 +1277,21 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
         )}
 
         {step === 2 && crossSlotErrorSlots.length > 0 && (
-          <CrossSlotErrorBanner offenders={crossSlotErrorSlots} t={t} />
+          <CrossSlotErrorBanner offenders={crossSlotErrorSlots} onJump={scrollToSlot} t={t} />
         )}
 
         {step === 1 && (
           <StepWhere
             form={form}
             errors={errors}
+            locationIssue={locationIssue}
             onAddressSelect={handleAddressSelect}
+            onAddressChange={handleAddressChange}
             onMapSelect={handleMapSelect}
             onMapInteraction={setMapScrollLocked}
-            onSetField={setField}
+            onSetField={setFieldTracked}
+            onApplyResolved={applyResolvedLocation}
+            onDismissIssue={() => setLocationIssue(null)}
             t={t}
           />
         )}
@@ -1021,6 +1304,10 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             activePreset={activePreset}
             serviceTypes={serviceTypes}
             servicesLoading={servicesLoading}
+            servicesError={!!servicesError && serviceTypes.length === 0}
+            onRetryServices={loadServices}
+            onRootLayout={y => { stepRootYRef.current = y; }}
+            onSlotLayout={(key, y) => { slotYRef.current[key] = y; }}
             agentsTotal={agentsTotal}
             onApplyPreset={applyPreset}
             onSetField={setField}
@@ -1034,6 +1321,8 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
             onChangeLineCount={changeLineCount}
             onSetLineUniform={setLineUniform}
             onFieldFocus={scrollToTail}
+            serviceTasks={serviceTasks}
+            onChangeServiceTasks={setServiceTasks}
             t={t}
           />
         )}
@@ -1042,31 +1331,32 @@ export const MissionCreateScreen: React.FC<Props> = ({ route, navigation }) => {
       {/* ── Smart footer: Back + Continue/Create ────────────────────── */}
       {!keyboardOpen && (
       <View style={styles.footer}>
-        <View style={styles.footerMeta}>
-          <Text style={styles.footerMetaText}>
-            {step < TOTAL_STEPS
-              ? t('create.footer_step_progress', { current: step, total: TOTAL_STEPS })
-              : t('create.footer_ready')}
-          </Text>
-          {step >= 2 && totalSlotHours(slots) > 0 && (
+        {/* Step 2 only: a useful summary. On step 1 "Étape 1 sur 2" just
+            repeated the stepper and the header. */}
+        {step >= 2 && totalSlotHours(slots) > 0 && (
+          <View style={styles.footerMeta}>
             <Text style={styles.footerMetaText}>
-              {' · '}{t('create.slots_total_short', { count: slots.length, hours: totalSlotHours(slots).toFixed(1) })}
+              {t('create.slots_total_short', { count: slots.length, hours: new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 1 }).format(totalSlotHours(slots)) })}
             </Text>
-          )}
-        </View>
+          </View>
+        )}
         <View style={styles.footerBtnRow}>
+          {/* On step 1 "Précédent" silently left the whole flow; the header
+              back arrow already does that, explicitly. */}
+          {step > 1 && (
+            <Button
+              label={t('create.footer_back')}
+              onPress={handleBack}
+              variant="ghost"
+              size="lg"
+              leftIcon={<ChevronLeft size={16} color={colors.textSecondary} strokeWidth={2.2} />}
+              style={styles.footerBackBtn}
+            />
+          )}
           <Button
-            label={t('create.footer_back')}
-            onPress={handleBack}
-            variant="ghost"
-            size="lg"
-            leftIcon={<ChevronLeft size={16} color={colors.textSecondary} strokeWidth={2.2} />}
-            style={styles.footerBackBtn}
-          />
-          <Button
-            label={nextLabel}
+            label={checkingLocation ? t('create.location_checking') : nextLabel}
             onPress={handleNext}
-            loading={loading}
+            loading={loading || checkingLocation}
             size="lg"
             style={styles.footerNextBtn}
             rightIcon={
@@ -1191,8 +1481,9 @@ const submitErrS = StyleSheet.create({
 
 const CrossSlotErrorBanner: React.FC<{
   offenders: Array<{ idx: number; key: string }>;
+  onJump:    (key: string) => void;
   t:         MissionsT;
-}> = ({ offenders, t }) => (
+}> = ({ offenders, onJump, t }) => (
   <View style={crossSlotErrS.wrap}>
     <View style={crossSlotErrS.headerRow}>
       <AlertTriangle size={15} color={colors.danger} strokeWidth={2.2} />
@@ -1201,9 +1492,17 @@ const CrossSlotErrorBanner: React.FC<{
     <Text style={crossSlotErrS.subtitle}>{t('create.cross_slot_error_subtitle')}</Text>
     <View style={crossSlotErrS.chipsRow}>
       {offenders.map(o => (
-        <View key={o.key} style={crossSlotErrS.chip}>
+        <TouchableOpacity
+          key={o.key}
+          style={crossSlotErrS.chip}
+          onPress={() => onJump(o.key)}
+          activeOpacity={0.75}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          accessibilityRole="button"
+          accessibilityLabel={t('create.cross_slot_error_jump', { n: o.idx + 1 })}
+        >
           <Text style={crossSlotErrS.chipText}>{t('create.cross_slot_error_jump', { n: o.idx + 1 })}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   </View>
@@ -1338,15 +1637,20 @@ const DurationBadge: React.FC<{
 interface StepWhereProps {
   form:             FormData;
   errors:           Record<string, string | undefined>;
+  locationIssue:    { declared: string; resolvedCity: string; resolvedZip: string } | null;
   onAddressSelect:  (r: NominatimResult) => void;
-  onMapSelect:      (c: { latitude: number; longitude: number }, addr?: string) => void;
+  onAddressChange:  (text: string) => void;
+  onMapSelect:      (c: { latitude: number; longitude: number }, place?: PickedPlace) => void;
   onMapInteraction: (locked: boolean) => void;
   onSetField:       <K extends keyof FormData>(k: K, v: FormData[K]) => void;
+  onApplyResolved:  () => void;
+  onDismissIssue:   () => void;
   t:                MissionsT;
 }
 
 const StepWhere: React.FC<StepWhereProps> = ({
-  form, errors, onAddressSelect, onMapSelect, onMapInteraction, onSetField, t,
+  form, errors, locationIssue, onAddressSelect, onAddressChange, onMapSelect,
+  onMapInteraction, onSetField, onApplyResolved, onDismissIssue, t,
 }) => (
   <View style={styles.stepContent}>
     <StepHero Icon={MapPin} title={t('create.where_title')} subtitle={t('create.where_subtitle')} />
@@ -1354,6 +1658,8 @@ const StepWhere: React.FC<StepWhereProps> = ({
       value={form.address}
       error={errors.address}
       onSelect={onAddressSelect}
+      onChangeText={onAddressChange}
+      label={t('create.address_label')}
       placeholder={t('create.address_placeholder')}
       countrycodes="fr"
     />
@@ -1372,9 +1678,11 @@ const StepWhere: React.FC<StepWhereProps> = ({
         <Input
           label={t('create.zip_label')}
           value={form.zipCode}
-          onChangeText={v => onSetField('zipCode', v)}
+          onChangeText={v => onSetField('zipCode', v.replace(/\D/g, '').slice(0, 5))}
           keyboardType="number-pad"
+          maxLength={5}
           placeholder={t('create.zip_placeholder')}
+          error={errors.zipCode}
           leftIcon={<MapPin size={16} color={colors.textMuted} strokeWidth={1.8} />}
         />
       </View>
@@ -1384,9 +1692,34 @@ const StepWhere: React.FC<StepWhereProps> = ({
       longitude={form.longitude ?? undefined}
       onSelect={onMapSelect}
       onInteractionChange={onMapInteraction}
+      focusQuery={[form.zipCode, form.city].map(s => s.trim()).filter(Boolean).join(' ')}
     />
     {errors.latitude && (
       <View style={styles.errorBanner}><Text style={styles.errorBannerText}>{errors.latitude}</Text></View>
+    )}
+    {locationIssue && (
+      <View style={styles.issueBanner} accessibilityRole="alert">
+        <View style={styles.issueHeader}>
+          <AlertTriangle size={16} color={colors.warning} strokeWidth={2.2} />
+          <Text style={styles.issueText}>
+            {t('create.location_incoherent', {
+              resolved: `${locationIssue.resolvedCity}${locationIssue.resolvedZip ? ` (${locationIssue.resolvedZip})` : ''}`,
+              declared: locationIssue.declared,
+            })}
+          </Text>
+        </View>
+        <View style={styles.issueActions}>
+          <TouchableOpacity style={styles.issuePrimary} onPress={onApplyResolved} activeOpacity={0.85} accessibilityRole="button">
+            <Check size={14} color={colors.textInverse} strokeWidth={2.4} />
+            <Text style={styles.issuePrimaryText}>
+              {t('create.location_use_resolved', { resolved: locationIssue.resolvedCity })}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.issueSecondary} onPress={onDismissIssue} activeOpacity={0.7} accessibilityRole="button">
+            <Text style={styles.issueSecondaryText}>{t('create.location_keep')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     )}
   </View>
 );
@@ -1402,6 +1735,10 @@ interface StepWhenWhoProps {
   activePreset:      PresetKey | null;
   serviceTypes:      ServiceType[];
   servicesLoading:   boolean;
+  servicesError:     boolean;
+  onRetryServices:   () => void;
+  onRootLayout:      (y: number) => void;
+  onSlotLayout:      (key: string, y: number) => void;
   agentsTotal:       number;
   onApplyPreset:     (p: SchedulePreset) => void;
   onSetField:        <K extends keyof FormData>(k: K, v: FormData[K]) => void;
@@ -1416,15 +1753,24 @@ interface StepWhenWhoProps {
   onSetLineUniform:  (key: string, serviceTypeId: string, uniform: UniformValue) => void;
   /** Scrolls the form tail above the keyboard when a trailing field is focused. */
   onFieldFocus:      () => void;
+  /** Tasks ticked per service (the mission = service + these tasks). */
+  serviceTasks:          Record<string, string[]>;
+  onChangeServiceTasks:  (next: Record<string, string[]>) => void;
   t:                 MissionsT;
 }
 
 const StepWhenWho: React.FC<StepWhenWhoProps> = ({
-  form, slots, errors, activePreset, serviceTypes, servicesLoading, agentsTotal,
+  form, slots, errors, activePreset, serviceTypes, servicesLoading, servicesError, onRetryServices,
+  onRootLayout, onSlotLayout, agentsTotal,
   onApplyPreset, onSetField, onAddSlot, onRemoveSlot, onUpdateSlotDates,
   onCopyFromSlot, onTogglePicker, onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform,
-  onFieldFocus, t,
+  onFieldFocus, serviceTasks, onChangeServiceTasks, t,
 }) => {
+  const { t: tt } = useTranslation('mission_tasks');
+  const orderedServiceIds = useMemo(
+    () => [...new Set(slots.flatMap(s => s.lines.map(l => l.serviceTypeId)))].filter(Boolean),
+    [slots],
+  );
   const minDate    = new Date(Date.now() + MIN_FUTURE_HOURS * 3_600_000);
   const totalH     = totalSlotHours(slots);
   const singleSlot = slots.length === 1;
@@ -1445,7 +1791,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
     && slots.some(s => s.lines.some(l => (l.ratePerHour ?? 0) > 0));
 
   return (
-    <View style={styles.stepContent}>
+    <View style={styles.stepContent} onLayout={e => onRootLayout(e.nativeEvent.layout.y)}>
       <StepHero Icon={CalendarClock} title={t('create.when_staff_title')} subtitle={t('create.when_staff_subtitle')} />
 
       {singleSlot && (
@@ -1458,6 +1804,8 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
             {SCHEDULE_PRESETS.map(p => {
               const { Icon } = p;
               const isActive = activePreset === p.key;
+              const built = p.build();
+              const summary = presetSummary(built.startAt, built.endAt);
               return (
                 <TouchableOpacity
                   key={p.key}
@@ -1466,7 +1814,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
                   activeOpacity={0.78}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isActive }}
-                  accessibilityLabel={t(p.i18n as any)}
+                  accessibilityLabel={`${t(p.i18n as any)}, ${summary}`}
                 >
                   {isActive && (
                     <View style={styles.presetActiveDot}>
@@ -1476,6 +1824,10 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
                   <Icon size={16} color={isActive ? colors.textInverse : colors.primary} strokeWidth={2} />
                   <Text style={[styles.presetLabel, isActive && styles.presetLabelActive]}>
                     {t(p.i18n as any)}
+                  </Text>
+                  {/* What it actually sets — "Ce soir" after 19:00 is tomorrow. */}
+                  <Text style={[styles.presetSub, isActive && styles.presetSubActive]} numberOfLines={1}>
+                    {summary}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1502,6 +1854,9 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
           errors={errors}
           serviceTypes={serviceTypes}
           servicesLoading={servicesLoading}
+          servicesError={servicesError}
+          onRetryServices={onRetryServices}
+          onLayoutY={y => onSlotLayout(slot.key, y)}
           canRemove={slots.length > 1}
           onUpdateDates={(patch) => onUpdateSlotDates(slot.key, patch)}
           onRemove={() => onRemoveSlot(slot.key)}
@@ -1563,6 +1918,19 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
 
       <View style={styles.sectionBlock}>
         <View style={styles.sectionHeader}>
+          <Check size={14} color={colors.textMuted} strokeWidth={2} />
+          <Text style={styles.sectionTitle} accessibilityRole="header">{tt('section_title')}</Text>
+        </View>
+        <Text style={styles.tasksHint}>{tt('section_hint')}</Text>
+        <ServiceTasksPicker
+          serviceTypeIds={orderedServiceIds}
+          value={serviceTasks}
+          onChange={onChangeServiceTasks}
+        />
+      </View>
+
+      <View style={styles.sectionBlock}>
+        <View style={styles.sectionHeader}>
           <FileText size={14} color={colors.textMuted} strokeWidth={2} />
           <Text style={styles.sectionTitle} accessibilityRole="header">{t('create.optional_section')}</Text>
         </View>
@@ -1573,7 +1941,7 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
           placeholder={t('create.title_placeholder')}
           onFocus={onFieldFocus}
           leftIcon={<Pencil size={16} color={colors.textMuted} strokeWidth={1.8} />}
-          maxLength={100}
+          maxLength={120}
         />
         <Input
           label={t('create.notes_label')}
@@ -1583,9 +1951,11 @@ const StepWhenWho: React.FC<StepWhenWhoProps> = ({
           onFocus={onFieldFocus}
           multiline
           numberOfLines={3}
+          maxLength={1000}
           style={styles.textArea}
           leftIcon={<FileText size={16} color={colors.textMuted} strokeWidth={1.8} />}
         />
+        <Text style={styles.tasksHint}>{tt('notes_hint')}</Text>
       </View>
     </View>
   );
@@ -1626,6 +1996,9 @@ interface SlotCardProps {
   errors:            Record<string, string | undefined>;
   serviceTypes:      ServiceType[];
   servicesLoading:   boolean;
+  servicesError:     boolean;
+  onRetryServices:   () => void;
+  onLayoutY:         (y: number) => void;
   canRemove:         boolean;
   onUpdateDates:     (patch: { startAt?: string; endAt?: string }) => void;
   onRemove:          () => void;
@@ -1639,7 +2012,8 @@ interface SlotCardProps {
 }
 
 const SlotCard: React.FC<SlotCardProps> = ({
-  slot, idx, prevSlot, allSlots, minDate, errors, serviceTypes, servicesLoading, canRemove,
+  slot, idx, prevSlot, allSlots, minDate, errors, serviceTypes, servicesLoading,
+  servicesError, onRetryServices, onLayoutY, canRemove,
   onUpdateDates, onRemove, onCopyFrom, onTogglePicker,
   onAddLine, onRemoveLine, onChangeLineCount, onSetLineUniform, t,
 }) => {
@@ -1652,6 +2026,10 @@ const SlotCard: React.FC<SlotCardProps> = ({
   const slotMinEnd = slot.startAt
     ? new Date(new Date(slot.startAt).getTime() + MIN_DURATION_H * 3_600_000)
     : slotMin;
+  // Legal ceiling (12 h) enforced in the picker itself, not only at Continue.
+  const slotMaxEnd = slot.startAt
+    ? new Date(new Date(slot.startAt).getTime() + MAX_DURATION_H * 3_600_000)
+    : undefined;
 
   const agents = slotAgents(slot);
   const hasValidDates = slot.startAt && slot.endAt && !startErr && !endErr && slotDurH > 0;
@@ -1667,7 +2045,10 @@ const SlotCard: React.FC<SlotCardProps> = ({
   );
 
   return (
-    <View style={[styles.slotCard, agents > 0 && styles.slotCardStaffed]}>
+    <View
+      style={[styles.slotCard, agents > 0 && styles.slotCardStaffed, (startErr || endErr || linesErr) && styles.slotCardError]}
+      onLayout={e => onLayoutY(e.nativeEvent.layout.y)}
+    >
       {/* Header */}
       <View style={styles.slotCardHeader}>
         <View style={styles.slotIdxBadge}><Text style={styles.slotIdxText}>{idx + 1}</Text></View>
@@ -1708,7 +2089,16 @@ const SlotCard: React.FC<SlotCardProps> = ({
       <DateTimePicker
         label={t('create.start_label')}
         value={slot.startAt}
-        onChange={v => onUpdateDates({ startAt: v, endAt: '' })}
+        maxDate={new Date(Date.now() + MAX_HORIZON_MS)}
+        onChange={v => {
+          // Moving the start keeps the slot's duration (it used to wipe the
+          // end, forcing the user to re-enter it every time).
+          const dur = slot.startAt && slot.endAt
+            ? new Date(slot.endAt).getTime() - new Date(slot.startAt).getTime()
+            : 0;
+          const endAt = dur > 0 && v ? new Date(new Date(v).getTime() + dur).toISOString() : '';
+          onUpdateDates({ startAt: v, endAt });
+        }}
         minDate={slotMin}
         error={startErr}
       />
@@ -1717,7 +2107,9 @@ const SlotCard: React.FC<SlotCardProps> = ({
         value={slot.endAt}
         onChange={v => onUpdateDates({ endAt: v })}
         minDate={slotMinEnd}
+        maxDate={slotMaxEnd}
         error={endErr}
+        hint={t('create.slot_duration_hint')}
       />
 
       <View style={styles.slotServicesDivider} />
@@ -1752,9 +2144,9 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 style={[styles.lineStepBtn, line.agentCount <= 1 && styles.lineStepBtnDisabled]}
                 onPress={() => onChangeLineCount(line.serviceTypeId, -1)}
                 disabled={line.agentCount <= 1}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel="Retirer un agent"
+                accessibilityLabel={t('create.remove_agent_a11y')}
                 accessibilityState={{ disabled: line.agentCount <= 1 }}
               >
                 <Minus size={11} color={line.agentCount <= 1 ? colors.textMuted : line.accent} strokeWidth={2.5} />
@@ -1764,7 +2156,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 style={[styles.lineStepBtn, line.agentCount >= MAX_AGENTS && styles.lineStepBtnDisabled]}
                 onPress={() => onChangeLineCount(line.serviceTypeId, +1)}
                 disabled={line.agentCount >= MAX_AGENTS}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
                 accessibilityLabel={i18n.t('common:add_agent')}
                 accessibilityState={{ disabled: line.agentCount >= MAX_AGENTS }}
@@ -1772,7 +2164,7 @@ const SlotCard: React.FC<SlotCardProps> = ({
                 <Plus size={11} color={line.agentCount >= MAX_AGENTS ? colors.textMuted : line.accent} strokeWidth={2.5} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => onRemoveLine(line.serviceTypeId)} style={styles.lineRemoveBtn} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }} accessibilityRole="button" accessibilityLabel="Retirer ce service">
+            <TouchableOpacity onPress={() => onRemoveLine(line.serviceTypeId)} style={styles.lineRemoveBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityRole="button" accessibilityLabel={t('create.remove_service_a11y')}>
               <X size={13} color={colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
           </View>
@@ -1827,6 +2219,15 @@ const SlotCard: React.FC<SlotCardProps> = ({
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={styles.pickerLoadingText}>{t('create.staff_loading')}</Text>
             </View>
+          ) : servicesError ? (
+            // Was a dead end ("Aucun service disponible", no way out).
+            <View style={styles.pickerErrorWrap} accessibilityRole="alert">
+              <Text style={styles.pickerEmpty}>{t('create.staff_load_error')}</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={onRetryServices} activeOpacity={0.8} accessibilityRole="button">
+                <RotateCcw size={13} color={colors.primary} strokeWidth={2.2} />
+                <Text style={styles.retryText}>{i18n.t('common:retry')}</Text>
+              </TouchableOpacity>
+            </View>
           ) : available.length === 0 ? (
             <Text style={styles.pickerEmpty}>
               {serviceTypes.length === 0 ? t('create.staff_services_empty') : t('create.staff_all_added')}
@@ -1848,9 +2249,12 @@ const SlotCard: React.FC<SlotCardProps> = ({
                   </View>
                   <View style={styles.pickerInfo}>
                     <Text style={styles.pickerName} numberOfLines={1}>{svc.name}</Text>
-                    <Text style={[styles.pickerRate, { color: accent }]}>
-                      {t('create.staff_rate_per_hour', { rate: formatEuros(svc.baseRatePerHour) })}
-                    </Text>
+                    {/* No €/h here (CEO decision): a bare HT rate without night /
+                        week-end surcharges or VAT reads as THE price. The quote
+                        presents the real, justified price. */}
+                    {svc.description ? (
+                      <Text style={styles.pickerDesc} numberOfLines={2}>{svc.description}</Text>
+                    ) : null}
                   </View>
                   <View style={[styles.pickerAddPill, { backgroundColor: accent + '15', borderColor: accent + '45' }]}>
                     <Plus size={12} color={accent} strokeWidth={2.6} />
@@ -1882,6 +2286,7 @@ const styles = StyleSheet.create({
   row:         { flexDirection: 'row', gap: spacing[3] },
   half:        { flex: 1 },
   textArea:    { minHeight: 104, textAlignVertical: 'top', paddingTop: spacing[3], marginBottom: spacing[2] },
+  tasksHint:   { color: colors.textMuted, fontSize: fontSize.xs, marginBottom: spacing[2] },
 
   sectionBlock:  { gap: spacing[2], marginTop: spacing[2] },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
@@ -1906,6 +2311,16 @@ const styles = StyleSheet.create({
   },
   presetLabel:       { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary, textAlign: 'center' },
   presetLabelActive: { color: colors.textInverse },
+  presetSub:         { fontFamily: fontFamily.body, fontSize: 10, color: colors.textSecondary, textAlign: 'center' },
+  presetSubActive:   { color: colors.textInverse },
+  slotCardError:     { borderColor: colors.danger },
+  pickerErrorWrap:   { alignItems: 'center', gap: spacing[2], paddingVertical: spacing[3] },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
+    paddingHorizontal: spacing[4], minHeight: 40, borderRadius: radius.full,
+    borderWidth: 1, borderColor: colors.borderPrimary, backgroundColor: colors.primarySurface,
+  },
+  retryText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.primary },
 
   // Slot card
   slotCard: {
@@ -1969,8 +2384,9 @@ const styles = StyleSheet.create({
   lineDot:  { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
   lineName: { flex: 1, fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs, color: colors.textPrimary },
   lineStepper: { flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2 },
+  // 32dp + 8dp hitSlop each side = 48dp effective touch target.
   lineStepBtn: {
-    width: 24, height: 24, borderRadius: 12,
+    width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
   },
@@ -2018,7 +2434,7 @@ const styles = StyleSheet.create({
   },
   pickerInfo: { flex: 1, gap: 1 },
   pickerName: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textPrimary },
-  pickerRate: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.xs },
+  pickerDesc: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textSecondary, lineHeight: fontSize.xs * 1.45 },
   pickerAddPill: {
     width: 28, height: 28, borderRadius: 14, borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -2043,6 +2459,23 @@ const styles = StyleSheet.create({
   durationText: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.primary },
   urgentRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
   urgentText:   { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.primaryLight },
+
+  // Location coherence issue (step 1)
+  issueBanner: {
+    backgroundColor: colors.warningSurface, borderRadius: radius.lg, padding: spacing[3],
+    borderWidth: 1, borderColor: colors.warningBorder, gap: spacing[3],
+  },
+  issueHeader:  { flexDirection: 'row', alignItems: 'flex-start', gap: spacing[2] },
+  issueText:    { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textPrimary, lineHeight: fontSize.sm * 1.45 },
+  issueActions: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing[3] },
+  issuePrimary: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2,
+    backgroundColor: colors.primary, borderRadius: radius.full,
+    paddingHorizontal: spacing[4], minHeight: 40,
+  },
+  issuePrimaryText:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.textInverse },
+  issueSecondary:     { minHeight: 40, justifyContent: 'center', paddingHorizontal: spacing[2] },
+  issueSecondaryText: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textSecondary, textDecorationLine: 'underline' },
 
   // Errors
   errorBanner: {

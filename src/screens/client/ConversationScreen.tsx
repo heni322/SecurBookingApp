@@ -19,6 +19,7 @@ import { colors }               from '@theme/colors';
 import { spacing, radius, layout } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
 import type { Message, MissionStackParamList } from '@models/index';
+import i18n from '@i18n';
 
 type Props = NativeStackScreenProps<MissionStackParamList, 'Conversation'>;
 
@@ -87,7 +88,7 @@ export const ConversationScreen: React.FC<Props> = ({ route, navigation }) => {
             {item.content}
           </Text>
           <Text style={[msgStyles.time, isMe && msgStyles.timeMe]}>
-            {new Date(item.createdAt).toLocaleTimeString(undefined, {
+            {new Date(item.createdAt).toLocaleTimeString(i18n.language, {
               hour: '2-digit', minute: '2-digit',
             })}
           </Text>

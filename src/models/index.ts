@@ -155,7 +155,8 @@ export interface ServiceType {
 export interface Quote {
   id:               string;
   missionId:        string;
-  status:           'PENDING' | 'ACCEPTED' | 'REJECTED';
+  /** Mirrors the API's QuoteStatus enum. EXPIRED was missing, so screens had no way to handle a quote the expiry job had closed (2026-10-07). */
+  status:           'PENDING' | 'OPEN' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
   expiresAt:        string;
   createdAt:        string;
   totalClientPrice: number;
@@ -288,8 +289,38 @@ export interface Mission {
   bookings?:     Booking[];
   /** Refunds / commercial gestures on this mission (GET /missions/get/:id). */
   creditNotes?:  CreditNoteSummary[];
+  /** Ordered tasks, frozen at order time (the API's docs/mission-tasks). */
+  serviceTasks?: MissionServiceTask[];
+  /** Client only: free texts held for review, not shown to officers yet. */
+  textReview?:   Array<{ targetType: string; targetId: string; field: string; status: 'PENDING_REVIEW' | 'REJECTED' }>;
   createdAt:     string;
   updatedAt:     string;
+}
+
+/** A task ordered on a mission for one of its services (snapshot of the catalogue). */
+export interface MissionServiceTask {
+  id?:                   string;
+  serviceTypeId:         string;
+  code:                  string;
+  labelFr:               string;
+  labelEn:               string;
+  adminValidation?:      'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  prefectoralValidation?: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+}
+
+/** GET /service-tasks entry: a service, the tasks a client may tick, what the officer does not do. */
+export interface TaskCatalogEntry {
+  serviceType: { id: string; i18nKey: string; name: string; category: string };
+  tasks: Array<{
+    code: string;
+    labelFr: string;
+    labelEn: string;
+    descriptionFr: string | null;
+    descriptionEn: string | null;
+    requiresAdminValidation: boolean;
+    requiresPrefectoralAuthorization: boolean;
+  }>;
+  exclusions: Array<{ code: string; labelFr: string; labelEn: string }>;
 }
 
 /**
@@ -330,6 +361,11 @@ export interface CreateMissionPayload {
   title?:    string;
   notes?:    string;
   isUrgent?: boolean;
+  /** Tasks ticked per service; omitted = none (older app versions). */
+  serviceTasks?: Array<{ serviceTypeId: string; taskCodes: string[] }>;
+  /** This app shows moderation warnings itself and can keep the text. */
+  moderationInteractive?: boolean;
+  moderationMaintain?:    boolean;
 }
 
 export type UpdateMissionPayload = Partial<CreateMissionPayload>;
@@ -1035,6 +1071,11 @@ export type PartnerHomeStackParamList = {
   // Employment (Phase 2 / IDCC 1351) — partner signs first, agent counter-signs.
   PartnerContractCreate: { bookingId: string; agentName?: string };
   PartnerContractDetail: { contractId: string; bookingId: string };
+  // 2026-10-07: contracts list + staffing (mobile ports of web /partner/*).
+  PartnerContracts:      undefined;
+  PartnerStaffing:       undefined;
+  PartnerAssignAgent:    { bookingId: string; label: string; when?: string };
+  PartnerMissionDetail:  { missionId: string };
 };
 
 // PartnerTeam tab — team roster + agent detail.

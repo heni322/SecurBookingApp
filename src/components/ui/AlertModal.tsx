@@ -81,6 +81,7 @@ import {
 import { palette }                  from '@theme/colors';
 import { fontFamily, fontSize }     from '@theme/typography';
 import { radius, spacing }          from '@theme/spacing';
+import i18n from '@i18n';
 
 // =============================================================================
 // Public types
@@ -522,7 +523,7 @@ const AlertModalView: React.FC<ModalViewProps> = ({ state, onClose }) => {
                 style={styles.dismissBtn}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel="Fermer"
+                accessibilityLabel={i18n.t('common:close')}
               >
                 <X size={16} color={palette.muted} strokeWidth={2.2} />
               </Pressable>

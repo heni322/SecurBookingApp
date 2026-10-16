@@ -48,7 +48,7 @@ export const contractsApi = {
 
   /** GET /employment/contracts — paginated list (filters). PARTNER + ADMIN. */
   list: (filter?: ContractFilter) =>
-    apiClient.get<ApiResponse<{ items: EmploymentContract[]; total: number; page: number; limit: number }>>(
+    apiClient.get<ApiResponse<{ data: EmploymentContract[]; meta: { total: number; page: number; limit: number; totalPages: number; hasNext: boolean; hasPrev: boolean } }>>(
       '/employment/contracts',
       { params: filter },
     ),
@@ -151,31 +151,15 @@ export const payslipsApi = {
     apiClient.get<ApiResponse<Payslip[]>>(`/employment/payslips/company/${companyId}`, {
       params: { from, to },
     }),
-
-  /** PATCH /employment/payslips/:id/status — ADMIN: DRAFT → VALIDATED → PAID. */
-  updateStatus: (id: string, status: PayslipStatus) =>
-    apiClient.patch<ApiResponse<Payslip>>(`/employment/payslips/${id}/status`, { status }),
 };
 
 // -- DPAE (URSSAF) -------------------------------------------------------------
 // Mostly admin territory, but partners need a read on the per-contract DPAE
 // to display submission status. The agent never sees DPAE directly.
 export const dpaeApi = {
-  /** GET /employment/dpae/pending — ADMIN. */
-  findPending: () =>
-    apiClient.get<ApiResponse<Dpae[]>>('/employment/dpae/pending'),
-
   /** GET /employment/dpae/by-contract/:contractId — PARTNER + ADMIN read. */
   findByContract: (contractId: string) =>
     apiClient.get<ApiResponse<Dpae>>(`/employment/dpae/by-contract/${contractId}`),
-
-  /** POST /employment/dpae/:id/submit — ADMIN manual URSSAF submission. */
-  submit: (id: string) =>
-    apiClient.post<ApiResponse<{ message: string }>>(`/employment/dpae/${id}/submit`),
-
-  /** POST /employment/dpae/retry-failed — ADMIN bulk retry FAILED DPAEs. */
-  retryFailed: () =>
-    apiClient.post<ApiResponse<{ message: string }>>('/employment/dpae/retry-failed'),
 };
 
 /**

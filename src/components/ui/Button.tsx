@@ -24,6 +24,7 @@ import { colors }              from '@theme/colors';
 import { spacing, radius }     from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
 import { rf }                  from '@utils/responsive';
+import i18n from '@i18n';
 
 type Variant = 'filled' | 'outline' | 'ghost' | 'danger';
 type Size    = 'sm' | 'md' | 'lg' | 'xl';
@@ -105,7 +106,7 @@ export const Button: React.FC<Props> = ({
         <ActivityIndicator
           size="small"
           color={variant === 'filled' ? colors.textInverse : colors.primary}
-          accessibilityLabel="Loading"
+          accessibilityLabel={i18n.t('common:loading')}
         />
       ) : (
         <View style={styles.inner}>

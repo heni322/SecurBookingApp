@@ -26,6 +26,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
+/** Biometric sign-in is not implemented yet; keep its button hidden. */
+const BIOMETRIC_LOGIN_ENABLED = false;
+
 export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const { t } = useTranslation('auth');
   const toast = useToast();
@@ -211,7 +214,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             rightIcon={!loading ? <ArrowRight size={18} color={colors.textInverse} strokeWidth={2} /> : undefined}
           />
 
-          {bioAvail && (
+          {/* Hidden (audit 2026-10-07): the button had no handler, so every
+              user with a fingerprint / Face ID set up saw a button that did
+              nothing. Re-enable once biometric unlock of a stored session
+              exists (BIOMETRIC_LOGIN_ENABLED). */}
+          {BIOMETRIC_LOGIN_ENABLED && bioAvail && (
             <TouchableOpacity style={styles.bioBtn} onPress={() => {}} activeOpacity={0.8}>
               <Fingerprint size={18} color={colors.primary} strokeWidth={1.8} />
               <Text style={styles.bioBtnText}>{bioLabel}</Text>

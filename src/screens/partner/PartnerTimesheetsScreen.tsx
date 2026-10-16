@@ -25,7 +25,7 @@ import { confirm } from '@store/confirmDialogStore';
 import { colors } from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily } from '@theme/typography';
-import { formatDate } from '@utils/formatters';
+import { formatDate, formatTime } from '@utils/formatters';
 import type { PartnerFinanceStackParamList } from '@models/index';
 
 type Nav = NativeStackNavigationProp<PartnerFinanceStackParamList, 'PartnerTimesheets'>;
@@ -95,7 +95,7 @@ export const PartnerTimesheetsScreen: React.FC = () => {
             <Text style={s.meta}>{t('timesheets.planned', { hours: hoursText(r.contract?.plannedHours ?? 0) })}</Text>
           </View>
         </View>
-        <Text style={s.meta}>{formatDate(r.checkinAt)} · {new Date(r.checkinAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → {new Date(r.checkoutAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</Text>
+        <Text style={s.meta}>{formatDate(r.checkinAt)} · {formatTime(r.checkinAt)} → {formatTime(r.checkoutAt)}</Text>
         {r.offlineCapture ? (
           <View style={s.flag}>
             <CloudOff size={14} color={colors.warning} strokeWidth={2} />

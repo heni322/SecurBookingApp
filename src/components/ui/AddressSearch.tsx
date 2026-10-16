@@ -11,8 +11,15 @@
  * changes. The backend's GeocodingResult is adapted into that shape internally.
  *
  * Debounced 400ms · min 3 chars · max 6 results.
+ *
+ * [FIX 2026-10-07] The field was only seeded from `value` on mount, so a
+ * restored draft showed an EMPTY field while the form held an address, and
+ * the ✕ button cleared the text but not the parent's saved address/GPS (the
+ * user could clear the field and still submit the old address). The field is
+ * now kept in sync with `value`, and typing / clearing are reported to the
+ * parent via onChangeText / onClear so the form always matches the screen.
  */
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   ActivityIndicator, StyleSheet,
@@ -53,6 +60,11 @@ export interface NominatimResult {
 interface Props {
   value:       string;
   onSelect:    (result: NominatimResult) => void;
+  /** Free-text edits (the parent keeps its address in sync with the field). */
+  onChangeText?: (text: string) => void;
+  /** ✕ pressed. */
+  onClear?:    () => void;
+  label?:      string;
   placeholder?: string;
   error?:      string;
   countrycodes?: string; // accepted for API compatibility; BAN is France-only
@@ -93,6 +105,9 @@ function adaptGeocodingResult(r: GeocodingResult, idx: number): NominatimResult 
 export const AddressSearch: React.FC<Props> = ({
   value,
   onSelect,
+  onChangeText,
+  onClear,
+  label,
   placeholder,
   error,
   // countrycodes is accepted for API compatibility but unused: the backend
@@ -101,16 +116,25 @@ export const AddressSearch: React.FC<Props> = ({
 }) => {
   const { t } = useTranslation('common');
   const [query,    setQuery]    = useState(value);
+
+  // Follow external changes (draft restore, edit hydration, map reverse
+  // geocode). Our own keystrokes round-trip through the parent unchanged.
+  useEffect(() => {
+    setQuery(prev => (prev === value ? prev : value));
+  }, [value]);
   const [results,  setResults]  = useState<NominatimResult[]>([]);
   const [loading,  setLoading]  = useState(false);
   const [open,     setOpen]     = useState(false);
   const [selected, setSelected] = useState(false);
+  // Outcome of the last search, so "nothing found" and "search failed" are
+  // told apart from "still typing" (both used to look like a dead field).
+  const [feedback, setFeedback] = useState<'none' | 'empty' | 'error'>('none');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards against out-of-order responses: only the latest query may render.
   const reqIdRef = useRef(0);
 
   const search = useCallback(async (text: string) => {
-    if (text.length < 3) { setResults([]); setOpen(false); return; }
+    if (text.trim().length < 3) { setResults([]); setOpen(false); setFeedback('none'); return; }
     const reqId = ++reqIdRef.current;
     setLoading(true);
     try {
@@ -120,25 +144,33 @@ export const AddressSearch: React.FC<Props> = ({
       const adapted = raw.map(adaptGeocodingResult);
       setResults(adapted);
       setOpen(adapted.length > 0);
+      setFeedback(adapted.length > 0 ? 'none' : 'empty');
     } catch {
       if (reqId !== reqIdRef.current) return;
       setResults([]);
       setOpen(false);
+      setFeedback('error');
     } finally {
       if (reqId === reqIdRef.current) setLoading(false);
     }
   }, []);
 
+  // Never leave a pending debounce firing after unmount.
+  useEffect(() => () => { if (debounceRef.current) clearTimeout(debounceRef.current); }, []);
+
   const handleChange = (text: string) => {
     setQuery(text);
     setSelected(false);
+    setFeedback('none');
+    onChangeText?.(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => search(text), 400);
   };
 
   const handleSelect = (item: NominatimResult) => {
-    const label = buildLabel(item);
-    setQuery(label);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    reqIdRef.current++; // drop any in-flight search for the old text
+    setQuery(buildShortLabel(item));
     setSelected(true);
     setOpen(false);
     setResults([]);
@@ -146,15 +178,20 @@ export const AddressSearch: React.FC<Props> = ({
   };
 
   const handleClear = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    reqIdRef.current++;
     setQuery('');
     setSelected(false);
+    setFeedback('none');
     setResults([]);
     setOpen(false);
+    onChangeText?.('');
+    onClear?.();
   };
 
   return (
     <View style={styles.wrapper}>
-      <Text style={[styles.label, error && styles.labelError]}>Adresse *</Text>
+      <Text style={[styles.label, error && styles.labelError]}>{label ?? t('address_label')}</Text>
 
       {/* Input row */}
       <View style={[
@@ -176,13 +213,18 @@ export const AddressSearch: React.FC<Props> = ({
         />
         {loading && <ActivityIndicator size="small" color={colors.primary} />}
         {!loading && query.length > 0 && (
-          <TouchableOpacity onPress={handleClear} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity onPress={handleClear} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityRole="button" accessibilityLabel={t('clear')}>
             <X size={14} color={colors.textMuted} strokeWidth={2} />
           </TouchableOpacity>
         )}
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
+      {!error && !loading && feedback !== 'none' && (
+        <Text style={styles.feedback} accessibilityLiveRegion="polite">
+          {feedback === 'empty' ? t('address_no_result') : t('address_search_error')}
+        </Text>
+      )}
 
       {/* Results dropdown */}
       {open && results.length > 0 && (
@@ -208,16 +250,6 @@ export const AddressSearch: React.FC<Props> = ({
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-function buildLabel(item: NominatimResult): string {
-  const a = item.address;
-  const parts = [
-    a.house_number && a.road ? `${a.house_number} ${a.road}` : a.road,
-    a.postcode,
-    a.city ?? a.town ?? a.village,
-  ].filter(Boolean);
-  return parts.join(', ') || item.display_name.split(',').slice(0, 3).join(',');
-}
 
 function buildShortLabel(item: NominatimResult): string {
   const a = item.address;
@@ -271,6 +303,13 @@ const styles = StyleSheet.create({
     fontSize:   fontSize.xs,
     color:      colors.danger,
     marginTop:  spacing[1],
+  },
+  feedback: {
+    fontFamily: fontFamily.body,
+    fontSize:   fontSize.xs,
+    color:      colors.warning,
+    marginTop:  spacing[1],
+    lineHeight: fontSize.xs * 1.5,
   },
 
   dropdown: {

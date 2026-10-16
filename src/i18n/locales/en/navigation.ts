@@ -7,6 +7,12 @@ const navigation: NavigationNS = {
     notifications: 'Alerts',
     profile:       'Profile',
   },
+  partner_tabs: {
+    dashboard: 'Home',
+    team:      'Team',
+    finance:   'Finances',
+    profile:   'Profile',
+  },
 };
 
 export default navigation;

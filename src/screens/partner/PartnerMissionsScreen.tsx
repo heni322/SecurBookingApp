@@ -2,6 +2,14 @@
  * PartnerMissionsScreen — Missions publiees par le partenaire (donneur d ordre).
  * GET /missions/posted. Permet de consulter et d annuler ses missions, et de
  * lancer la creation d une nouvelle mission.
+ *
+ * [FIX 2026-10-07] Unfunded missions (CREATED) now carry "Valider le devis et
+ * payer", the only way back into the funding flow if the partner left it —
+ * before, an unpaid order was a dead end (never published to agents).
+ * CANCELLABLE listed DRAFT / CONFIRMED, which are not mission statuses.
+ * Each card now says how many posts are filled and by whom (the partner had
+ * only a raw post count), and an unpaid order whose transfer is declared
+ * says so instead of inviting a second declaration.
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -13,7 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { usePartnerT } from './_partnerI18n';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Plus, MapPin, CalendarClock, Users, Zap, Briefcase, XCircle,
+  Plus, MapPin, CalendarClock, Users, Zap, Briefcase, XCircle, Receipt,
 } from 'lucide-react-native';
 
 import { missionsApi, type MissionScope } from '@api/endpoints/missions';
@@ -38,7 +46,7 @@ type BadgeVariant = 'info' | 'success' | 'danger' | 'warning' | 'primary' | 'acc
  * client's Badge {color, bg} pair. Kept inline because it is consumed by
  * a single screen; promote to shared utils if reused.
  */
-function statusBadge(status: string): { color: string; bg: string } {
+export function statusBadge(status: string): { color: string; bg: string } {
   const v = statusVariant(status);
   switch (v) {
     case 'success': return { color: colors.success, bg: colors.successSurface };
@@ -49,7 +57,9 @@ function statusBadge(status: string): { color: string; bg: string } {
     default:        return { color: colors.primary, bg: colors.primarySurface };
   }
 }
-const CANCELLABLE = new Set(['CREATED', 'DRAFT', 'CONFIRMED', 'PUBLISHED', 'STAFFING']);
+// Mirrors the API rule for partners (MissionsService.cancel).
+const CANCELLABLE = new Set(['CREATED', 'PUBLISHED', 'STAFFING']);
+const FILLED = new Set(['ASSIGNED', 'IN_PROGRESS', 'COMPLETED']);
 
 function statusVariant(status: string): BadgeVariant {
   switch (status) {
@@ -177,9 +187,18 @@ export const PartnerMissionsScreen: React.FC = () => {
             </>
           }
           renderItem={({ item: m }) => {
-            const agentCount = m.bookings?.length ?? 0;
+            const posts      = (m.bookings ?? []).filter((b: any) => b.status !== 'CANCELLED');
+            const filled     = posts.filter((b: any) => FILLED.has(b.status));
+            const names      = filled.map((b: any) => b.agent?.fullName).filter(Boolean) as string[];
             const canCancel  = CANCELLABLE.has(m.status);
+            const transferPending = (m as any).payment?.status === 'PENDING';
             return (
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() => navigation.navigate('PartnerMissionDetail', { missionId: m.id })}
+                accessibilityRole="button"
+                accessibilityLabel={m.title || m.city || t('missionsList.untitled')}
+              >
               <Card style={styles.missionCard}>
                 <View style={styles.cardTop}>
                   <Text style={styles.missionTitle} numberOfLines={1}>
@@ -209,8 +228,25 @@ export const PartnerMissionsScreen: React.FC = () => {
                 </View>
                 <View style={styles.metaRow}>
                   <Users size={14} color={colors.textMuted} strokeWidth={2} />
-                  <Text style={styles.metaTxt}>{t('missionsList.agents', { count: agentCount })}</Text>
+                  <Text style={styles.metaTxt} numberOfLines={2}>
+                    {t('missionsList.filled', { filled: filled.length, total: posts.length })}
+                    {names.length > 0
+                      ? ` · ${names.slice(0, 3).join(', ')}${names.length > 3 ? ` ${t('missionsList.moreAgents', { count: names.length - 3 })}` : ''}`
+                      : ''}
+                  </Text>
                 </View>
+
+                {m.status === 'CREATED' && (
+                  <TouchableOpacity
+                    style={styles.fundBtn}
+                    onPress={() => navigation.navigate('PartnerMissionFunding', { missionId: m.id, bookingLines: [] })}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                  >
+                    <Receipt size={15} color={palette.navy} strokeWidth={2.2} />
+                    <Text style={styles.fundTxt}>{transferPending ? t('missionsList.transferPending') : t('missionsList.fundAction')}</Text>
+                  </TouchableOpacity>
+                )}
 
                 {canCancel && (
                   <TouchableOpacity
@@ -225,6 +261,7 @@ export const PartnerMissionsScreen: React.FC = () => {
                   </TouchableOpacity>
                 )}
               </Card>
+              </TouchableOpacity>
             );
           }}
         />
@@ -257,6 +294,8 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing[2] },
   metaTxt: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
 
+  fundBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], marginTop: spacing[2], minHeight: 44, borderRadius: radius.md, backgroundColor: palette.gold },
+  fundTxt: { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: palette.navy },
   cancelBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], marginTop: spacing[2], height: 38, borderRadius: radius.md, borderWidth: 1, borderColor: colors.danger, backgroundColor: colors.dangerSurface },
   cancelTxt: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.danger },
 });

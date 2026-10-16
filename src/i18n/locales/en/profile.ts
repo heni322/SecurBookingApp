@@ -17,6 +17,7 @@ const profile: ProfileNS = {
     two_fa:          'Two-Factor Authentication (2FA)',
     two_fa_enabled:  'Enabled',
     two_fa_disabled: 'Disabled',
+    two_fa_recommended: 'Off · recommended to protect your payments',
     quick_login:     'Quick login',
     notifications:   'Notifications',
     language:        'Language',
@@ -33,9 +34,13 @@ const profile: ProfileNS = {
     support:         'Contact support',
   },
   hero: {
-    verified:      'VERIFIED CLIENT',
-    since:         'Since {{date}}',
+    verified:      'VERIFIED ACCOUNT',
+    since:         'Member since {{date}}',
     phone_not_set: 'Not provided',
+    add_name:      'Add your name',
+    account_id:    'Account ID · {{id}}',
+    email_unverified: 'Email not verified',
+    email_verified:   'Verified',
   },
   language_picker: {
     title:    'Choose language',

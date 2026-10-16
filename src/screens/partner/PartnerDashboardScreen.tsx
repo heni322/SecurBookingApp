@@ -13,7 +13,7 @@ import { usePartnerT } from './_partnerI18n';
 import {
   Users, Briefcase, Plus, CircleCheckBig, Clock, Pencil,
   TrendingUp, Wallet, ChevronRight, Building2, ShieldCheck, FileText, XCircle,
-  ClipboardCheck,
+  ClipboardCheck, UserCheck, FileSignature,
 } from 'lucide-react-native';
 import { partnerApi }    from '@api/endpoints/partner';
 import { useAuthStore }  from '@store/authStore';
@@ -175,19 +175,23 @@ export const PartnerDashboardScreen: React.FC = () => {
           <Separator marginV={spacing[2]} />
           <ActionRow Icon={Briefcase}  label={t('dashboard.actions.myMissions')}    sub={t('dashboard.actions.myMissionsSub')}    onPress={() => navigation.navigate('PartnerMissions')} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={Users}       label={t('dashboard.actions.team')}       sub={t('dashboard.actions.teamSub')}        onPress={() => navigation.navigate('PartnerTeam',    { screen: 'PartnerTeamList' })} />
+          <ActionRow Icon={UserCheck}   label={t('dashboard.actions.staffing')}   sub={t('dashboard.actions.staffingSub')}   onPress={() => navigation.navigate('PartnerStaffing')} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={TrendingUp}  label={t('dashboard.actions.finances')}   sub={t('dashboard.actions.financesSub')}    onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerFinancials' })} />
+          <ActionRow Icon={FileSignature} label={t('dashboard.actions.contracts')} sub={t('dashboard.actions.contractsSub')} onPress={() => navigation.navigate('PartnerContracts')} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={Wallet}      label={t('dashboard.actions.billing')}    sub={t('dashboard.actions.billingSub')}     onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerBilling' })} />
+          <ActionRow Icon={Users}       label={t('dashboard.actions.team')}       sub={t('dashboard.actions.teamSub')}        onPress={() => navigation.navigate('PartnerTeam', { screen: 'PartnerTeamList', initial: false })} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={ClipboardCheck} label={t('dashboard.actions.timesheets')} sub={t('dashboard.actions.timesheetsSub')} onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerTimesheets' })} />
+          <ActionRow Icon={TrendingUp}  label={t('dashboard.actions.finances')}   sub={t('dashboard.actions.financesSub')}    onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerFinancials', initial: false })} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={ShieldCheck} label={t('dashboard.actions.compliance')} sub={t('dashboard.actions.complianceSub')} onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerCompliance' })} />
+          <ActionRow Icon={Wallet}      label={t('dashboard.actions.billing')}    sub={t('dashboard.actions.billingSub')}     onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerBilling', initial: false })} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={FileText}    label={t('dashboard.actions.documents')}  sub={t('dashboard.actions.documentsSub')}  onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerDocuments' })} />
+          <ActionRow Icon={ClipboardCheck} label={t('dashboard.actions.timesheets')} sub={t('dashboard.actions.timesheetsSub')} onPress={() => navigation.navigate('PartnerFinance', { screen: 'PartnerTimesheets', initial: false })} />
           <Separator marginV={spacing[2]} />
-          <ActionRow Icon={Pencil}      label={t('dashboard.actions.editCompany')}sub={t('dashboard.actions.editCompanySub')}onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerCompanyEdit' })} />
+          <ActionRow Icon={ShieldCheck} label={t('dashboard.actions.compliance')} sub={t('dashboard.actions.complianceSub')} onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerCompliance', initial: false })} />
+          <Separator marginV={spacing[2]} />
+          <ActionRow Icon={FileText}    label={t('dashboard.actions.documents')}  sub={t('dashboard.actions.documentsSub')}  onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerDocuments', initial: false })} />
+          <Separator marginV={spacing[2]} />
+          <ActionRow Icon={Pencil}      label={t('dashboard.actions.editCompany')}sub={t('dashboard.actions.editCompanySub')}onPress={() => navigation.navigate('PartnerProfile', { screen: 'PartnerCompanyEdit', initial: false })} />
         </Card>
 
         <View style={{ height: 32 }} />

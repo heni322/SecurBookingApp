@@ -8,6 +8,12 @@ const booking: BookingNS = {
     cnaps_badge:     'CNAPS ✓',
     missions_count:  '{{count}} missions',
     follow_live:     'Follow agent live',
+    missions_count_one: '{{count}} mission',
+    new_agent:       'New agent',
+    checkin_at:      'Arrived {{time}}',
+    checkout_at:     'Left {{time}}',
+    awaiting_agent:  'Awaiting an agent',
+    auto_assign:     'Automatic assignment',
     rating_empty:    '—',
   },
 

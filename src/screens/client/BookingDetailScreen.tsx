@@ -224,7 +224,7 @@ export const BookingDetailScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Users size={14} color={colors.textMuted} strokeWidth={1.8} />
                 <Text style={styles.sectionLabel}>{t('applications.section_title', { count: pendingApps.length })}</Text>
               </View>
-              <View style={styles.autoAssignNote}><Text style={styles.autoAssignText}>Attribution automatique</Text></View>
+              <View style={styles.autoAssignNote}><Text style={styles.autoAssignText}>{t('agent.auto_assign')}</Text></View>
             </View>
             {pendingApps.slice(0, 3).map(app => (
               <ApplicationRow key={app.id} application={app} />

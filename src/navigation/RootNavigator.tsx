@@ -27,6 +27,14 @@ export const RootNavigator: React.FC = () => {
     checkOnboardingDone().then(done => setOnboardingDone(done));
   }, []);
 
+  // A notification tapped while signed out is held by the router; replay it
+  // once the signed-in navigator ('Main') has mounted.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const id = setTimeout(flushPendingNotification, 300);
+    return () => clearTimeout(id);
+  }, [isLoggedIn, user?.role]);
+
   if (isLoading || onboardingDone === null) {
     return (
       <SafeAreaProvider>

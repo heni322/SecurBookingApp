@@ -9,6 +9,11 @@
  * stays EUR regardless of language because the business operates in euros.
  */
 import i18n from '@i18n';
+import { PARIS_TZ } from './parisTime';
+
+// Dates and times are shown in Paris time (mission times live in France —
+// decision 2026-10-07, see utils/parisTime.ts), whatever the phone's zone.
+const TZ = { timeZone: PARIS_TZ } as const;
 
 /** Map the active i18n language ('fr' | 'en' | …) to a BCP-47 locale tag. */
 const LOCALE_BY_LANG: Record<string, string> = {
@@ -74,29 +79,29 @@ const safeDate = (v: string | Date | number | null | undefined): Date | null => 
 export const formatDate = (v: string | Date | null | undefined): string => {
   const d = safeDate(v);
   return d
-    ? new Intl.DateTimeFormat(activeLocale(), { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
+    ? new Intl.DateTimeFormat(activeLocale(), { ...TZ, weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
     : '—';
 };
 
 /** Date ISO → "26/03/2026" */
 export const formatDateShort = (v: string | Date | null | undefined): string => {
   const d = safeDate(v);
-  return d ? new Intl.DateTimeFormat(activeLocale()).format(d) : '—';
+  return d ? new Intl.DateTimeFormat(activeLocale(), TZ).format(d) : '—';
 };
 
 /** Heure ISO, Date ou timestamp → "14:30" */
 export const formatTime = (v: string | Date | number | null | undefined): string => {
   const d = safeDate(v);
-  return d ? new Intl.DateTimeFormat(activeLocale(), { hour: '2-digit', minute: '2-digit' }).format(d) : '—';
+  return d ? new Intl.DateTimeFormat(activeLocale(), { ...TZ, hour: '2-digit', minute: '2-digit' }).format(d) : '—';
 };
 
 /** "26/03 · 08:00 → 16:00" */
 export const formatMissionRange = (startAt: string, endAt: string): string => {
   const s = new Date(startAt), e = new Date(endAt);
   const loc = activeLocale();
-  const date = new Intl.DateTimeFormat(loc, { day: '2-digit', month: '2-digit' }).format(s);
-  const st   = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(s);
-  const en   = new Intl.DateTimeFormat(loc, { hour: '2-digit', minute: '2-digit' }).format(e);
+  const date = new Intl.DateTimeFormat(loc, { ...TZ, day: '2-digit', month: '2-digit' }).format(s);
+  const st   = new Intl.DateTimeFormat(loc, { ...TZ, hour: '2-digit', minute: '2-digit' }).format(s);
+  const en   = new Intl.DateTimeFormat(loc, { ...TZ, hour: '2-digit', minute: '2-digit' }).format(e);
   return `${date} · ${st} → ${en}`;
 };
 

@@ -15,6 +15,22 @@
  * the native @stripe/stripe-react-native SDK which isn't installed yet. Offline
  * (virement / chèque) is the no-extra-dependency path and matches how French
  * B2B security contracts are usually settled.
+ *
+ * [FIX 2026-10-07 · partner audit] This screen never worked end-to-end:
+ *  - nothing navigated to it (orphan route) — now opened right after a
+ *    partner creates a mission, and from "Valider le devis et payer" on
+ *    unfunded missions in the partner missions list;
+ *  - every API it calls was CLIENT-only (403) — PARTNER added server-side,
+ *    with ownership still enforced by the services;
+ *  - the quote request carried bookingLines, rejected by the API's strict
+ *    DTO (400) — quotesApi.calculate now sends missionId only;
+ *  - it itemised "Salaires agents / Charges fixes / Marge plateforme":
+ *    Provalk's cost structure shown to a customer. Breakdown is now one
+ *    service line + itemised surcharges, same rule as the web quote page
+ *    (and the API no longer sends those fields to customers);
+ *  - a declared transfer (payment PENDING) was not recognised, so reopening
+ *    offered to declare again and the API refused. It now shows an
+ *    "awaiting transfer" state.
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -33,6 +49,7 @@ import { Card }         from '@components/ui/Card';
 import { Button }       from '@components/ui/Button';
 import { Separator }    from '@components/ui/Separator';
 import { showAlert }    from '@components/ui/AlertModal';
+import { EmailVerificationBanner } from '@components/domain/EmailVerificationBanner';
 import { colors, palette } from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
@@ -48,7 +65,7 @@ type OfflineMethod = 'VIREMENT' | 'CHEQUE';
 
 export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation }) => {
   const { t } = usePartnerT();
-  const { missionId, bookingLines } = route.params;
+  const { missionId } = route.params;
 
   const quoteQuery     = useMissionQuote(missionId);
   const paymentQuery   = useMissionPayment(missionId);
@@ -66,7 +83,7 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
   useEffect(() => {
     if (quoteQuery.isLoading) return;
     if (!quote && !calculateQuote.isPending) {
-      calculateQuote.mutate({ missionId, bookingLines });
+      calculateQuote.mutate({ missionId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteQuery.isLoading]);
@@ -100,7 +117,16 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
   };
 
   const isAccepted = quote?.status === 'ACCEPTED';
+  // Expired quotes (status EXPIRED, or PENDING past its date) cannot be
+  // accepted: the API refuses. Offer a recalculation instead (2026-10-07).
+  const isExpired = quote?.status === 'EXPIRED'
+    || Boolean(quote?.status === 'PENDING' && (quote as any)?.expiresAt && new Date((quote as any).expiresAt) <= new Date());
   const isFunded   = payment?.status === 'PAID' || payment?.status === 'PROCESSING';
+  // Transfer / cheque declared, waiting for Provalk to confirm receipt.
+  const isAwaitingTransfer = payment?.status === 'PENDING' && !instructions;
+  // The API returns the transfer instructions again while it is pending, so a
+  // partner coming back to actually pay still has the IBAN and reference.
+  const pendingInstr = (payment as any)?.offline as DeclareOfflinePaymentResult | undefined;
 
   // ── Loading / calculating state ──────────────────────────────────────────
   if (quoteQuery.isLoading || (calculateQuote.isPending && !quote)) {
@@ -130,6 +156,42 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
           </Card>
         )}
 
+        {/* Declared earlier, not yet received: say so instead of offering
+            to declare again (the API refuses a second declaration). */}
+        {isAwaitingTransfer && (
+          <Card style={styles.card}>
+            <View style={styles.successRow}>
+              <Clock3 size={18} color={colors.warning} strokeWidth={2.2} />
+              <Text style={[styles.successText, { color: colors.warning }]}>{t('funding.pending.title')}</Text>
+            </View>
+            <Text style={styles.noticeTxt}>{t('funding.pending.body')}</Text>
+            {(payment as any)?.invoiceNumber ? (
+              <InstrRow label={t('funding.pending.invoice')} value={(payment as any).invoiceNumber} onCopy={copy} />
+            ) : null}
+            {pendingInstr?.instructions?.iban && (
+              <InstrRow label="IBAN" value={pendingInstr.instructions.iban} onCopy={copy} mono />
+            )}
+            {pendingInstr?.instructions?.bic && (
+              <InstrRow label="BIC" value={pendingInstr.instructions.bic} onCopy={copy} mono />
+            )}
+            {pendingInstr?.instructions?.reference && (
+              <InstrRow label={t('funding.instructions.reference')} value={pendingInstr.instructions.reference} onCopy={copy} mono />
+            )}
+            {pendingInstr?.instructions?.beneficiary && (
+              <InstrRow label={t('funding.instructions.beneficiary')} value={pendingInstr.instructions.beneficiary} />
+            )}
+            {pendingInstr?.instructions?.address && (
+              <InstrRow label={t('funding.instructions.address')} value={pendingInstr.instructions.address} />
+            )}
+            {pendingInstr?.instructions?.message && (
+              <View style={styles.msgBox}>
+                <FileText size={13} color={colors.textMuted} strokeWidth={2} />
+                <Text style={styles.msgTxt}>{pendingInstr.instructions.message}</Text>
+              </View>
+            )}
+          </Card>
+        )}
+
         {/* Quote breakdown */}
         {quote ? (
           <QuoteBreakdown quote={quote} t={t} />
@@ -138,15 +200,32 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
             <Text style={styles.errorText}>{t('funding.errors.noQuote')}</Text>
             <Button
               label={t('funding.actions.retryQuote')}
-              onPress={() => calculateQuote.mutate({ missionId, bookingLines })}
+              onPress={() => calculateQuote.mutate({ missionId })}
               loading={calculateQuote.isPending}
               fullWidth variant="outline" size="sm"
             />
           </Card>
         )}
 
+        {/* Expired: recalculate first (accept would be refused). */}
+        {quote && isExpired && !instructions && (
+          <Card style={styles.card}>
+            <View style={styles.successRow}>
+              <Clock3 size={18} color={colors.danger} strokeWidth={2.2} />
+              <Text style={[styles.successText, { color: colors.danger }]}>{t('funding.expired.title')}</Text>
+            </View>
+            <Text style={styles.noticeTxt}>{t('funding.expired.body')}</Text>
+            <Button
+              label={t('funding.expired.action')}
+              onPress={() => calculateQuote.mutate({ missionId })}
+              loading={calculateQuote.isPending}
+              fullWidth size="lg"
+            />
+          </Card>
+        )}
+
         {/* Step 1 — accept the quote */}
-        {quote && !isAccepted && !instructions && (
+        {quote && !isAccepted && !isExpired && !instructions && (
           <Button
             label={t('funding.actions.accept')}
             onPress={handleAccept}
@@ -156,8 +235,11 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
         )}
 
         {/* Step 2 — choose offline method + declare */}
-        {quote && isAccepted && !instructions && !isFunded && (
+        {quote && isAccepted && !instructions && !isFunded && !isAwaitingTransfer && (
           <Card style={styles.card}>
+            {/* Declaring a payment requires a verified email (EmailVerifiedGuard).
+                Renders nothing once verified; otherwise explains and resends. */}
+            <EmailVerificationBanner variant="inline" />
             <Text style={styles.sectionLabel}>{t('funding.payment.method')}</Text>
             <View style={styles.methodRow}>
               {(['VIREMENT', 'CHEQUE'] as OfflineMethod[]).map((m) => (
@@ -223,7 +305,9 @@ export const PartnerMissionFundingScreen: React.FC<Props> = ({ route, navigation
             <Separator marginV={spacing[3]} />
             <Button
               label={t('funding.actions.done')}
-              onPress={() => navigation.navigate('PartnerMissions')}
+              // popTo: back to the list if it is below us, else replace — navigate()
+              // stacked a second list on top, and back returned here.
+              onPress={() => navigation.popTo('PartnerMissions')}
               fullWidth size="lg"
             />
           </Card>
@@ -247,6 +331,10 @@ const QuoteBreakdown: React.FC<{ quote: Quote; t: any }> = ({ quote, t }) => {
     ['location', toNumber(quote.locationSurcharge)],
   ];
   const activeSurcharges = surcharges.filter(([, v]) => v > 0);
+  // One service line = HT total minus the itemised surcharges, so every line
+  // shown adds up to the total. Never itemise salary / charges / margin.
+  const surchargeTotal = activeSurcharges.reduce((sum, [, v]) => sum + v, 0);
+  const baseAmount = toNumber(quote.totalClientPrice) - surchargeTotal;
 
   return (
     <Card style={breakdown.card}>
@@ -255,12 +343,10 @@ const QuoteBreakdown: React.FC<{ quote: Quote; t: any }> = ({ quote, t }) => {
         <Text style={breakdown.title}>{t('funding.breakdown.title')}</Text>
       </View>
 
-      <Line label={t('funding.breakdown.agentSalary')} value={formatEuros(quote.totalAgentSalary)} />
-      <Line label={t('funding.breakdown.fixedCharges')} value={formatEuros(quote.fixedCharges)} />
+      <Line label={t('funding.breakdown.base')} value={formatEuros(baseAmount)} />
       {activeSurcharges.map(([key, val]) => (
         <Line key={key} label={t(`funding.breakdown.surcharges.${key}`)} value={formatEuros(val)} />
       ))}
-      <Line label={t('funding.breakdown.platformMargin')} value={formatEuros(quote.platformMargin)} />
 
       <Separator marginV={spacing[3]} />
       <Line label={t('funding.breakdown.totalHT')} value={formatEuros(quote.totalClientPrice)} emphasis />

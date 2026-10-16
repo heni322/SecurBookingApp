@@ -1,5 +1,22 @@
 /**
  * ProfileScreen — Premium client profile.
+ *
+ * v2 (2026-10-07, device QA):
+ *  - Empty fullName rendered a "?" avatar and a blank title line, leaving the
+ *    email floating alone. Now: initials fall back to the email, and a gold
+ *    "Ajouter votre nom" call-to-action replaces the missing name.
+ *  - "CLIENT VÉRIFIÉ" was shown to EVERY user regardless of status — a false
+ *    trust claim. It now reflects emailVerifiedAt; unverified accounts see a
+ *    neutral "E-mail non vérifié" chip instead.
+ *  - "Depuis ven. 2 octobre 2026": weekday + exact day is noise for a tenure
+ *    line → "Membre depuis octobre 2026".
+ *  - Three entry points to the same edit screen (header pencil, avatar, row):
+ *    header pencil removed.
+ *  - Info section repeated the email and the join date already in the hero;
+ *    it now holds only what the hero lacks (email verification, phone).
+ *  - 2FA "Désactivé" in muted grey read as neutral: shown as a warning with
+ *    the reason to enable it (this account stores cards / SEPA mandates).
+ *  - Raw UUID at the bottom is now labelled and selectable for support.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -9,7 +26,7 @@ import {
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Mail, Phone, CalendarDays, ShieldCheck,
+  Mail, Phone, ShieldCheck,
   FileText, Info, LogOut, ChevronRight, CreditCard,
   Bell, Lock, Wallet, Fingerprint, Trash2, Edit3, BarChart2, Globe,
   Scale, LifeBuoy, Receipt,
@@ -22,10 +39,9 @@ import { ProfileSkeleton }  from '@components/ui/SkeletonLoader';
 import { useAuthStore }     from '@store/authStore';
 import { usersApi }         from '@api/endpoints/users';
 import { biometricService } from '@services/biometricService';
-import { colors }           from '@theme/colors';
+import { colors, palette }  from '@theme/colors';
 import { spacing, layout, radius } from '@theme/spacing';
 import { fontSize, fontFamily }    from '@theme/typography';
-import { formatDate }       from '@utils/formatters';
 import type { ProfileStackParamList } from '@models/index';
 import { useTranslation }   from '@i18n';
 import { useConfirmDialogStore } from '@store/confirmDialogStore';
@@ -101,16 +117,18 @@ export const ProfileScreen: React.FC = () => {
 
   if (!user) return <ProfileSkeleton />;
 
+  const displayName   = user.fullName?.trim() || '';
+  const emailVerified = !!user.emailVerifiedAt;
+  const memberSince   = (() => {
+    const d = new Date(user.createdAt);
+    return isNaN(d.getTime())
+      ? null
+      : new Intl.DateTimeFormat(i18n.language, { month: 'long', year: 'numeric' }).format(d);
+  })();
+
   return (
     <View style={styles.screen}>
-      <ScreenHeader
-        title={t('title')}
-        rightElement={
-          <TouchableOpacity style={styles.editHeaderBtn} onPress={() => navigation.navigate('ProfileEdit')} accessibilityRole="button" accessibilityLabel={t('menu.edit_profile')}>
-            <Edit3 size={18} color={colors.primary} strokeWidth={2} />
-          </TouchableOpacity>
-        }
-      />
+      <ScreenHeader title={t('title')} />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -123,22 +141,40 @@ export const ProfileScreen: React.FC = () => {
             <TouchableOpacity onPress={() => navigation.navigate('ProfileEdit')} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={t('menu.edit_profile')}>
               <View style={styles.avatarRingOuter}>
                 <View style={styles.avatarRingInner}>
-                  <Avatar name={user.fullName} avatarUrl={user.avatarUrl} size={72} />
+                  <Avatar name={displayName || user.email} avatarUrl={user.avatarUrl} size={72} />
                 </View>
+              </View>
+              <View style={styles.avatarEditBadge}>
+                <Edit3 size={11} color={palette.navy} strokeWidth={2.4} />
               </View>
             </TouchableOpacity>
             <View style={styles.heroInfo}>
-              <Text style={styles.fullName}>{user.fullName}</Text>
-              <Text style={styles.email}>{user.email}</Text>
-              {user.phone && <Text style={styles.phone}>{user.phone}</Text>}
+              {displayName ? (
+                <Text style={styles.fullName} numberOfLines={2}>{displayName}</Text>
+              ) : (
+                <TouchableOpacity onPress={() => navigation.navigate('ProfileEdit')} accessibilityRole="button" hitSlop={{ top: 8, bottom: 8 }}>
+                  <Text style={styles.addName}>{t('hero.add_name')}</Text>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.email} numberOfLines={1}>{user.email}</Text>
+              {user.phone ? <Text style={styles.phone}>{user.phone}</Text> : null}
             </View>
           </View>
           <View style={styles.tierRow}>
-            <View style={styles.tierBadge}>
-              <ShieldCheck size={12} color={colors.primary} strokeWidth={2} />
-              <Text style={styles.tierText}>{t('hero.verified')}</Text>
-            </View>
-            <Text style={styles.memberSince}>{t('hero.since', { date: formatDate(user.createdAt) })}</Text>
+            {emailVerified ? (
+              <View style={styles.tierBadge}>
+                <ShieldCheck size={12} color={colors.primary} strokeWidth={2} />
+                <Text style={styles.tierText}>{t('hero.verified')}</Text>
+              </View>
+            ) : (
+              <View style={[styles.tierBadge, styles.tierBadgeMuted]}>
+                <Mail size={12} color={colors.textMuted} strokeWidth={2} />
+                <Text style={[styles.tierText, styles.tierTextMuted]}>{t('hero.email_unverified')}</Text>
+              </View>
+            )}
+            {memberSince && (
+              <Text style={styles.memberSince} numberOfLines={1}>{t('hero.since', { date: memberSince })}</Text>
+            )}
           </View>
         </Card>
 
@@ -167,8 +203,8 @@ export const ProfileScreen: React.FC = () => {
               Icon={Lock}
               iconColor={colors.warning}
               label={t('menu.two_fa')}
-              value={user.twoFaEnabled ? t('menu.two_fa_enabled') : t('menu.two_fa_disabled')}
-              valueColor={user.twoFaEnabled ? colors.success : colors.textMuted}
+              value={user.twoFaEnabled ? t('menu.two_fa_enabled') : t('menu.two_fa_recommended')}
+              valueColor={user.twoFaEnabled ? colors.success : colors.warning}
               tappable
               onPress={() => navigation.navigate('TwoFaSetup')}
             />
@@ -222,11 +258,23 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.sectionGroup}>
           <Text style={styles.sectionTitle}>{t('sections.info')}</Text>
           <Card elevated style={styles.menuCard}>
-            <MenuRow Icon={Mail}         iconColor={colors.info}      label={t('menu.email')}        value={user.email} />
+            <MenuRow
+              Icon={Mail}
+              iconColor={colors.info}
+              label={t('menu.email')}
+              value={emailVerified ? t('hero.email_verified') : t('hero.email_unverified')}
+              valueColor={emailVerified ? colors.success : colors.warning}
+            />
             <Divider />
-            <MenuRow Icon={Phone}        iconColor={colors.success}   label={t('menu.phone')}        value={user.phone ?? t('hero.phone_not_set')} />
-            <Divider />
-            <MenuRow Icon={CalendarDays} iconColor={colors.textMuted} label={t('menu.member_since')} value={formatDate(user.createdAt)} />
+            <MenuRow
+              Icon={Phone}
+              iconColor={colors.success}
+              label={t('menu.phone')}
+              value={user.phone || t('hero.phone_not_set')}
+              valueColor={user.phone ? undefined : colors.warning}
+              tappable={!user.phone}
+              onPress={() => navigation.navigate('ProfileEdit')}
+            />
           </Card>
         </View>
 
@@ -260,7 +308,7 @@ export const ProfileScreen: React.FC = () => {
           <Text style={styles.deleteText}>{t('delete_account')}</Text>
         </TouchableOpacity>
 
-        <Text style={styles.uid}>{user.id}</Text>
+        <Text style={styles.uid} selectable>{t('hero.account_id', { id: user.id })}</Text>
       </ScrollView>
 
       {/* ── Language Picker Modal ── */}
@@ -419,21 +467,29 @@ const styles = StyleSheet.create({
   avatarRingInner: { width: 76, height: 76, borderRadius: 38, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   heroInfo:        { flex: 1, gap: spacing[1] },
   fullName:        { fontFamily: fontFamily.display, fontSize: fontSize.xl, color: colors.textPrimary, letterSpacing: -0.4 },
+  addName:         { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: colors.primary, textDecorationLine: 'underline' },
+  avatarEditBadge: {
+    position: 'absolute', right: 2, bottom: 2,
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: colors.primary, borderWidth: 2, borderColor: colors.background,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tierBadgeMuted:  { backgroundColor: colors.surface, borderColor: colors.border },
+  tierTextMuted:   { color: colors.textMuted },
   email:           { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textSecondary },
   phone:           { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
-  tierRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  tierRow:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing[3] },
   tierBadge:       { flexDirection: 'row', alignItems: 'center', gap: spacing[1] + 2, backgroundColor: colors.primarySurface, borderRadius: radius.full, paddingHorizontal: spacing[3], paddingVertical: spacing[1] + 2, borderWidth: 1, borderColor: colors.borderPrimary },
   tierText:        { fontFamily: fontFamily.bodySemiBold, fontSize: 10, color: colors.primary, letterSpacing: 0.8 },
-  memberSince:     { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
+  memberSince:     { flexShrink: 1, textAlign: 'right', fontFamily: fontFamily.body, fontSize: fontSize.xs, color: colors.textMuted },
   sectionGroup:    { gap: spacing[2] },
   sectionTitle:    { fontFamily: fontFamily.bodyMedium, fontSize: 10, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 1.2, marginLeft: spacing[1] },
   menuCard:        { padding: 0, overflow: 'hidden' },
-  editHeaderBtn:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   logoutBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[3], marginTop: spacing[2], paddingVertical: spacing[4], borderRadius: radius.xl, borderWidth: 1, borderColor: colors.danger + '55', backgroundColor: colors.dangerSurface },
   logoutText:      { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: colors.danger },
   deleteBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing[2], paddingVertical: spacing[3], opacity: 0.6 },
   deleteText:      { fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.danger },
-  uid:             { textAlign: 'center', fontFamily: fontFamily.mono, fontSize: 10, color: colors.textMuted, opacity: 0.5, marginTop: spacing[2] },
+  uid:             { textAlign: 'center', fontFamily: fontFamily.mono, fontSize: 10, color: colors.textMuted, marginTop: spacing[2] },
 });
 
 

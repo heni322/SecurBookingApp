@@ -44,12 +44,16 @@ const partner: PartnerNS = {
       "documentsSub": "Tous les documents légaux soumis",
       "editCompany": "Ma société",
       "editCompanySub": "Modifier les informations légales",
-      "createMission": "Publier une mission",
-      "createMissionSub": "Créer une nouvelle prestation",
+      "createMission": "Commander une mission",
+      "createMissionSub": "Devis immédiat, paiement par virement",
       "myMissions": "Mes missions",
-      "myMissionsSub": "Suivre et gérer les missions publiées",
+      "myMissionsSub": "Suivre vos commandes et leur paiement",
       "timesheets": "Feuilles de temps",
-      "timesheetsSub": "Valider les heures de vos agents"
+      "timesheetsSub": "Valider les heures de vos agents",
+      "staffing": "Postes à pourvoir",
+      "staffingSub": "Affecter vos agents aux missions ouvertes",
+      "contracts": "Contrats de travail",
+      "contractsSub": "Signature des agents, DPAE, PDF"
     },
     "errors": {
       "title": "Chargement impossible",
@@ -559,9 +563,13 @@ const partner: PartnerNS = {
     },
     "title": "Mes missions",
     "untitled": "Mission sans titre",
-    "newMission": "Publier une nouvelle mission",
+    "newMission": "Commander une mission",
     "urgent": "Urgent",
     "cancelAction": "Annuler la mission",
+    "fundAction": "Valider le devis et payer",
+    "filled": "{{filled}}/{{total}} postes pourvus",
+    "moreAgents": "+{{count}}",
+    "transferPending": "Virement déclaré · voir le suivi",
     "agents_one": "{{count}} agent",
     "agents_other": "{{count}} agents",
     "tabs": {
@@ -595,9 +603,9 @@ const partner: PartnerNS = {
     }
   },
   "createMission": {
-    "title": "Publier une mission",
-    "submit": "Publier la mission",
-    "submitting": "Publication…",
+    "title": "Commander une mission",
+    "submit": "Commander la mission",
+    "submitting": "Envoi…",
     "cancel": "Annuler",
     "confirm": "Confirmer",
     "endsAt": "Se termine à {{time}}",
@@ -806,10 +814,74 @@ const partner: PartnerNS = {
       }
     }
   },
+  "staffing": {
+    "title": "Postes à pourvoir",
+    "subtitle": "Missions payées qui attendent des agents. Affectez les vôtres.",
+    "cityPlaceholder": "Filtrer par ville",
+    "retry": "Réessayer",
+    "empty": { "title": "Aucun poste ouvert", "body": "Tous les postes publiés sont pourvus pour le moment. Revenez plus tard." },
+    "error": { "title": "Chargement impossible", "body": "Vérifiez votre connexion et réessayez." },
+    "urgent": "Urgent",
+    "filled": "Mission : {{assigned}}/{{requested}} postes pourvus",
+    "noSlot": "Horaire à confirmer",
+    "assign": {
+      "title": "Affecter un agent",
+      "intro": "Vos agents qui peuvent prendre ce poste apparaissent en premier.",
+      "empty": "Aucun de vos agents n'est éligible pour ce poste.",
+      "cta": "Affecter",
+      "confirmTitle": "Confirmer l'affectation",
+      "confirmBody": "Affecter {{agent}} à ce poste ? Son contrat de travail sera créé automatiquement.",
+      "confirm": "Affecter",
+      "cancel": "Annuler",
+      "success": "{{agent}} est affecté(e). Le contrat attend sa signature.",
+      "favorite": "Favori du client",
+      "available": "Disponible",
+      "distance": "{{km}} km",
+      "notAssignable": "Non affectable",
+      "rating": "{{rating}} · {{count}} missions",
+      "errors": {
+        "generic": "L'affectation a échoué. Rien n'a été modifié.",
+        "network": "Impossible de joindre le serveur. Aucune affectation n'a été faite.",
+        "taken": "Ce poste vient d'être pourvu. Rechargez la liste.",
+        "notFound": "Ce poste n'existe plus. Rechargez la liste.",
+        "forbidden": "Cet agent n'appartient pas à votre société, ou votre société n'est pas en règle."
+      }
+    }
+  },
+  "missionDetail": {
+    "title": "Détail de la mission",
+    "posts": "Postes",
+    "slotLabel": "Créneau {{n}}",
+    "open": "Poste à pourvoir",
+    "checkin": "Arrivée {{time}}",
+    "checkout": "Départ {{time}}",
+    "incidents_one": "{{count}} incident signalé",
+    "incidents_other": "{{count}} incidents signalés",
+    "paymentTitle": "Paiement",
+    "payment": { "PAID": "Payé", "PENDING": "Virement déclaré, en attente de réception", "PROCESSING": "Paiement en cours", "AUTHORIZED": "Paiement autorisé", "FAILED": "Paiement refusé", "REFUNDED": "Remboursé", "none": "Non payé" },
+    "total": "Total TTC",
+    "timesNote": "Heures de Paris",
+    "errorTitle": "Chargement impossible",
+    "errorBody": "Vérifiez votre connexion et réessayez.",
+    "retry": "Réessayer"
+  },
+  "contractsList": {
+    "title": "Contrats de travail",
+    "subtitle": "Signés côté employeur à l'affectation",
+    "retry": "Réessayer",
+    "empty": { "title": "Aucun contrat", "body": "Un contrat est créé dès que vous affectez un agent à un poste." },
+    "error": { "title": "Chargement impossible", "body": "Vérifiez votre connexion et réessayez." },
+    "agentSigned": "Signé par l'agent",
+    "awaitingAgent": "En attente de la signature de l'agent",
+    "dpae": "DPAE",
+    "unknownAgent": "Agent"
+  },
   "funding": {
     "title": "Financement",
     "calculating": "Calcul du devis…",
     "funded": "Mission financée",
+    "expired": { "title": "Devis expiré", "body": "Ce devis n'est plus valable. Recalculez-le pour obtenir un prix à jour, puis acceptez-le.", "action": "Recalculer le devis" },
+    "pending": { "title": "Virement déclaré", "body": "Votre paiement est en attente de réception. La mission sera publiée aux agents dès sa confirmation par Provalk.", "invoice": "Facture" },
     "actions": {
       "accept": "Accepter le devis",
       "declare": "Déclarer le paiement",
@@ -832,6 +904,7 @@ const partner: PartnerNS = {
       "totalTTC": "Total TTC",
       "vat": "TVA",
       "agentSalary": "Salaires agents",
+      "base": "Prestation de sécurité",
       "platformMargin": "Marge plateforme",
       "fixedCharges": "Charges fixes",
       "surcharges": {
@@ -846,7 +919,7 @@ const partner: PartnerNS = {
     },
     "payment": {
       "method": "Mode de paiement",
-      "notice": "Effectuez le virement en utilisant les coordonnées ci-dessous. La mission sera publiée dès réception.",
+      "notice": "Les coordonnées bancaires et la référence s'affichent après la déclaration. La mission est publiée dès réception du paiement.",
       "VIREMENT": "Virement bancaire",
       "CHEQUE": "Chèque"
     },
@@ -857,7 +930,7 @@ const partner: PartnerNS = {
     },
     "instructions": {
       "title": "Coordonnées bancaires",
-      "invoice": "N de facture",
+      "invoice": "N° de facture",
       "amount": "Montant",
       "reference": "Référence",
       "beneficiary": "Bénéficiaire",

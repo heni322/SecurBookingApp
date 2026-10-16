@@ -11,6 +11,8 @@ const payment: PaymentNS = {
 
   sepa_success: 'Mandat SEPA enregistré !',
   card_success: 'Paiement confirmé !',
+  total_ttc_label: 'Montant total TTC',
+  use_new_card:    'Utiliser une nouvelle carte',
   card_held: 'Carte autorisée !',
   card_held_body:
     "Le montant est réservé sur votre carte, pas encore débité. Il sera débité dès que tous les agents de votre mission seront affectés, et libéré si la mission est annulée avant. Vous recevrez votre facture par e-mail.",
@@ -115,6 +117,9 @@ const payment: PaymentNS = {
     header_iban: 'Ajouter un IBAN',
     header_card: 'Ajouter une carte',
     pick_sub: 'Stocké en sécurité chez Stripe (PCI-DSS niveau 1).',
+    pick_title:   'Choisissez un type',
+    iban_invalid: 'Format IBAN invalide',
+    iban_valid:   'IBAN valide',
     card_label: 'Carte bancaire',
     card_desc: 'Visa - Mastercard - CB - AMEX',
     sepa_label: 'Débit SEPA (IBAN)',

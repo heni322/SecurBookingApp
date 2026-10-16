@@ -310,7 +310,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
 
         {/* Amount recap */}
         <Card style={styles.amountCard} elevated>
-          <Text style={styles.amountLabel}>Montant total TTC</Text>
+          <Text style={styles.amountLabel}>{t('total_ttc_label')}</Text>
           <Text style={styles.amountValue}>
             {totalTTC ? formatCurrency(totalTTC * 100) : '–'}
           </Text>
@@ -371,7 +371,7 @@ export const PaymentScreen: React.FC<Props> = ({ route, navigation }) => {
               activeOpacity={0.75}
               accessibilityRole="radio"
               accessibilityState={{ selected: selectedMethodId === null }}
-              accessibilityLabel="Utiliser une nouvelle carte"
+              accessibilityLabel={t('use_new_card')}
             >
               <Star size={13} color={selectedMethodId === null ? colors.primary : colors.textMuted} strokeWidth={2} />
               <Text style={[styles.newCardToggleText, selectedMethodId === null && styles.newCardToggleTextActive]}>

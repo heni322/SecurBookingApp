@@ -82,6 +82,26 @@
  *        kept as a short ref-based fix history toward the site, displayed in
  *        the bottom card only while the agent is still approaching (!inZone);
  *        once on-site an ETA to "arrive" is meaningless, so it's hidden.
+ *  v8 — [UI/UX OVERHAUL] Layout & visual fixes from device QA:
+ *        - Map was absoluteFill over the whole screen → it covered the
+ *          ScreenHeader (no back button / title) and the site marker sat
+ *          hidden behind the bottom card. Layout is now header → mapArea
+ *          (flex:1, owns all floating overlays) → card in normal flow.
+ *        - "Hidden" alert banner was only translated -160 from top:180, so
+ *          a translucent red band + ⚠ stayed on screen over the zoom control.
+ *          It now lives inside the clipped mapArea, fades with its slide, and
+ *          uses a solid surface (the 13%-alpha red was unreadable on a map).
+ *        - FAB / attribution used magic bottom:290/300 offsets that collided
+ *          with each other and drifted with card height; now map-relative.
+ *        - Green/red badges & zone strip used SOLID uiGreen/uiRed behind
+ *          green/red text (invisible); switched to tinted surface tokens.
+ *        - Primary CTA moved from light blue (white-on-#60a5fa ≈ 2.5:1) to
+ *          the brand gold; disabled state is an explicit muted style.
+ *        - Removed duplicate "waiting" messaging (pill + input-looking strip).
+ *        - Recenter FAB hidden until a position exists (it was a no-op).
+ *        - Sync is an icon button with in-progress feedback.
+ *        - Leaflet +/- removed (pinch-zoom is native; it clashed with chrome).
+ *        - Tab bar hidden on this screen (see MainNavigator IMMERSIVE_ROUTES).
  */
 
 import React, {
@@ -92,6 +112,7 @@ import {
   Platform, ActivityIndicator, Animated, Vibration,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Navigation2, MapPin, Wifi, WifiOff,
   AlertTriangle, CheckCircle2, Target, RefreshCw,
@@ -116,6 +137,11 @@ const GEOFENCE_RADIUS_M  = 30;
 /** Must be longer than the slide-out timing duration (220 ms) to prevent
  *  pointerEvents from flipping before the animation finishes. */
 const ALERT_SLIDE_OUT_MS = 220;
+/** Off-screen Y for the alert banner (fully above the clipped map area). */
+const ALERT_HIDDEN_Y = -200;
+/** Card top radius — the card overlaps the map by exactly this much so the
+ *  rounded corners sit on the map instead of on a dark gap. */
+const CARD_RADIUS = 24;
 const ALERT_SLIDE_IN_CONFIG = { friction: 8, tension: 80, useNativeDriver: true } as const;
 
 // [FIX H4] Below this age a position counts as "live"; above it (but still
@@ -320,6 +346,8 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   } = route.params;
 
   const { t } = useTranslation('tracking');
+  const insets = useSafeAreaInsets();
+  const [syncing, setSyncing] = useState(false);
 
   // [FIX C3] Mission coordinates can be null/undefined at runtime (draft mission,
   // failed geocoding, or a push deep-link with absent siteLat/siteLng). Without
@@ -366,7 +394,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   const [etaMin, setEtaMin] = useState<number | null>(null);
 
   // ── Alert banner animation ────────────────────────────────────────────────
-  const alertSlide     = useRef(new Animated.Value(-160)).current;
+  const alertSlide     = useRef(new Animated.Value(ALERT_HIDDEN_Y)).current;
   /**
    * isAlertVisible — ref (not state) so it can be read synchronously inside
    * animation callbacks and set without triggering re-renders.
@@ -402,7 +430,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
    */
   const slideOut = useCallback(() => {
     Animated.timing(alertSlide, {
-      toValue: -160,
+      toValue: ALERT_HIDDEN_Y,
       duration: ALERT_SLIDE_OUT_MS,
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -525,6 +553,14 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     }
   }, [agentPosition, inject]);
 
+  const handleSync = useCallback(() => {
+    if (syncing) return;
+    setSyncing(true);
+    socketService.resyncMission(missionId);
+    // Visual acknowledgement only — the resync itself is fire-and-forget.
+    setTimeout(() => setSyncing(false), 1200);
+  }, [syncing, missionId]);
+
   const handleViewSite = useCallback(() => {
     followingRef.current = false;
     setShowFollowBtn(true);
@@ -600,92 +636,130 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+  // [v8] Header → mapArea (flex:1, clips + owns every floating overlay) → card.
+  const isWaiting  = connected && !agentPosition;
+  const canFollow  = !!agentPosition;
+  const statusTone: 'danger' | 'warning' | 'live' | 'neutral' =
+    !connected ? 'danger' : signalLost ? 'warning' : agentPosition ? 'live' : 'neutral';
+
+  const alertOpacity = alertSlide.interpolate({
+    inputRange: [ALERT_HIDDEN_Y, ALERT_HIDDEN_Y / 2, 0],
+    outputRange: [0, 0, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.container}>
       <ScreenHeader title={t('screen_title')} onBack={() => navigation.goBack()} />
 
-      {/* ── Map ── */}
-      <LeafletMapView
-        ref={mapRef}
-        centerLat={siteLat}
-        centerLng={siteLng}
-        initialZoom={17}
-        zoomControl
-        dragging
-        bodyScript={bodyScript}
-        extraStyle={TRACKING_EXTRA_STYLE}
-        onMessage={handleMessage}
-        onReady={handleMapReady}
-      />
+      {/* ── Map area — every overlay below is positioned relative to it ── */}
+      <View style={styles.mapArea}>
+        <LeafletMapView
+          ref={mapRef}
+          centerLat={siteLat}
+          centerLng={siteLng}
+          initialZoom={17}
+          zoomControl={false}
+          dragging
+          bodyScript={bodyScript}
+          extraStyle={TRACKING_EXTRA_STYLE}
+          onMessage={handleMessage}
+          onReady={handleMapReady}
+        />
 
-      {/* ── OSM Attribution ── */}
-      <View style={styles.attribution} pointerEvents="none">
-        <Text style={styles.attributionTxt}>{t('attribution')}</Text>
-      </View>
-
-      {/* ── Status bar ── */}
-      <View style={styles.statusBar}>
-        {connected
-          ? <Wifi    size={12} color={colors.success} strokeWidth={2} />
-          : <WifiOff size={12} color={colors.danger}  strokeWidth={2} />
-        }
-        <Text style={[styles.statusTxt, !connected && styles.statusTxtOff]}>
-          {statusText}
-        </Text>
-        {connected && !agentPosition && (
-          <ActivityIndicator size="small" color={colors.primary} />
-        )}
-        {signalLost && connected && (
-          <SignalIcon size={12} color={colors.warning} strokeWidth={2} />
-        )}
-      </View>
-
-      {/* ── Geofence alert banner ─────────────────────────────────────────────
-       *  pointerEvents is driven by alertPointerEvents state, which is only
-       *  set to 'none' inside the slide-out animation callback — NOT on
-       *  pendingAlert state change. This prevents the race where a tap on ✕
-       *  was swallowed because React had already flipped pointerEvents to
-       *  'none' in the same render that started the animation.
-       * ─────────────────────────────────────────────────────────────────── */}
-      <Animated.View
-        style={[styles.alertBanner, { transform: [{ translateY: alertSlide }] }]}
-        pointerEvents={alertPointerEvents}
-      >
-        <AlertTriangle size={20} color="#fff" strokeWidth={2.5} />
-        <View style={styles.alertTextBlock}>
-          <Text style={styles.alertTitle}>{pendingAlert ? t('out_of_zone') : ''}</Text>
-          <Text style={styles.alertBody} numberOfLines={1}>
-            {pendingAlert ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}` : ''}
+        {/* ── Connection / freshness pill ── */}
+        <View
+          style={[
+            styles.statusPill,
+            statusTone === 'danger'  && styles.statusPillDanger,
+            statusTone === 'warning' && styles.statusPillWarning,
+          ]}
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+        >
+          {statusTone === 'danger'  && <WifiOff    size={14} color={colors.danger}  strokeWidth={2.2} />}
+          {statusTone === 'warning' && <SignalIcon size={14} color={colors.warning} strokeWidth={2.2} />}
+          {statusTone === 'live'    && <View style={styles.liveDot} />}
+          {statusTone === 'neutral' && isWaiting && (
+            <ActivityIndicator size="small" color={colors.primary} style={styles.pillSpinner} />
+          )}
+          {statusTone === 'neutral' && !isWaiting && <Wifi size={14} color={colors.success} strokeWidth={2.2} />}
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.statusTxt,
+              statusTone === 'danger'  && styles.statusTxtDanger,
+              statusTone === 'warning' && styles.statusTxtWarning,
+            ]}
+          >
+            {statusText.replace(/^⚠\s*/, '')}
           </Text>
         </View>
-        <TouchableOpacity
-          onPress={handleDismissAlert}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          activeOpacity={0.6}
-          style={styles.alertCloseBtn}
-          accessibilityRole="button"
-          accessibilityLabel={t('close_a11y')}
+
+        {/* ── Geofence alert banner ──
+         *  Lives inside the clipped mapArea and fades with its slide, so the
+         *  resting (hidden) state can never bleed onto the map again.
+         *  pointerEvents is still flipped only in the slide-out callback (v4). */}
+        <Animated.View
+          style={[
+            styles.alertBanner,
+            { opacity: alertOpacity, transform: [{ translateY: alertSlide }] },
+          ]}
+          pointerEvents={alertPointerEvents}
+          accessibilityRole="alert"
         >
-          <Text style={styles.alertClose}>✕</Text>
-        </TouchableOpacity>
-      </Animated.View>
+          <View style={styles.alertIconWrap}>
+            <AlertTriangle size={18} color={colors.danger} strokeWidth={2.5} />
+          </View>
+          <View style={styles.alertTextBlock}>
+            <Text style={styles.alertTitle}>{pendingAlert ? t('out_of_zone') : ''}</Text>
+            <Text style={styles.alertBody} numberOfLines={1}>
+              {pendingAlert ? `${pendingAlert.agentName} — ${pendingAlert.distanceStr}` : ''}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={handleDismissAlert}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.6}
+            style={styles.alertCloseBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('close_a11y')}
+          >
+            <Text style={styles.alertClose}>✕</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
-      {/* ── Re-center FAB ── */}
-      {showFollowBtn && (
-        <TouchableOpacity style={styles.reCenterFab} onPress={handleFollowAgent} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={t('recenter_a11y')}>
-          <Target size={20} color={colors.primary} strokeWidth={2} />
-        </TouchableOpacity>
-      )}
+        {/* ── Re-center FAB — only meaningful once there is a position ── */}
+        {showFollowBtn && canFollow && (
+          <TouchableOpacity
+            style={styles.reCenterFab}
+            onPress={handleFollowAgent}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={t('recenter_a11y')}
+          >
+            <Target size={22} color={colors.primary} strokeWidth={2} />
+          </TouchableOpacity>
+        )}
 
-      {/* ── Bottom card ── */}
-      <View style={styles.card}>
+        {/* ── OSM attribution (licence requirement) — bottom-left, clear of the FAB ── */}
+        <View style={styles.attribution} pointerEvents="none">
+          <Text style={styles.attributionTxt}>{t('attribution')}</Text>
+        </View>
+      </View>
+
+      {/* ── Bottom card (normal flow, overlaps the map by CARD_RADIUS) ── */}
+      <View style={[styles.card, { paddingBottom: Math.max(insets.bottom, spacing[3]) + spacing[2] }]}>
         <View style={styles.cardRow}>
           <View style={styles.avatarBubble}>
             <Text style={styles.avatarTxt}>{agentInitials}</Text>
           </View>
           <View style={styles.cardMeta}>
-            <Text style={styles.cardName}>{agentName}</Text>
-            <Text style={styles.cardAddress} numberOfLines={1}>{missionAddress}</Text>
+            <Text style={styles.cardName} numberOfLines={1}>{agentName}</Text>
+            <View style={styles.addressRow}>
+              <MapPin size={12} color={colors.textMuted} strokeWidth={2} />
+              <Text style={styles.cardAddress} numberOfLines={1}>{missionAddress}</Text>
+            </View>
           </View>
           <View style={styles.badgeStack}>
             {etaLabel && (
@@ -697,7 +771,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             {zoneState !== 'unknown' && distanceLabel && (
               <View style={[styles.distBadge, zoneState === 'out' && styles.distBadgeAlert]}>
                 {zoneState === 'in'
-                  ? <CheckCircle2 size={12} color={colors.success} strokeWidth={2.5} />
+                  ? <CheckCircle2  size={12} color={colors.success} strokeWidth={2.5} />
                   : <AlertTriangle size={12} color={colors.danger}  strokeWidth={2.5} />
                 }
                 <Text style={[styles.distTxt, zoneState === 'out' && styles.distTxtAlert]}>
@@ -708,56 +782,69 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* [FIX UI] Zone strip is now three-state. While 'unknown' (no position
-            yet) it shows a neutral waiting state instead of a false green
-            "In zone" — which previously contradicted the "Waiting for position"
-            pill and any stale out-of-zone alert. */}
-        <View style={[
-          styles.zoneStrip,
-          zoneState === 'out'     && styles.zoneStripAlert,
-          zoneState === 'unknown' && styles.zoneStripNeutral,
-        ]}>
-          <Text style={[
-            styles.zoneTxt,
-            zoneState === 'out'     && styles.zoneTxtAlert,
-            zoneState === 'unknown' && styles.zoneTxtNeutral,
-          ]}>
-            {zoneState === 'unknown'
-              ? t('zone_unknown')
-              : zoneState === 'in'
-                ? `✓ ${t('in_zone')} (${GEOFENCE_RADIUS_M} m)`
-                : `⚠ ${t('out_of_zone')}`}
-          </Text>
-        </View>
+        {/* Zone status — only once it is actually known. While waiting, the
+            pill above already says so; a second, input-looking "Locating…"
+            box duplicated it and read as a disabled text field. */}
+        {zoneState !== 'unknown' && (
+          <View style={[styles.zoneStrip, zoneState === 'out' && styles.zoneStripAlert]}>
+            {zoneState === 'in'
+              ? <CheckCircle2  size={14} color={colors.success} strokeWidth={2.4} />
+              : <AlertTriangle size={14} color={colors.danger}  strokeWidth={2.4} />
+            }
+            <Text style={[styles.zoneTxt, zoneState === 'out' && styles.zoneTxtAlert]}>
+              {zoneState === 'in'
+                ? `${t('in_zone')} · ${GEOFENCE_RADIUS_M} m`
+                : t('out_of_zone')}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.ctrlRow}>
-          <TouchableOpacity style={styles.ctrlBtn} onPress={handleViewSite} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel={t('view_site_btn')}>
-            <MapPin size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.ctrlTxt}>{t('view_site_btn')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.ctrlBtn, styles.ctrlBtnPrimary, !agentPosition && styles.ctrlBtnDisabled]}
-            onPress={handleFollowAgent}
-            disabled={!agentPosition}
-            activeOpacity={0.75}
-            accessibilityRole="button"
-            accessibilityLabel={t('follow_agent_btn')}
-            accessibilityState={{ disabled: !agentPosition }}
-          >
-            <Navigation2 size={15} color="#fff" strokeWidth={2} />
-            <Text style={[styles.ctrlTxt, styles.ctrlTxtPrimary]}>{t('follow_agent_btn')}</Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={styles.ctrlBtn}
-            onPress={() => socketService.resyncMission(missionId)}
+            onPress={handleViewSite}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={t('view_site_btn')}
+          >
+            <MapPin size={16} color={colors.textPrimary} strokeWidth={2} />
+            <Text style={styles.ctrlTxt} numberOfLines={1}>{t('view_site_btn')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.ctrlBtn, styles.ctrlBtnPrimary, !canFollow && styles.ctrlBtnPrimaryDisabled]}
+            onPress={handleFollowAgent}
+            disabled={!canFollow}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t('follow_agent_btn')}
+            accessibilityState={{ disabled: !canFollow }}
+          >
+            <Navigation2
+              size={16}
+              color={canFollow ? palette.navy : colors.textMuted}
+              strokeWidth={2.2}
+            />
+            <Text
+              numberOfLines={1}
+              style={[styles.ctrlTxtPrimary, !canFollow && styles.ctrlTxtDisabled]}
+            >
+              {t('follow_agent_btn')}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={handleSync}
+            disabled={syncing}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={t('sync_btn')}
+            accessibilityState={{ busy: syncing }}
           >
-            <RefreshCw size={15} color={colors.textSecondary} strokeWidth={2} />
-            <Text style={styles.ctrlTxt}>{t('sync_btn')}</Text>
+            {syncing
+              ? <ActivityIndicator size="small" color={colors.textPrimary} />
+              : <RefreshCw size={18} color={colors.textPrimary} strokeWidth={2} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -766,6 +853,13 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
+const CTRL_HEIGHT = 48; // ≥ 48dp touch target (Material / WCAG 2.5.8)
+
+const floatingShadow = Platform.select({
+  ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 8 },
+  android: { elevation: 6 },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: palette.navy },
 
@@ -788,148 +882,180 @@ const styles = StyleSheet.create({
   },
   coordsErrorBtn: {
     marginTop: spacing[4],
-    backgroundColor: palette.uiBlue, borderRadius: radius.full,
+    backgroundColor: palette.gold, borderRadius: radius.full,
     paddingHorizontal: spacing[6], paddingVertical: spacing[3],
   },
   coordsErrorBtnTxt: {
-    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: colors.white,
+    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: palette.navy,
   },
 
-  attribution: {
-    position: 'absolute', bottom: 290, right: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  attributionTxt: {
-    fontSize: 9, color: colors.textMuted, fontFamily: fontFamily.body,
+  // ── Map area ──
+  mapArea: {
+    flex: 1,
+    overflow: 'hidden',          // clips the hidden alert banner & map edges
+    marginBottom: -CARD_RADIUS,  // map runs under the card's rounded corners
   },
 
-  statusBar: {
-    // [FIX UI] Centered, auto-width chip instead of a full-width bar — the
-    // old left:16/right:16 span ran straight under the map's top-left +/-
-    // zoom control and collided with it. Centering clears the control and
-    // reads as a floating status pill.
-    position: 'absolute', top: 60, alignSelf: 'center', maxWidth: '88%',
+  statusPill: {
+    position: 'absolute', top: spacing[3], alignSelf: 'center', maxWidth: '86%',
     flexDirection: 'row', alignItems: 'center', gap: spacing[2],
-    backgroundColor: colors.overlay,
+    backgroundColor: palette.panelSolid,
     borderRadius: radius.full,
-    paddingVertical: spacing[2], paddingHorizontal: spacing[3],
+    height: 34, paddingHorizontal: spacing[4],
     borderWidth: 1, borderColor: palette.white10,
+    ...floatingShadow,
   },
-  statusTxt:    { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white },
-  statusTxtOff: { color: colors.danger },
+  statusPillDanger:  { borderColor: palette.borderRed },
+  statusPillWarning: { borderColor: palette.borderGold },
+  pillSpinner:       { transform: [{ scale: 0.75 }] },
+  liveDot: {
+    width: 8, height: 8, borderRadius: 4, backgroundColor: palette.uiGreen,
+  },
+  statusTxt:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white },
+  statusTxtDanger:  { color: colors.danger },
+  statusTxtWarning: { color: colors.warning },
 
   alertBanner: {
-    position: 'absolute', top: 180, left: 16, right: 16,
+    position: 'absolute', top: spacing[3] + 34 + spacing[2], left: spacing[4], right: spacing[4],
     flexDirection: 'row', alignItems: 'center', gap: spacing[3],
-    backgroundColor: colors.dangerSurface, borderRadius: radius.xl,
-    padding: spacing[4],
+    backgroundColor: palette.panelSolid,
+    borderRadius: radius.xl,
+    borderWidth: 1, borderColor: palette.borderRed,
+    paddingVertical: spacing[3], paddingHorizontal: spacing[4],
     zIndex: 50,
     ...Platform.select({
       ios: {
         shadowColor: colors.danger, shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.55, shadowRadius: 14,
+        shadowOpacity: 0.4, shadowRadius: 14,
       },
-      android: {
-        // Must be higher than card (elevation: 24) to render on top.
-        elevation: 30,
-      },
+      android: { elevation: 12 },
     }),
+  },
+  alertIconWrap: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: palette.bgRed,
+    alignItems: 'center', justifyContent: 'center',
   },
   alertTextBlock: { flex: 1 },
   alertTitle: {
     fontFamily: fontFamily.display, fontSize: fontSize.base,
-    color: colors.white, letterSpacing: -0.2,
+    color: colors.danger, letterSpacing: -0.2,
   },
   alertBody: {
     fontFamily: fontFamily.body, fontSize: fontSize.sm,
     color: colors.textSecondary, marginTop: 2,
   },
-  // Explicit container for the close button so the hitSlop has a defined
-  // boundary to expand from and doesn't bleed outside the banner on Android.
   alertCloseBtn: {
-    padding: spacing[1],
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: palette.white06,
   },
   alertClose: {
-    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base,
+    fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm,
     color: colors.textSecondary,
   },
 
   reCenterFab: {
-    position: 'absolute', right: 16, bottom: 300,
-    width: 48, height: 48, borderRadius: 24,
+    position: 'absolute', right: spacing[4], bottom: CARD_RADIUS + spacing[4],
+    width: 52, height: 52, borderRadius: 26,
     backgroundColor: palette.panelSolid,
-    borderWidth: 1, borderColor: palette.white10,
+    borderWidth: 1, borderColor: palette.borderGold,
     alignItems: 'center', justifyContent: 'center',
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 8 },
-      android: { elevation: 8 },
-    }),
+    ...floatingShadow,
   },
 
+  attribution: {
+    position: 'absolute', left: spacing[2], bottom: CARD_RADIUS + spacing[1],
+    backgroundColor: 'rgba(12,18,32,0.72)',
+    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  attributionTxt: {
+    fontSize: 9, color: palette.white70, fontFamily: fontFamily.body,
+  },
+
+  // ── Bottom card ──
   card: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(12,18,32,0.97)',
-    borderTopLeftRadius: radius['2xl'], borderTopRightRadius: radius['2xl'],
-    padding: spacing[5], gap: spacing[3],
+    backgroundColor: palette.panelSolid,   // solid: no map ghosting through
+    borderTopLeftRadius: CARD_RADIUS, borderTopRightRadius: CARD_RADIUS,
+    paddingTop: spacing[5], paddingHorizontal: spacing[5],
+    gap: spacing[4],
     borderTopWidth: 1, borderTopColor: palette.white10,
     ...Platform.select({
       ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.35, shadowRadius: 20 },
-      android: { elevation: 24 },
+      android: { elevation: 16 },
     }),
   },
 
   cardRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing[3] },
   avatarBubble: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: 'rgba(96,165,250,0.15)',
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: palette.bgGold,
+    borderWidth: 1, borderColor: palette.borderGold,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  avatarTxt:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: palette.white },
-  cardMeta:    { flex: 1 },
-  cardName:    { fontFamily: fontFamily.display, fontSize: fontSize.base, color: palette.white, letterSpacing: -0.2 },
-  cardAddress: { fontFamily: fontFamily.body, fontSize: fontSize.xs, color: palette.white30, marginTop: 2 },
+  avatarTxt:   { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.base, color: palette.goldTxt },
+  cardMeta:    { flex: 1, minWidth: 0 },
+  cardName:    { fontFamily: fontFamily.display, fontSize: fontSize.md, color: palette.white, letterSpacing: -0.2 },
+  addressRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
+  // was white30 (~2.6:1 on navy, fails WCAG AA) → muted (~6.9:1)
+  cardAddress: { flex: 1, fontFamily: fontFamily.body, fontSize: fontSize.sm, color: colors.textMuted },
 
-  // [FIX H4] Stacks the ETA badge above the distance badge when both are shown.
   badgeStack: { alignItems: 'flex-end', gap: 4, flexShrink: 0 },
 
   etaBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: palette.uiBlue + '22', borderRadius: radius.full,
+    backgroundColor: palette.bgBlue, borderRadius: radius.full,
     paddingHorizontal: spacing[3], paddingVertical: spacing[1],
-    borderWidth: 1, borderColor: colors.info + '55',
+    borderWidth: 1, borderColor: palette.borderBlue,
   },
   etaTxt: { fontFamily: fontFamily.monoMedium, fontSize: fontSize.xs, color: colors.info },
 
+  // Tinted surfaces — the previous SOLID uiGreen/uiRed fills made the
+  // same-hue text unreadable.
   distBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: palette.uiGreen, borderRadius: radius.full,
+    backgroundColor: palette.bgGreen, borderRadius: radius.full,
     paddingHorizontal: spacing[3], paddingVertical: spacing[1],
-    borderWidth: 1, borderColor: `${palette.txtGreen}55`,
+    borderWidth: 1, borderColor: palette.borderGreen,
   },
-  distBadgeAlert: { backgroundColor: palette.uiRed, borderColor: `${palette.txtRed}55` },
+  distBadgeAlert: { backgroundColor: palette.bgRed, borderColor: palette.borderRed },
   distTxt:        { fontFamily: fontFamily.monoMedium, fontSize: fontSize.xs, color: colors.success },
   distTxtAlert:   { color: colors.danger },
 
   zoneStrip: {
-    backgroundColor: palette.uiGreen, borderRadius: radius.lg,
-    paddingVertical: spacing[2], paddingHorizontal: spacing[3],
-    borderWidth: 1, borderColor: `${palette.txtGreen}44`, alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: spacing[2],
+    backgroundColor: palette.bgGreen, borderRadius: radius.lg,
+    paddingVertical: spacing[2] + 2, paddingHorizontal: spacing[3],
+    borderWidth: 1, borderColor: palette.borderGreen,
   },
-  zoneStripAlert:  { backgroundColor: palette.uiRed, borderColor: `${palette.txtRed}44` },
-  zoneTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: colors.success },
-  zoneTxtAlert:    { color: colors.danger },
-  zoneStripNeutral: { backgroundColor: palette.white05, borderColor: palette.white10 },
-  zoneTxtNeutral:   { color: colors.textMuted },
+  zoneStripAlert: { backgroundColor: palette.bgRed, borderColor: palette.borderRed },
+  zoneTxt:        { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.success },
+  zoneTxtAlert:   { color: colors.danger },
 
+  // ── Controls ──
   ctrlRow: { flexDirection: 'row', gap: spacing[2] },
   ctrlBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: spacing[1], paddingVertical: spacing[3], borderRadius: radius.lg,
-    backgroundColor: palette.white05, borderWidth: 1, borderColor: palette.white10,
+    flex: 1, height: CTRL_HEIGHT,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: spacing[2], paddingHorizontal: spacing[2], borderRadius: radius.lg,
+    backgroundColor: palette.white06, borderWidth: 1, borderColor: palette.white10,
   },
-  ctrlBtnPrimary:  { backgroundColor: palette.uiBlue, borderColor: palette.uiBlue, flex: 2 },
-  ctrlBtnDisabled: { opacity: 0.35 },
-  ctrlTxt:         { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.xs, color: palette.white60 },
-  ctrlTxtPrimary:  { color: colors.white },
+  ctrlTxt: { fontFamily: fontFamily.bodyMedium, fontSize: fontSize.sm, color: colors.textPrimary },
+
+  // Brand-gold primary (was light blue with white text ≈ 2.5:1 contrast).
+  ctrlBtnPrimary: {
+    flex: 1.6,
+    backgroundColor: palette.gold, borderColor: palette.gold,
+  },
+  ctrlBtnPrimaryDisabled: {
+    backgroundColor: palette.white05, borderColor: palette.white10,
+  },
+  ctrlTxtPrimary:  { fontFamily: fontFamily.bodySemiBold, fontSize: fontSize.sm, color: palette.navy },
+  ctrlTxtDisabled: { color: colors.textMuted },
+
+  iconBtn: {
+    width: CTRL_HEIGHT, height: CTRL_HEIGHT, borderRadius: radius.lg,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: palette.white06, borderWidth: 1, borderColor: palette.white10,
+  },
 });

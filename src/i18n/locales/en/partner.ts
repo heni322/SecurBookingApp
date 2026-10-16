@@ -44,12 +44,16 @@ const partner: PartnerNS = {
       "documentsSub": "All submitted legal documents",
       "editCompany": "My company",
       "editCompanySub": "Edit legal information",
-      "createMission": "Post a mission",
-      "createMissionSub": "Publish a new assignment",
+      "createMission": "Order a mission",
+      "createMissionSub": "Instant quote, pay by bank transfer",
       "myMissions": "My missions",
-      "myMissionsSub": "Track and manage posted missions",
+      "myMissionsSub": "Track your orders and their payment",
       "timesheets": "Timesheets",
-      "timesheetsSub": "Approve your agents' hours"
+      "timesheetsSub": "Approve your agents' hours",
+      "staffing": "Open posts",
+      "staffingSub": "Assign your agents to open missions",
+      "contracts": "Employment contracts",
+      "contractsSub": "Agent signature, DPAE, PDF"
     },
     "errors": {
       "title": "Unable to load",
@@ -559,9 +563,13 @@ const partner: PartnerNS = {
     },
     "title": "My missions",
     "untitled": "Untitled mission",
-    "newMission": "Post a new mission",
+    "newMission": "Order a mission",
     "urgent": "Urgent",
     "cancelAction": "Cancel mission",
+    "fundAction": "Review the quote and pay",
+    "filled": "{{filled}}/{{total}} posts filled",
+    "moreAgents": "+{{count}}",
+    "transferPending": "Transfer declared · see status",
     "agents_one": "{{count}} agent",
     "agents_other": "{{count}} agents",
     "tabs": {
@@ -595,9 +603,9 @@ const partner: PartnerNS = {
     }
   },
   "createMission": {
-    "title": "Post a mission",
-    "submit": "Publish mission",
-    "submitting": "Publishing…",
+    "title": "Order a mission",
+    "submit": "Order the mission",
+    "submitting": "Sending…",
     "cancel": "Cancel",
     "confirm": "Confirm",
     "endsAt": "Ends at {{time}}",
@@ -806,10 +814,74 @@ const partner: PartnerNS = {
       }
     }
   },
+  "staffing": {
+    "title": "Open posts",
+    "subtitle": "Paid missions waiting for agents. Assign yours.",
+    "cityPlaceholder": "Filter by city",
+    "retry": "Retry",
+    "empty": { "title": "No open posts", "body": "Every published post is filled for now. Check back later." },
+    "error": { "title": "Could not load", "body": "Check your connection and try again." },
+    "urgent": "Urgent",
+    "filled": "Mission: {{assigned}}/{{requested}} posts filled",
+    "noSlot": "Schedule to be confirmed",
+    "assign": {
+      "title": "Assign an agent",
+      "intro": "Your agents who can take this post are listed first.",
+      "empty": "None of your agents is eligible for this post.",
+      "cta": "Assign",
+      "confirmTitle": "Confirm assignment",
+      "confirmBody": "Assign {{agent}} to this post? Their employment contract will be created automatically.",
+      "confirm": "Assign",
+      "cancel": "Cancel",
+      "success": "{{agent}} is assigned. The contract awaits their signature.",
+      "favorite": "Client favourite",
+      "available": "Available",
+      "distance": "{{km}} km",
+      "notAssignable": "Not assignable",
+      "rating": "{{rating}} · {{count}} missions",
+      "errors": {
+        "generic": "Assignment failed. Nothing was changed.",
+        "network": "Could not reach the server. No assignment was made.",
+        "taken": "This post was just filled. Reload the list.",
+        "notFound": "This post no longer exists. Reload the list.",
+        "forbidden": "This agent is not in your company, or your company is not compliant."
+      }
+    }
+  },
+  "missionDetail": {
+    "title": "Mission details",
+    "posts": "Posts",
+    "slotLabel": "Slot {{n}}",
+    "open": "Open post",
+    "checkin": "Arrived {{time}}",
+    "checkout": "Left {{time}}",
+    "incidents_one": "{{count}} incident reported",
+    "incidents_other": "{{count}} incidents reported",
+    "paymentTitle": "Payment",
+    "payment": { "PAID": "Paid", "PENDING": "Transfer declared, awaiting receipt", "PROCESSING": "Payment processing", "AUTHORIZED": "Payment authorised", "FAILED": "Payment declined", "REFUNDED": "Refunded", "none": "Not paid" },
+    "total": "Total incl. VAT",
+    "timesNote": "Paris time",
+    "errorTitle": "Could not load",
+    "errorBody": "Check your connection and try again.",
+    "retry": "Retry"
+  },
+  "contractsList": {
+    "title": "Employment contracts",
+    "subtitle": "Employer-signed on assignment",
+    "retry": "Retry",
+    "empty": { "title": "No contracts", "body": "A contract is created as soon as you assign an agent to a post." },
+    "error": { "title": "Could not load", "body": "Check your connection and try again." },
+    "agentSigned": "Signed by the agent",
+    "awaitingAgent": "Awaiting the agent's signature",
+    "dpae": "DPAE",
+    "unknownAgent": "Agent"
+  },
   "funding": {
     "title": "Funding",
     "calculating": "Calculating quote…",
     "funded": "Mission funded",
+    "expired": { "title": "Quote expired", "body": "This quote is no longer valid. Recalculate it for an up-to-date price, then accept it.", "action": "Recalculate the quote" },
+    "pending": { "title": "Transfer declared", "body": "Your payment is awaiting receipt. The mission will be published to agents as soon as Provalk confirms it.", "invoice": "Invoice" },
     "actions": {
       "accept": "Accept quote",
       "declare": "Declare payment",
@@ -832,6 +904,7 @@ const partner: PartnerNS = {
       "totalTTC": "Total incl. VAT",
       "vat": "VAT",
       "agentSalary": "Agent payroll",
+      "base": "Security service",
       "platformMargin": "Platform margin",
       "fixedCharges": "Fixed charges",
       "surcharges": {
@@ -846,7 +919,7 @@ const partner: PartnerNS = {
     },
     "payment": {
       "method": "Payment method",
-      "notice": "Make the transfer using the details below. The mission will be published as soon as the funds are received.",
+      "notice": "Bank details and the reference appear once you declare the payment. The mission is published as soon as the payment is received.",
       "VIREMENT": "Bank transfer",
       "CHEQUE": "Cheque"
     },

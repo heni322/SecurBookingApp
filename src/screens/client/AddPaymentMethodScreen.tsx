@@ -119,9 +119,9 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
       <View style={s.screen}>
         <ScreenHeader title={t('add.header_add')} onBack={() => navigation.goBack()} />
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.pickTitle}>Choisissez un type</Text>
+          <Text style={s.pickTitle}>{t('add.pick_title')}</Text>
           <Text style={s.pickSub}>{t('add.pick_sub')}</Text>
-          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('card')} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel="Carte bancaire" accessibilityHint="Visa, Mastercard, CB, AMEX">
+          <TouchableOpacity style={s.pickCard} onPress={() => handlePickType('card')} activeOpacity={0.82} accessibilityRole="button" accessibilityLabel={t('add.card_label')} accessibilityHint="Visa, Mastercard, CB, AMEX">
             <View style={[s.pickIcon, { backgroundColor: colors.primarySurface }]}>
               <CreditCard size={24} color={colors.primary} strokeWidth={1.8} />
             </View>
@@ -193,8 +193,8 @@ export const AddPaymentMethodScreen: React.FC<Props> = ({ navigation }) => {
                 maxLength={42}
                 selectionColor={colors.primary}
               />
-              {iban.length > 0 && !ibanValid && <Text style={s.ibanErr}>Format IBAN invalide</Text>}
-              {ibanValid && <View style={s.ibanOkRow}><CheckCircle2 size={13} color={colors.success} strokeWidth={2} /><Text style={s.ibanOkText}>IBAN valide</Text></View>}
+              {iban.length > 0 && !ibanValid && <Text style={s.ibanErr}>{t('add.iban_invalid')}</Text>}
+              {ibanValid && <View style={s.ibanOkRow}><CheckCircle2 size={13} color={colors.success} strokeWidth={2} /><Text style={s.ibanOkText}>{t('add.iban_valid')}</Text></View>}
               <View style={s.mandate}>
                 <Info size={13} color={colors.primary} strokeWidth={2} />
                 <Text style={s.mandateText}>{t('add.mandate_text')}</Text>
